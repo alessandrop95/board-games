@@ -260,6 +260,10 @@ table.sc .small { font-size: 12px; color: var(--muted); display: block; }
 .stamp { position: fixed; left: 50%; top: 40%; z-index: 50; pointer-events: none; transform: translate(-50%, -50%); font-family: var(--f-disp); font-weight: 700; font-size: clamp(32px, 9vw, 58px); color: var(--gold); text-shadow: 0 0 28px rgba(230, 194, 120, .7), 0 3px 0 #000; animation: stamp 1.4s ease-out forwards; white-space: nowrap; }
 @keyframes stamp { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition: none !important; } }
+@media (max-width: 440px) {
+  .tv-top .brand { display: none; }
+  .tv-top .iconbtn { padding: 4px 10px; font-size: 12px; letter-spacing: .02em; }
+}
 
 </style>
 </head>
