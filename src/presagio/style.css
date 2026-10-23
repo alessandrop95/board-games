@@ -61,7 +61,7 @@ input.field.code { font-family: var(--f-label); font-weight: 700; letter-spacing
 .hero h1 { font-family: var(--f-disp); font-weight: 700; font-size: clamp(46px, 13vw, 88px); line-height: .95; letter-spacing: .02em;
   background: linear-gradient(180deg, #fff7df, #e6c278 55%, #9f7430); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 22px rgba(230, 194, 120, .35)); }
 .hero .tag { font-size: 19px; color: #e4dcf5; max-width: 40ch; margin: 0; }
-.hero .credit { font-size: 12px; color: #8e88ab; font-family: var(--f-label); letter-spacing: .06em; }
+.hero .credit { font-size: 14px; font-style: italic; color: #cfc6ee; opacity: .85; text-shadow: 0 1px 6px #000, 0 0 2px #000; }
 .fan { position: relative; height: 170px; }
 .fan .card { position: absolute; left: 50%; top: 6px; --cw: 100px; transform-origin: 50% 140%; }
 @media (min-width: 760px) { .hero { grid-template-columns: 1.3fr 1fr; min-height: 340px; } .fan { height: 220px; } .fan .card { --cw: 124px; } }
