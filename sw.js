@@ -1,6 +1,6 @@
 /* Service worker di Board Games: le pagine si caricano dalla rete (così gli aggiornamenti arrivano subito)
    e, se la rete manca, dalla copia salvata. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v7';
+var CACHE = 'board-games-v8';
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',
   './presagio/', './presagio/manifest.webmanifest', './presagio/icon-192.png',
@@ -20,6 +20,7 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
   var fonts = url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com';
   if (url.origin !== location.origin && !fonts) return;
+  if (/\.(mp3|ogg|oga|wav)$/.test(url.pathname)) return; // audio: lo gestisce il browser (richieste a pezzi)
   if (req.mode === 'navigate') {
     // pagina: rete prima, copia salvata se offline (ignorando ?t=CODICE)
     e.respondWith(fetch(req).then(function (res) {

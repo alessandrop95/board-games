@@ -255,7 +255,7 @@ window.addEventListener('resize', function () { if (TV.mounted()) TV.update(App.
 function lobbyHTML() {
   var fan = [cardHTML(52), cardHTML(12), cardHTML(56)].map(function (h, i) { return h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 12) + 'deg) translateX(' + ((i - 1) * 20) + 'px)" class="card'); }).join('');
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
-  return '<div class="wrap lobby"><a class="back-link" href="../">← Tutti i giochi</a>' + curTableHTML() +
+  return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
     '<section class="hero"><div style="display:grid;gap:10px"><h1>Presagio</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: incisioni di Gustave Doré e di antichi atlanti celesti, di pubblico dominio</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
@@ -275,7 +275,7 @@ function roomHTML() {
   }
   var noEven = !!(d.opts && d.opts.noEven), hidden = !!(d.opts && d.opts.hidden);
   var rounds = n >= 3 ? 60 / Math.max(3, Math.min(6, n)) : 20;
-  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
@@ -375,7 +375,7 @@ var RULES = '<p>Si gioca con 60 carte: quattro casate (Fiamme, Maree, Foreste, S
   '<h3>Previsioni coperte (opzione del tavolo)</h3><p>Ognuno dichiara a turno ma il numero resta nascosto agli altri: si vede solo chi ha già previsto e quante prese ha fatto. A fine mano si scoprono tutte le previsioni e si contano i punti.</p>' +
   '<h3>Le prese</h3><ul><li>Apre chi siede dopo il mazziere; poi apre chi ha vinto l’ultima presa.</li><li>Bisogna rispondere al colore di chi apre, se lo si ha. Arcimaghi e Giullari si possono giocare sempre.</li><li>Se si apre con un Arcimago, gli altri giocano quello che vogliono. Se si apre con un Giullare, il colore lo decide la prima carta numerata.</li><li>Vince il primo Arcimago; altrimenti la briscola più alta; altrimenti la carta più alta del colore di uscita. Se tutti giocano Giullari, vince il primo.</li></ul>' +
   '<h3>Punti</h3><ul><li>Previsione esatta: 20 punti più 10 per ogni presa.</li><li>Previsione sbagliata: −10 per ogni presa di differenza.</li></ul>' +
-  '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p>' +
+  '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p><h3>Musica</h3><p>«Fireflies and Stardust» ed «Enchanted Valley» di Kevin MacLeod (incompetech.com), licenza CC BY 3.0. Gli effetti sonori sono sintetizzati.</p>' +
   '<h3>Giocare online</h3><p>Chi apre il tavolo è l’host: il suo telefono tiene la partita e muove i giocatori automatici. Se si disconnette, gli altri possono prendere il comando dopo qualche secondo. Le partite passano da un server pubblico gratuito: usa un soprannome.</p>';
 
 /* ---------- eventi ---------- */

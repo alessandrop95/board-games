@@ -38,22 +38,22 @@ def page(title, desc, theme, fonts, css, js, short):
 </html>
 '''
 
-net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js')
+net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js') + '\n' + r('src', 'shared', 'audio.js')
 
 pp = 'src/polvere-e-piombo/'
 pp_css = 'html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}\n' + r(pp, 'style.css')
-pp_js = "window.GAME_PREFIX = 'polvere-piombo/v1/';\n" + '\n'.join(r(pp, f) for f in ['data.js', 'engine.js', 'bot.js', 'cards.js', 'fx.js']) + '\n' + net + '\n' + r(pp, 'ui.js')
+pp_js = "window.GAME_PREFIX = 'polvere-piombo/v1/';\n" + '\n'.join(r(pp, f) for f in ['data.js', 'engine.js', 'bot.js', 'cards.js', 'fx.js']) + '\n' + net + '\n' + r(pp, 'sound.js') + '\n' + r(pp, 'ui.js')
 open(os.path.join(ROOT, 'polvere-e-piombo', 'index.html'), 'w', encoding='utf-8').write(page(
     'Polvere &amp; Piombo', 'Gioco di carte western a ruoli segreti, da 4 a 7 giocatori, ognuno dal proprio telefono.', '#1d140e',
     'family=Courier+Prime:wght@400;700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Rye', pp_css, pp_js, 'Polvere&amp;Piombo'))
 
 pr = 'src/presagio/'
-pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'ui.js'])
+pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
 open(os.path.join(ROOT, 'presagio', 'index.html'), 'w', encoding='utf-8').write(page(
     'Presagio', 'Gioco di carte a prese con previsione, da 3 a 6 giocatori, ognuno dal proprio telefono.', '#06050d',
     'family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:wght@500;600;700', r(pr, 'style.css'), pr_js, 'Presagio'))
 gm = 'src/gattomina/'
-gm_js = "window.GAME_PREFIX = 'gattomina/v1/';\n" + net + '\n' + '\n'.join(r(gm, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'ui.js'])
+gm_js = "window.GAME_PREFIX = 'gattomina/v1/';\n" + net + '\n' + '\n'.join(r(gm, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
 open(os.path.join(ROOT, 'gattomina', 'index.html'), 'w', encoding='utf-8').write(page(
     'Gattomina', 'Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori, ognuno dal proprio telefono.', '#2a1446',
     'family=Fredoka:wght@400;500;600;700&family=Luckiest+Guy', r(gm, 'style.css'), gm_js, 'Gattomina'))

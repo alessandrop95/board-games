@@ -302,7 +302,7 @@ function lobbyHTML() {
   var fanItems = [ { h: backHTML() }, { h: charCardHTML('maggie') }, { h: typeCardHTML('sparo') } ];
   fanItems.forEach(function (f, i) { fan += f.h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 22) + 'px)" class="card'); });
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b class="mono">' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
-  return '<div class="wrap lobby"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' + curTableHTML() +
+  return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
     '<section class="hero"><div style="display:grid;gap:10px"><h1>Polvere <span class="amp">&amp;</span> Piombo</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: disegni e dipinti di Frederic Remington e stampe western dell’Ottocento, di pubblico dominio</p></div>' +
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
@@ -327,7 +327,7 @@ function roomHTML() {
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
   var n = d.seats.length;
-  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' +
     '<section class="panel"><span class="lead">Codice del tavolo</span><div class="row"><span class="codebig">' + esc(d.code) + '</span></div>' +
     '<div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
@@ -408,7 +408,7 @@ function tableHTML() {
   }
   var alive = g.players.filter(function (P) { return P.alive; }).length;
   return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info"><b>' + connInfo(alive + ' in vita') + '</b><span>' + esc(d.code) + '</span></span>' +
-    '<button class="iconbtn" data-act="log">Registro</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
+    Sound.buttonHTML() + '<button class="iconbtn" data-act="log">Registro</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
     '<main class="wrap board">' + hostBanner() + Chat.dockHTML('position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:15;margin:0') +
     '<div class="sec-title">Al saloon, in ordine di turno</div><div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
     '<section class="felt"><div class="pile deck">' + backHTML() + '<span>' + g.deck.length + ' nel mazzo</span></div><div class="pile disc">' + disc + '<span>scarti</span></div>' +
@@ -657,7 +657,8 @@ var CREDITS = ['Frederic Remington (1861–1909): illustrazioni per Wolfville di
   'Rufus F. Zogbaum, Painting the Town Red (Harper’s Weekly, 1886) · Cattle Raid on the Texas Border e Slaughtered for the Hide (Harper’s Weekly, 1874) · Mary L. Stone, Interior of a Country Store (1872).',
   'Charles M. Russell, cowgirl su un cavallo imbizzarrito · Charles Dana Gibson (1902) · cartoline americane d’inizio Novecento (Take Care!, I’ll Catch You!, A Bunco Game) · fotografia di cowgirl, circa 1900.',
   'Alhambra Saloon, Tombstone (1880) · pubblicità d’epoca: Elliot’s New Repeaters (1864), casseforti Julius Ochs (1870), Winchester (1898) · revolver Colt (1878) · fucile Sharps · Explosion au Mont-Valérien (1873).',
-  'Tutte di pubblico dominio, da Wikimedia Commons. Ritagliate e virate leggermente in seppia, senza alterarne il disegno.'];
+  'Tutte di pubblico dominio, da Wikimedia Commons. Ritagliate e virate leggermente in seppia, senza alterarne il disegno.',
+  'Musica: «Western Streets» di Kevin MacLeod (incompetech.com, licenza CC BY 3.0) e «Maple Leaf Rag» suonata da Scott Joplin (rullo per pianola del 1916, pubblico dominio). Suoni: spari ed esplosione di pubblico dominio da Wikimedia Commons, nitrito di Hü (pubblico dominio); gli altri effetti sono sintetizzati.'];
 
 /* ---------- avvio ---------- */
 (function boot() {

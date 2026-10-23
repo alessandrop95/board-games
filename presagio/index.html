@@ -1120,6 +1120,7 @@ var Chat = (function () {
     if (Net.tableCode !== code) { code = Net.tableCode; unread = 0; }
     paintDock(!fromLog && m.uid !== Net.uid);
     if (isOpen) { paintList(); return; }
+    if (!fromLog && m.uid !== Net.uid && window.Sound) Sound.play('chat');
     if (!fromLog && m.uid !== Net.uid && !pinned) { unread++; paintBadges(); bubble(m); }
   });
   document.addEventListener('click', function (e) {
@@ -1131,6 +1132,184 @@ var Chat = (function () {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) close(); });
   function reset() { close(); hideBubble(); unread = 0; code = Net.tableCode; paintBadges(); paintDock(false); }
   return { badgeHTML: badgeHTML, dockHTML: dockHTML, isPinned: function () { return pinned; }, open: open, close: close, reset: reset, isOpen: function () { return isOpen; } };
+})();
+
+/* ===== Suoni e musica (condiviso) =====
+   Musica di sottofondo da file (licenze libere), effetti in parte registrati e in parte sintetizzati con Web Audio.
+   Le preferenze (musica / effetti) valgono per questo telefono. Il suono parte solo dopo il primo tocco (regole dei browser). */
+var Sound = (function () {
+  var ctx = null, master = null, sfxBus = null, musicBus = null, buffers = {}, loading = {}, cfg = { tracks: [], samples: {}, synth: {}, musicVol: .32 };
+  var musicOn = read('bg-music', true), sfxOn = read('bg-sfx', true), unlocked = false, wantMusic = false;
+  var audioEl = null, trackIdx = 0, lastPlay = {};
+  function read(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v === '1'; } catch (e) { return d; } }
+  function write(k, v) { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) {} }
+
+  function ensure() {
+    if (ctx) return ctx;
+    var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = .9;
+    var comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+    master.connect(comp); comp.connect(ctx.destination);
+    sfxBus = ctx.createGain(); sfxBus.gain.value = sfxOn ? 1 : 0; sfxBus.connect(master);
+    return ctx;
+  }
+  function unlock() {
+    if (unlocked) return; unlocked = true;
+    ensure(); if (ctx && ctx.state === 'suspended') ctx.resume();
+    Object.keys(cfg.samples).forEach(load);
+    if (musicOn && wantMusic) startMusic();
+  }
+  ['pointerdown', 'keydown', 'touchend'].forEach(function (ev) { document.addEventListener(ev, unlock, { capture: true, passive: true }); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (audioEl) audioEl.pause(); if (ctx && ctx.state === 'running') ctx.suspend(); }
+    else { if (ctx && unlocked) ctx.resume(); if (audioEl && musicOn && wantMusic && unlocked) audioEl.play().catch(function () {}); }
+  });
+
+  /* ---------- campioni registrati ---------- */
+  function load(name) {
+    if (buffers[name] || loading[name] || !ensure()) return;
+    var s = cfg.samples[name]; loading[name] = true;
+    fetch(s.url).then(function (r) { return r.arrayBuffer(); }).then(function (a) {
+      return new Promise(function (ok, ko) { ctx.decodeAudioData(a, ok, ko); });
+    }).then(function (b) { buffers[name] = b; }).catch(function () { loading[name] = false; });
+  }
+  function sample(name, o) {
+    o = o || {}; var b = buffers[name], s = cfg.samples[name];
+    if (!b) { load(name); return false; }
+    var src = ctx.createBufferSource(); src.buffer = b;
+    src.playbackRate.value = (o.rate || 1) * (1 + (o.vary == null ? .06 : o.vary) * (Math.random() * 2 - 1));
+    var g = ctx.createGain(); g.gain.value = (s.vol || 1) * (o.vol || 1);
+    src.connect(g); g.connect(sfxBus);
+    var off = s.start || 0, dur = o.dur || s.dur;
+    src.start(ctx.currentTime + (o.at || 0), off, dur);
+    if (dur) { g.gain.setValueAtTime(g.gain.value, ctx.currentTime + (o.at || 0) + dur * .8); g.gain.linearRampToValueAtTime(0, ctx.currentTime + (o.at || 0) + dur); }
+    return true;
+  }
+
+  /* ---------- piccolo sintetizzatore ---------- */
+  var noiseBuf = null;
+  function noise() {
+    if (noiseBuf) return noiseBuf;
+    var n = ctx.sampleRate * 2; noiseBuf = ctx.createBuffer(1, n, ctx.sampleRate);
+    var d = noiseBuf.getChannelData(0); for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  function env(g, t, a, d, peak, sus) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(Math.max(.0001, sus || .0001), t + a + d); }
+  // tono: f frequenza (o [da, a]), type, dur, vol, at, a(ttacco)
+  function tone(o) {
+    var t = ctx.currentTime + (o.at || 0), osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = o.type || 'sine';
+    var f = o.f instanceof Array ? o.f : [o.f, o.f];
+    osc.frequency.setValueAtTime(f[0], t); if (f[1] !== f[0]) osc.frequency.exponentialRampToValueAtTime(f[1], t + (o.slide || o.dur || .2));
+    if (o.detune) osc.detune.value = o.detune;
+    env(g, t, o.a || .005, o.dur || .2, o.vol || .3);
+    var out = g;
+    if (o.lp) { var fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = o.lp; g.connect(fl); out = fl; }
+    osc.connect(g); out.connect(sfxBus);
+    osc.start(t); osc.stop(t + (o.a || .005) + (o.dur || .2) + .05);
+  }
+  // rumore filtrato: tipo filtro, frequenza (o [da, a]), q, dur, vol
+  function hiss(o) {
+    var t = ctx.currentTime + (o.at || 0), src = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noise(); src.loop = true;
+    fl.type = o.ft || 'bandpass'; fl.Q.value = o.q || 1;
+    var f = o.f instanceof Array ? o.f : [o.f || 2000, o.f || 2000];
+    fl.frequency.setValueAtTime(f[0], t); fl.frequency.exponentialRampToValueAtTime(f[1], t + (o.dur || .2));
+    env(g, t, o.a || .005, o.dur || .2, o.vol || .3);
+    src.connect(fl); fl.connect(g); g.connect(sfxBus);
+    src.start(t, Math.random()); src.stop(t + (o.a || .005) + (o.dur || .2) + .05);
+  }
+  // campanella: parziali inarmonici (vetro, cristallo, campana)
+  function bell(o) {
+    var parts = o.parts || [1, 2.76, 5.4, 8.93];
+    parts.forEach(function (m, i) { tone({ f: o.f * m, type: 'sine', dur: (o.dur || 1.2) / (1 + i * .7), vol: (o.vol || .2) / (1 + i * 1.3), at: o.at, a: .002 }); });
+  }
+  function arp(notes, o) { o = o || {}; notes.forEach(function (n, i) { (o.bell ? bell : tone)({ f: n, type: o.type || 'triangle', dur: o.dur || .35, vol: o.vol || .18, at: (o.at || 0) + i * (o.step || .08), parts: o.parts }); }); }
+  var N = {}; (function () { var names = ['C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B']; for (var o = 2; o <= 7; o++) names.forEach(function (n, i) { N[n + o] = 440 * Math.pow(2, (o - 4) + (i - 9) / 12); }); })();
+
+  // effetti comuni a tutti i giochi
+  var BASE = {
+    tap: function () { tone({ f: [900, 600], type: 'triangle', dur: .05, vol: .12 }); },
+    card: function () { hiss({ f: [5200, 2400], q: .8, dur: .09, vol: .28 }); tone({ f: [180, 120], type: 'sine', dur: .05, vol: .12, at: .04 }); },
+    deal: function () { for (var i = 0; i < 6; i++) hiss({ f: [6000, 3000], q: .9, dur: .06, vol: .2, at: i * .07 }); },
+    swoosh: function () { hiss({ f: [800, 4800], ft: 'bandpass', q: 1.2, a: .08, dur: .28, vol: .22 }); },
+    shuffle: function () { for (var i = 0; i < 14; i++) hiss({ f: [4500, 2500], q: 1.4, dur: .04, vol: .12 + Math.random() * .08, at: i * .045 + Math.random() * .01 }); },
+    turn: function () { arp([N.E5, N.A5], { bell: true, vol: .16, step: .12, dur: .9 }); },
+    chat: function () { tone({ f: N.A5, type: 'sine', dur: .12, vol: .12 }); tone({ f: N.E6, type: 'sine', dur: .2, vol: .1, at: .08 }); },
+    error: function () { tone({ f: [220, 180], type: 'square', dur: .14, vol: .07, lp: 1200 }); },
+    win: function () { arp([N.C5, N.E5, N.G5, N.C6], { type: 'triangle', step: .12, dur: .5, vol: .2 }); arp([N.C6, N.E6, N.G6], { bell: true, at: .5, step: .06, vol: .12, dur: 1.4 }); },
+    lose: function () { arp([N.G4, N.Ds4, N.C4], { type: 'triangle', step: .22, dur: .6, vol: .18 }); }
+  };
+  function play(name, o) {
+    if (!sfxOn || !unlocked || !ensure() || ctx.state !== 'running') return;
+    var now = performance.now(); if (lastPlay[name] && now - lastPlay[name] < 45) return; lastPlay[name] = now; // niente raffiche identiche
+    try {
+      var f = cfg.synth[name] || BASE[name];
+      if (f) f(o || {}, api);
+      else if (cfg.samples[name]) sample(name, o);
+    } catch (e) {}
+  }
+
+  /* ---------- musica ---------- */
+  function startMusic() {
+    if (!cfg.tracks.length) return;
+    if (!audioEl) {
+      audioEl = new Audio(); audioEl.preload = 'auto'; audioEl.volume = cfg.musicVol;
+      audioEl.addEventListener('ended', function () { trackIdx = (trackIdx + 1) % cfg.tracks.length; audioEl.src = cfg.tracks[trackIdx]; audioEl.play().catch(function () {}); });
+      trackIdx = Math.floor(Math.random() * cfg.tracks.length); audioEl.src = cfg.tracks[trackIdx];
+    }
+    fadeTo(cfg.musicVol);
+    audioEl.play().catch(function () {});
+  }
+  var fadeTimer = null;
+  function fadeTo(v, then) {
+    if (!audioEl) return; clearInterval(fadeTimer);
+    fadeTimer = setInterval(function () {
+      var cur = audioEl.volume, step = .03;
+      if (Math.abs(cur - v) <= step) { audioEl.volume = v; clearInterval(fadeTimer); if (then) then(); return; }
+      audioEl.volume = cur + (v > cur ? step : -step);
+    }, 40);
+  }
+  function stopMusic() { if (audioEl) fadeTo(0, function () { audioEl.pause(); }); }
+  function duck(ms) { if (!audioEl || audioEl.paused) return; fadeTo(cfg.musicVol * .35); setTimeout(function () { if (musicOn && wantMusic) fadeTo(cfg.musicVol); }, ms || 1500); }
+
+  function setMusic(v) { musicOn = !!v; write('bg-music', musicOn); if (musicOn && wantMusic && unlocked) startMusic(); else stopMusic(); paint(); }
+  function setSfx(v) { sfxOn = !!v; write('bg-sfx', sfxOn); if (sfxBus) sfxBus.gain.value = sfxOn ? 1 : 0; paint(); if (sfxOn) play('tap'); }
+  // la musica suona solo dentro i giochi (home e tavolo), e si spegne se il gioco lo chiede
+  function scene(on) { wantMusic = !!on; if (wantMusic && musicOn && unlocked) startMusic(); else if (!wantMusic) stopMusic(); }
+
+  var css = '.snd-btn{appearance:none;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.07);color:inherit;border-radius:999px;min-height:36px;min-width:38px;padding:4px 9px;cursor:pointer;display:inline-grid;place-items:center;font-size:17px;line-height:1}' +
+    '.snd-btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
+    '.snd-pop{position:fixed;z-index:75;min-width:230px;padding:10px;border-radius:14px;background:#1d1a2a;color:#f4eefc;box-shadow:0 12px 30px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);display:grid;gap:6px;font:15px/1.3 system-ui,sans-serif}' +
+    '.snd-pop label{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:10px;cursor:pointer}.snd-pop label:hover{background:rgba(255,255,255,.06)}' +
+    '.snd-pop input{width:20px;height:20px;accent-color:#e6c278}.snd-pop small{opacity:.65;font-size:12px;padding:0 6px}';
+  function ensureCss() { if (!document.getElementById('snd-css')) { var s = document.createElement('style'); s.id = 'snd-css'; s.textContent = css; document.head.appendChild(s); } }
+  var ICON_ON = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
+  var ICON_OFF = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
+  function buttonHTML() { ensureCss(); var on = musicOn || sfxOn; return '<button class="snd-btn" data-snd="menu" aria-label="Suoni e musica">' + (on ? ICON_ON : ICON_OFF) + '</button>'; }
+  function paint() {
+    document.querySelectorAll('[data-snd="menu"]').forEach(function (b) { b.innerHTML = musicOn || sfxOn ? ICON_ON : ICON_OFF; });
+    var p = document.querySelector('.snd-pop'); if (p) { p.querySelector('#snd-m').checked = musicOn; p.querySelector('#snd-s').checked = sfxOn; }
+  }
+  function openPop(btn) {
+    var old = document.querySelector('.snd-pop'); if (old) { old.remove(); return; }
+    unlock();
+    var r = btn.getBoundingClientRect(), p = document.createElement('div'); p.className = 'snd-pop';
+    p.innerHTML = '<label><input type="checkbox" id="snd-m"' + (musicOn ? ' checked' : '') + '> Musica di sottofondo</label><label><input type="checkbox" id="snd-s"' + (sfxOn ? ' checked' : '') + '> Effetti sonori</label><small>' + (cfg.credit || '') + '</small>';
+    document.body.appendChild(p);
+    var w = p.offsetWidth; p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px'; p.style.top = (r.bottom + 6) + 'px';
+    p.addEventListener('change', function (e) { if (e.target.id === 'snd-m') setMusic(e.target.checked); if (e.target.id === 'snd-s') setSfx(e.target.checked); });
+    setTimeout(function () { document.addEventListener('click', function off(e) { if (!p.contains(e.target) && !e.target.closest('[data-snd]')) { p.remove(); document.removeEventListener('click', off, true); } }, true); }, 0);
+  }
+  document.addEventListener('click', function (e) { if (e.target.closest('.btn,.iconbtn,.pbtn,.opt,.trow button') && !e.target.closest('[disabled]')) play('tap'); }, true);
+  document.addEventListener('click', function (e) { var b = e.target.closest('[data-snd="menu"]'); if (b) { e.preventDefault(); e.stopPropagation(); openPop(b); } }, true);
+
+  function setup(c) { for (var k in c) cfg[k] = c[k]; if (unlocked) Object.keys(cfg.samples).forEach(load); }
+  var api = { setup: setup, play: play, scene: scene, duck: duck, buttonHTML: buttonHTML, setMusic: setMusic, setSfx: setSfx,
+    tone: function (o) { tone(o); }, hiss: function (o) { hiss(o); }, bell: function (o) { bell(o); }, arp: arp, sample: function (n, o) { return sample(n, o); }, N: N,
+    get music() { return audioEl ? { paused: audioEl.paused, t: audioEl.currentTime, src: audioEl.src.split('/').pop(), vol: audioEl.volume } : null; }, get musicOn() { return musicOn; }, get sfxOn() { return sfxOn; }, get ready() { return unlocked && ctx && ctx.state === 'running'; } };
+  return api;
 })();
 
 /* ===== Presagio: regole (equivalenti al gioco di prese a previsione con Maghi e Giullari) ===== */
@@ -1446,7 +1625,7 @@ var TV = (function () {
   function mount() {
     var root = $id('app');
     root.innerHTML = '<div class="tv" id="tv"><div class="tv-sky"></div>' +
-      '<div class="tv-top"><span class="brand">Presagio</span><span class="info" id="tv-info"></span><button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
+      '<div class="tv-top"><span class="brand">Presagio</span><span class="info" id="tv-info"></span>' + Sound.buttonHTML() + '<button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
       '<div id="tv-banner" class="tv-banner"></div>' + Chat.dockHTML() +
       '<div class="tv-table" id="tv-table"><div class="tv-oval"></div><div class="tv-trump" id="tv-trump"></div><div class="tv-pr" id="tv-pr"></div><div class="tv-msg" id="tv-msg"></div><div class="tv-zone" id="tv-zone"></div><div id="tv-seats"></div></div>' +
       '<div class="tv-status" id="tv-status" aria-live="polite"></div><div class="tv-me" id="tv-me"></div><div class="tv-hand" id="tv-hand" aria-label="La tua mano"></div><div class="tv-actions" id="tv-actions"></div></div>';
@@ -1517,6 +1696,7 @@ var TV = (function () {
     var end = center(el.getBoundingClientRect()), from = st.handRects[c] ? center(st.handRects[c]) : seatPoint(i);
     var dx = from.x - end.x, dy = from.y - end.y, s = slot(i, c);
     st.shown.push({ c: c, p: i, el: el });
+    var CC = PRData.CARDS[c]; Sound.play(CC.k === 'w' ? 'wizard' : CC.k === 'j' ? 'jester' : 'play', { v: CC.v });
     return anim(el, [
       { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (s.r - 25) + 'deg) scale(' + (st.handRects[c] ? 1.1 : .45) + ')', opacity: st.handRects[c] ? 1 : 0 },
       { transform: 'translate(0,0) rotate(' + s.r + 'deg) scale(1.08)', opacity: 1, offset: .82 },
@@ -1547,6 +1727,7 @@ var TV = (function () {
       ], { duration: 480, delay: j * 45, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' }).then(function () { x.el.remove(); });
     }));
     floatAt(to, L.winner === myIdx() ? '+1 presa' : '+1', false);
+    Sound.play(L.winner === myIdx() ? 'mytrick' : 'trick');
   }
   async function runTrick() {
     if (st.running) return; st.running = true;
@@ -1676,17 +1857,18 @@ var TV = (function () {
   function effects(g, me) {
     if (g.flash && g.flash.n > st.flashN) {
       var fl = g.flash; st.flashN = fl.n;
-      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; floatAt(seatPoint(fl.p), fl.p === me ? 'Prevedi ' + P.bid : bidHidden(g, fl.p, me) ? 'Ha previsto ✦' : 'Prevede ' + P.bid, false); }
+      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; Sound.play('bid', { b: bidHidden(g, fl.p, me) ? 3 : P.bid }); floatAt(seatPoint(fl.p), fl.p === me ? 'Prevedi ' + P.bid : bidHidden(g, fl.p, me) ? 'Ha previsto ✦' : 'Prevede ' + P.bid, false); }
     }
     if (g.phase === 'roundEnd' && st.scoredRound !== g.round) {
       st.scoredRound = g.round;
       var wait = 1500;
       if (!st.first && g.opts.hidden) { // si scoprono le previsioni, poi i punti
         wait = 3300;
-        setTimeout(function () { revealBids(g, me); }, 1300);
+        setTimeout(function () { revealBids(g, me); Sound.play('reveal'); }, 1300);
       }
       if (!st.first) setTimeout(function () {
         g.players.forEach(function (P, i) { var h = P.hist[P.hist.length - 1]; if (h) floatAt(seatPoint(i), (h.delta > 0 ? '+' : '') + h.delta, h.delta < 0); });
+        var mh = me >= 0 && g.players[me].hist[g.players[me].hist.length - 1]; if (mh) Sound.play(mh.delta > 0 ? 'plus' : 'minus');
       }, wait);
     }
   }
@@ -1740,6 +1922,9 @@ var TV = (function () {
       $id('tv-me').innerHTML = '<span class="nm">' + esc(P.nick) + (g.dealer === me ? ' · mazziere' : '') + '</span>' + gemsHTML(P) + '<span>' + P.score + ' punti</span>';
     } else $id('tv-me').innerHTML = '';
     renderHand(g, me, dealing && !first);
+    if (dealing && !first) { Sound.play('shuffle'); setTimeout(function () { Sound.play('deal'); if (g.trumpCard != null) Sound.play('trump'); }, 500); }
+    if (!first && g.phase !== 'over' && g.turn === me && E.decider(g) === me && st.turnSeq !== g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0)) { st.turnSeq = g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0); setTimeout(function () { Sound.play('turn'); }, 600); }
+    if (!first && g.phase === 'over' && !st.overSnd) { st.overSnd = true; setTimeout(function () { Sound.play(me >= 0 && g.winner && g.winner.indexOf(me) >= 0 ? 'win' : 'lose'); }, 1800); }
     $id('tv-actions').innerHTML = actionsHTML(g, me, sum);
     if (first) { staticTrick(g); st.flashN = g.flash ? g.flash.n : 0; st.scoredRound = g.phase === 'roundEnd' || g.phase === 'over' ? g.round : 0; }
     else {
@@ -1767,6 +1952,30 @@ var TV = (function () {
   }
 
   return { update: update, unmount: unmount, mounted: mounted };
+})();
+
+/* ===== Presagio: musica e suoni ===== */
+(function () {
+  var S = Sound, N = S.N, PENTA = [N.C5, N.D5, N.E5, N.G5, N.A5, N.C6, N.D6, N.E6, N.G6, N.A6, N.C7, N.D7, N.E7];
+  S.setup({
+    tracks: ['audio/m1.mp3', 'audio/m2.mp3'], musicVol: .3,
+    credit: 'Musica: «Fireflies and Stardust» ed «Enchanted Valley» di Kevin MacLeod (incompetech.com, CC BY 3.0).',
+    synth: {
+      // carta giocata: fruscio più un rintocco di cristallo che sale con il valore
+      play: function (o) { S.play('card'); var v = o.v || 7; S.bell({ f: PENTA[Math.max(0, Math.min(12, v - 1))] / 2, parts: [1, 2.76, 5.4], dur: .9, vol: .1, at: .08 }); },
+      wizard: function () { S.play('card'); S.arp([N.E6, N.G6, N.B6, N.E7, N.G7], { bell: true, parts: [1, 2.76], step: .05, dur: 1, vol: .09 }); S.hiss({ ft: 'highpass', f: [4000, 9000], a: .2, dur: .8, vol: .05 }); },
+      jester: function () { S.play('card'); S.tone({ f: [300, 900], type: 'square', dur: .12, vol: .05, lp: 2500 }); S.tone({ f: [900, 250], type: 'square', dur: .2, vol: .05, lp: 2500, at: .13 }); },
+      trick: function () { S.arp([N.C5, N.E5, N.G5, N.C6, N.E6], { type: 'triangle', step: .055, dur: .5, vol: .1 }); S.bell({ f: N.G6, dur: 1.4, vol: .08, at: .3 }); },
+      mytrick: function () { S.play('trick'); S.arp([N.C6, N.G6], { bell: true, step: .1, at: .35, dur: 1.4, vol: .1 }); },
+      bid: function (o) { S.bell({ f: PENTA[Math.min(12, (o.b || 0) + 2)], dur: 1.1, vol: .13 }); },
+      reveal: function () { S.arp([N.A5, N.C6, N.E6, N.A6], { bell: true, step: .1, dur: 1.2, vol: .1 }); },
+      plus: function () { S.arp([N.E5, N.A5, N.E6], { bell: true, step: .08, dur: 1, vol: .1 }); },
+      minus: function () { S.arp([N.E4, N.C4], { type: 'sine', step: .18, dur: .7, vol: .14 }); },
+      trump: function () { S.hiss({ f: [800, 6000], q: .7, a: .15, dur: .6, vol: .08 }); S.arp([N.D5, N.A5, N.D6], { bell: true, step: .12, at: .2, dur: 1.4, vol: .1 }); },
+      turn: function () { S.arp([N.E6, N.B6], { bell: true, parts: [1, 2.76, 5.4], step: .14, dur: 1.4, vol: .12 }); }
+    }
+  });
+  S.scene(true);
 })();
 
 /* ===== Presagio: interfaccia ===== */
@@ -2026,7 +2235,7 @@ window.addEventListener('resize', function () { if (TV.mounted()) TV.update(App.
 function lobbyHTML() {
   var fan = [cardHTML(52), cardHTML(12), cardHTML(56)].map(function (h, i) { return h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 12) + 'deg) translateX(' + ((i - 1) * 20) + 'px)" class="card'); }).join('');
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
-  return '<div class="wrap lobby"><a class="back-link" href="../">← Tutti i giochi</a>' + curTableHTML() +
+  return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
     '<section class="hero"><div style="display:grid;gap:10px"><h1>Presagio</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: incisioni di Gustave Doré e di antichi atlanti celesti, di pubblico dominio</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
@@ -2046,7 +2255,7 @@ function roomHTML() {
   }
   var noEven = !!(d.opts && d.opts.noEven), hidden = !!(d.opts && d.opts.hidden);
   var rounds = n >= 3 ? 60 / Math.max(3, Math.min(6, n)) : 20;
-  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
@@ -2146,7 +2355,7 @@ var RULES = '<p>Si gioca con 60 carte: quattro casate (Fiamme, Maree, Foreste, S
   '<h3>Previsioni coperte (opzione del tavolo)</h3><p>Ognuno dichiara a turno ma il numero resta nascosto agli altri: si vede solo chi ha già previsto e quante prese ha fatto. A fine mano si scoprono tutte le previsioni e si contano i punti.</p>' +
   '<h3>Le prese</h3><ul><li>Apre chi siede dopo il mazziere; poi apre chi ha vinto l’ultima presa.</li><li>Bisogna rispondere al colore di chi apre, se lo si ha. Arcimaghi e Giullari si possono giocare sempre.</li><li>Se si apre con un Arcimago, gli altri giocano quello che vogliono. Se si apre con un Giullare, il colore lo decide la prima carta numerata.</li><li>Vince il primo Arcimago; altrimenti la briscola più alta; altrimenti la carta più alta del colore di uscita. Se tutti giocano Giullari, vince il primo.</li></ul>' +
   '<h3>Punti</h3><ul><li>Previsione esatta: 20 punti più 10 per ogni presa.</li><li>Previsione sbagliata: −10 per ogni presa di differenza.</li></ul>' +
-  '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p>' +
+  '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p><h3>Musica</h3><p>«Fireflies and Stardust» ed «Enchanted Valley» di Kevin MacLeod (incompetech.com), licenza CC BY 3.0. Gli effetti sonori sono sintetizzati.</p>' +
   '<h3>Giocare online</h3><p>Chi apre il tavolo è l’host: il suo telefono tiene la partita e muove i giocatori automatici. Se si disconnette, gli altri possono prendere il comando dopo qualche secondo. Le partite passano da un server pubblico gratuito: usa un soprannome.</p>';
 
 /* ---------- eventi ---------- */

@@ -14,7 +14,7 @@ var TV = (function () {
   function mount() {
     var root = $id('app');
     root.innerHTML = '<div class="tv" id="tv"><div class="tv-bg"></div>' +
-      '<div class="tv-top"><span class="brand">Gattomina</span><span class="info" id="tv-info"></span><button class="iconbtn" data-act="rules">Regole</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
+      '<div class="tv-top"><span class="brand">Gattomina</span><span class="info" id="tv-info"></span>' + Sound.buttonHTML() + '<button class="iconbtn" data-act="rules">Regole</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
       '<div id="tv-banner"></div>' + Chat.dockHTML() +
       '<div class="tv-table" id="tv-table"><div class="tv-rug"></div><div id="tv-seats"></div>' +
       '<div class="tv-center"><div class="deck" id="tv-deck" data-act="drawtap"></div><div class="disc" id="tv-disc"></div></div>' +
@@ -192,6 +192,7 @@ var TV = (function () {
     return el;
   }
   function boom(p, card) {
+    Sound.play('fuse'); later(1450, function () { Sound.play('boom'); });
     var deck = mid(R($id('tv-deck'))), el = bigCard(card);
     anim(el, [{ transform: 'scale(.3) rotateY(180deg)', filter: 'brightness(.3)' }, { transform: 'scale(1.05) rotateY(0)', filter: 'brightness(1)', offset: .3 }, { transform: 'scale(1) rotate(-3deg)', offset: .45 }, { transform: 'scale(1.06) rotate(3deg)', offset: .6 }, { transform: 'scale(1) rotate(-3deg)', offset: .75 }, { transform: 'scale(1.1) rotate(0)' }], { duration: 1500, easing: 'ease-in-out' }).then(function () {
       var c = mid(R(el)); el.remove();
@@ -204,6 +205,7 @@ var TV = (function () {
     });
   }
   function defuse(p, card, def) {
+    Sound.play('fuse'); later(1500, function () { Sound.play('defuse'); });
     var el = bigCard(card), c = mid(R($id('tv-table')));
     var sparks = add('<img src="' + GMCards.src('2728') + '" alt="">', 'fuse'); sparks.style.left = (c.x + 40) + 'px'; sparks.style.top = (c.y - 90) + 'px';
     anim(el, [{ transform: 'scale(.3) rotateY(180deg)' }, { transform: 'scale(1.05) rotateY(0)', offset: .3 }, { transform: 'scale(1) rotate(-4deg)', offset: .5 }, { transform: 'scale(1.04) rotate(4deg)', offset: .7 }, { transform: 'scale(1)' }], { duration: 1300 }).then(function () {
@@ -252,30 +254,32 @@ var TV = (function () {
     var mine = f.p === me;
     switch (f.kind) {
       case 'play': {
+        Sound.play(f.cards.length > 1 ? 'cats' : 'play');
         var to = playPoint(), pzEl = $id('tv-play'); pzEl.classList.add('incoming'); later(560 + f.cards.length * 80, function () { pzEl.classList.remove('incoming'); });
         f.cards.forEach(function (c, j) { fly(GMCards.html(c), mine ? handPoint(c) : seatPoint(f.p), to, { w: 70, delay: j * 80, o1: 0, s0: mine ? 1 : .4 }); });
         if (f.target != null) later(450, function () { var t = seatPoint(f.target); if (t) floatAt(t, '🎯', 'emoji', 1200); });
         break;
       }
       case 'nope':
+        later(380, function () { Sound.play('nope'); });
         fly(GMCards.html(f.card), mine ? handPoint(f.card) : seatPoint(f.p), playPoint(), { w: 70, o1: 0, s0: mine ? 1 : .4, dur: 420 }).then(function () { stamp('Soffio!', 'red'); shake($id('tv-play')); particles(playPoint(), ['1f4a8', '1f4a2'], 6, 90); });
         break;
-      case 'cancel': { var pz = playPoint(); floatAt(pz, 'Niente da fare!', 'word', 1400); break; }
-      case 'attack': paws(seatPoint(f.p), seatPoint(f.t)); later(700, function () { floatAt(seatPoint(f.t), '×' + f.turns, 'word big', 1700); if (f.t === me) stamp('Agguato!', 'orange'); }); break;
-      case 'skip': floatAt(seatPoint(f.p), '<img src="' + GMCards.src('1f4a4') + '" alt="" style="width:46px">', '', 1800); break;
-      case 'shuffle': shuffleFx(); break;
-      case 'future': if (!mine) floatAt(seatPoint(f.p), '<img src="' + GMCards.src('1f440') + '" alt="" style="width:46px">', '', 1800); break;
-      case 'draw': later(60, function () { fly(mine ? GMCards.html(f.card) : GMCards.back(), deckPoint(), seatPoint(f.p), { w: mine ? 86 : 54, s0: 1, s1: mine ? 1 : .5, o1: mine ? 1 : 0 }); }); break;
-      case 'steal': case 'give': {
+      case 'cancel': { Sound.play('cancel'); var pz = playPoint(); floatAt(pz, 'Niente da fare!', 'word', 1400); break; }
+      case 'attack': Sound.play('attack'); paws(seatPoint(f.p), seatPoint(f.t)); later(700, function () { floatAt(seatPoint(f.t), '×' + f.turns, 'word big', 1700); if (f.t === me) stamp('Agguato!', 'orange'); }); break;
+      case 'skip': Sound.play('skip'); floatAt(seatPoint(f.p), '<img src="' + GMCards.src('1f4a4') + '" alt="" style="width:46px">', '', 1800); break;
+      case 'shuffle': Sound.play('shuffle'); shuffleFx(); break;
+      case 'future': Sound.play('future'); if (!mine) floatAt(seatPoint(f.p), '<img src="' + GMCards.src('1f440') + '" alt="" style="width:46px">', '', 1800); break;
+      case 'draw': Sound.play('draw'); later(60, function () { fly(mine ? GMCards.html(f.card) : GMCards.back(), deckPoint(), seatPoint(f.p), { w: mine ? 86 : 54, s0: 1, s1: mine ? 1 : .5, o1: mine ? 1 : 0 }); }); break;
+      case 'steal': case 'give': { Sound.play('steal');
         var from = f.kind === 'steal' ? f.t : f.p, to2 = f.kind === 'steal' ? f.p : f.t, show = from === me || to2 === me;
         fly(show ? GMCards.html(f.card) : GMCards.back(), seatPoint(from), seatPoint(to2), { w: 64, s1: .8, o1: .2 });
         break;
       }
-      case 'take': fly(GMCards.html(f.card), discPoint(), seatPoint(f.p), { w: 64, s1: .8, o1: .2 }); break;
-      case 'miss': floatAt(seatPoint(f.t), 'Non ce l’ha!', 'word', 1400); break;
+      case 'take': Sound.play('steal'); fly(GMCards.html(f.card), discPoint(), seatPoint(f.p), { w: 64, s1: .8, o1: .2 }); break;
+      case 'miss': Sound.play('miss'); floatAt(seatPoint(f.t), 'Non ce l’ha!', 'word', 1400); break;
       case 'defuse': defuse(f.p, f.card, f.def); break;
       case 'boom': boom(f.p, f.card); break;
-      case 'insert': if (!reduce) fly(GMCards.back(), seatPoint(f.p), deckPoint(), { w: 60, s1: .9, o1: 0 }).then(function () { floatAt(deckPoint(), 'Shhh…', 'word', 1300); }); break;
+      case 'insert': Sound.play('insert'); if (!reduce) fly(GMCards.back(), seatPoint(f.p), deckPoint(), { w: 60, s1: .9, o1: 0 }).then(function () { floatAt(deckPoint(), 'Shhh…', 'word', 1300); }); break;
     }
   }
 
@@ -293,12 +297,13 @@ var TV = (function () {
     $id('tv-actions').innerHTML = actionsHTML(g, me);
     if (st.first) { st.lastFx = g.flash ? g.flash.n : 0; if (g.logN <= 2) later(300, dealFx); }
     else effects(g, me, st.prev);
-    if (g.phase === 'over' && st.prev && st.prev.phase !== 'over') later(1900, function () { confetti(); var w = seatPoint(g.winner); if (w) floatAt(w, '<img src="' + GMCards.src('1f451') + '" alt="" style="width:60px">', '', 2600); });
-    else if (st.prev && g.turn !== st.prev.turn && g.turn === me && g.phase === 'play' && g.players[me].alive) later(500, function () { banner(g.turns > 1 ? 'Tocca a te! ×' + g.turns : 'Tocca a te!'); });
+    if (g.phase === 'over' && st.prev && st.prev.phase !== 'over') later(1900, function () { confetti(); Sound.play(g.winner === me ? 'win' : 'lose'); var w = seatPoint(g.winner); if (w) floatAt(w, '<img src="' + GMCards.src('1f451') + '" alt="" style="width:60px">', '', 2600); });
+    else if (st.prev && g.turn !== st.prev.turn && g.turn === me && g.phase === 'play' && g.players[me].alive) later(500, function () { banner(g.turns > 1 ? 'Tocca a te! ×' + g.turns : 'Tocca a te!'); Sound.play('turn'); });
     st.prev = { turn: g.turn, phase: g.phase };
     st.first = false;
   }
   function dealFx() {
+    Sound.play('shuffle'); setTimeout(function () { Sound.play('deal'); }, 500);
     if (reduce || !App.doc || !App.doc.game) return;
     var g = App.doc.game, me = myIdx(), d = deckPoint(); if (!d) return;
     var k = 0;

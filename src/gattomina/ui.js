@@ -256,7 +256,7 @@ function lobbyHTML() {
   var ids = [CARDS.filter(function (c) { return c.t === 'scatoletta'; })[0].id, CARDS[0].id, CARDS.filter(function (c) { return c.t === 'soffio'; })[0].id];
   var fan = ids.map(function (id, i) { return GMCards.html(id).replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 24) + 'px)" class="card'); }).join('');
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
-  return '<div class="wrap lobby"><a class="back-link" href="../">← Tutti i giochi</a>' + curTableHTML() +
+  return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
     '<section class="hero"><div style="display:grid;gap:10px"><h1>Gattomina</h1><p class="tag">Pesca una carta alla volta e spera che non sia una Gattomina. L’ultimo che resta intero vince! Da 2 a 5 giocatori, ognuno dal proprio telefono.</p><p class="credit">Grafica: emoji 3D Noto di Google (licenza Apache 2.0)</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
@@ -273,7 +273,7 @@ function roomHTML() {
       ((isHost && s.uid !== Net.uid) || (s.uid === Net.uid && !isHost) ? '<button class="x" data-act="kick" data-uid="' + esc(s.uid) + '" aria-label="Togli ' + esc(s.nick) + '">×</button>' : '') + '</div>';
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
-  return '<div class="topbar"><div class="wrap"><span class="brand">Gattomina</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Gattomina</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 2 a 5 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
@@ -371,7 +371,8 @@ var RULES = '<p>Nel mazzo si nascondono le <b>Gattomine</b>: chi ne pesca una es
   '<h3>I mici</h3><ul><li>Da soli non fanno nulla.</li><li><b>Due uguali</b>: rubi una carta a caso a un giocatore.</li><li><b>Tre uguali</b>: chiedi una carta precisa; se ce l’ha, te la deve dare.</li><li><b>Cinque carte diverse</b>: prendi la carta che vuoi dagli scarti.</li></ul>' +
   '<h3>All’inizio</h3><p>Ognuno riceve 7 carte e 1 Scatoletta. Nel mazzo ci sono tante Gattomine quanti i giocatori meno uno, più le Scatolette avanzate (solo 2 se siete in 2 o 3).</p>' +
   '<h3>Giocare online</h3><p>Chi apre il tavolo è l’host: il suo telefono tiene la partita e muove i giocatori automatici. Se si disconnette, gli altri possono prendere il comando dopo qualche secondo.</p>' +
-  '<h3>Grafica</h3><p>Le illustrazioni sono emoji 3D di Noto Emoji di Google (licenza Apache 2.0), combinate in carte originali.</p>';
+  '<h3>Grafica</h3><p>Le illustrazioni sono emoji 3D di Noto Emoji di Google (licenza Apache 2.0), combinate in carte originali.</p>' +
+  '<h3>Musica e suoni</h3><p>«Monkeys Spinning Monkeys» e «Sneaky Snitch» di Kevin MacLeod (incompetech.com), licenza CC BY 3.0. Miagolii: Dcrosby (CC BY-SA 3.0) e Heismark (pubblico dominio); fusa di jim_mowatt (pubblico dominio); soffio di Zabuhailo (CC0); esplosione di pubblico dominio, tutti da Wikimedia Commons. Gli altri effetti sono sintetizzati.</p>';
 
 /* ---------- eventi ---------- */
 document.addEventListener('click', function (ev) {

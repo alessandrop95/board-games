@@ -116,6 +116,7 @@ var Chat = (function () {
     if (Net.tableCode !== code) { code = Net.tableCode; unread = 0; }
     paintDock(!fromLog && m.uid !== Net.uid);
     if (isOpen) { paintList(); return; }
+    if (!fromLog && m.uid !== Net.uid && window.Sound) Sound.play('chat');
     if (!fromLog && m.uid !== Net.uid && !pinned) { unread++; paintBadges(); bubble(m); }
   });
   document.addEventListener('click', function (e) {

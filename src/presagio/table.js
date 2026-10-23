@@ -16,7 +16,7 @@ var TV = (function () {
   function mount() {
     var root = $id('app');
     root.innerHTML = '<div class="tv" id="tv"><div class="tv-sky"></div>' +
-      '<div class="tv-top"><span class="brand">Presagio</span><span class="info" id="tv-info"></span><button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
+      '<div class="tv-top"><span class="brand">Presagio</span><span class="info" id="tv-info"></span>' + Sound.buttonHTML() + '<button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
       '<div id="tv-banner" class="tv-banner"></div>' + Chat.dockHTML() +
       '<div class="tv-table" id="tv-table"><div class="tv-oval"></div><div class="tv-trump" id="tv-trump"></div><div class="tv-pr" id="tv-pr"></div><div class="tv-msg" id="tv-msg"></div><div class="tv-zone" id="tv-zone"></div><div id="tv-seats"></div></div>' +
       '<div class="tv-status" id="tv-status" aria-live="polite"></div><div class="tv-me" id="tv-me"></div><div class="tv-hand" id="tv-hand" aria-label="La tua mano"></div><div class="tv-actions" id="tv-actions"></div></div>';
@@ -87,6 +87,7 @@ var TV = (function () {
     var end = center(el.getBoundingClientRect()), from = st.handRects[c] ? center(st.handRects[c]) : seatPoint(i);
     var dx = from.x - end.x, dy = from.y - end.y, s = slot(i, c);
     st.shown.push({ c: c, p: i, el: el });
+    var CC = PRData.CARDS[c]; Sound.play(CC.k === 'w' ? 'wizard' : CC.k === 'j' ? 'jester' : 'play', { v: CC.v });
     return anim(el, [
       { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (s.r - 25) + 'deg) scale(' + (st.handRects[c] ? 1.1 : .45) + ')', opacity: st.handRects[c] ? 1 : 0 },
       { transform: 'translate(0,0) rotate(' + s.r + 'deg) scale(1.08)', opacity: 1, offset: .82 },
@@ -117,6 +118,7 @@ var TV = (function () {
       ], { duration: 480, delay: j * 45, easing: 'cubic-bezier(.5,0,.75,0)', fill: 'forwards' }).then(function () { x.el.remove(); });
     }));
     floatAt(to, L.winner === myIdx() ? '+1 presa' : '+1', false);
+    Sound.play(L.winner === myIdx() ? 'mytrick' : 'trick');
   }
   async function runTrick() {
     if (st.running) return; st.running = true;
@@ -246,17 +248,18 @@ var TV = (function () {
   function effects(g, me) {
     if (g.flash && g.flash.n > st.flashN) {
       var fl = g.flash; st.flashN = fl.n;
-      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; floatAt(seatPoint(fl.p), fl.p === me ? 'Prevedi ' + P.bid : bidHidden(g, fl.p, me) ? 'Ha previsto ✦' : 'Prevede ' + P.bid, false); }
+      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; Sound.play('bid', { b: bidHidden(g, fl.p, me) ? 3 : P.bid }); floatAt(seatPoint(fl.p), fl.p === me ? 'Prevedi ' + P.bid : bidHidden(g, fl.p, me) ? 'Ha previsto ✦' : 'Prevede ' + P.bid, false); }
     }
     if (g.phase === 'roundEnd' && st.scoredRound !== g.round) {
       st.scoredRound = g.round;
       var wait = 1500;
       if (!st.first && g.opts.hidden) { // si scoprono le previsioni, poi i punti
         wait = 3300;
-        setTimeout(function () { revealBids(g, me); }, 1300);
+        setTimeout(function () { revealBids(g, me); Sound.play('reveal'); }, 1300);
       }
       if (!st.first) setTimeout(function () {
         g.players.forEach(function (P, i) { var h = P.hist[P.hist.length - 1]; if (h) floatAt(seatPoint(i), (h.delta > 0 ? '+' : '') + h.delta, h.delta < 0); });
+        var mh = me >= 0 && g.players[me].hist[g.players[me].hist.length - 1]; if (mh) Sound.play(mh.delta > 0 ? 'plus' : 'minus');
       }, wait);
     }
   }
@@ -310,6 +313,9 @@ var TV = (function () {
       $id('tv-me').innerHTML = '<span class="nm">' + esc(P.nick) + (g.dealer === me ? ' · mazziere' : '') + '</span>' + gemsHTML(P) + '<span>' + P.score + ' punti</span>';
     } else $id('tv-me').innerHTML = '';
     renderHand(g, me, dealing && !first);
+    if (dealing && !first) { Sound.play('shuffle'); setTimeout(function () { Sound.play('deal'); if (g.trumpCard != null) Sound.play('trump'); }, 500); }
+    if (!first && g.phase !== 'over' && g.turn === me && E.decider(g) === me && st.turnSeq !== g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0)) { st.turnSeq = g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0); setTimeout(function () { Sound.play('turn'); }, 600); }
+    if (!first && g.phase === 'over' && !st.overSnd) { st.overSnd = true; setTimeout(function () { Sound.play(me >= 0 && g.winner && g.winner.indexOf(me) >= 0 ? 'win' : 'lose'); }, 1800); }
     $id('tv-actions').innerHTML = actionsHTML(g, me, sum);
     if (first) { staticTrick(g); st.flashN = g.flash ? g.flash.n : 0; st.scoredRound = g.phase === 'roundEnd' || g.phase === 'over' ? g.round : 0; }
     else {

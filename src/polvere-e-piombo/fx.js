@@ -96,6 +96,7 @@ var FX = (function () {
     var sx = from.x + from.w / 2 - (ex + w / 2), sy = from.y + from.h / 2 - (ey + h / 2), s0 = from.card ? from.w / w : .45, rot = (Math.random() - .5) * 30;
     var mx = sx * .45, my = sy * .45 - Math.min(80, Math.abs(sx) * .25 + 30);
     later(opt.delay || 0, function () {
+      if (!opt.silent) Sound.play('card');
       if (flip) setTimeout(function () { var n = cardGhost(id, true, w); n.style.left = el.style.left; n.style.top = el.style.top; el.replaceWith(n); el = n; anim(el, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 180, easing: 'ease-out' }).then(end); }, reduce ? 0 : 300);
       var a = anim(el, [
         { transform: 'translate(' + sx + 'px,' + sy + 'px) rotate(' + rot + 'deg) scale(' + s0 + ')', opacity: from.card ? 1 : 0 },
@@ -144,11 +145,13 @@ var FX = (function () {
 
   /* ---------- effetti di gioco ---------- */
   function shot(p, t, kind) {
+    Sound.play('shot');
     var a = mid(seatRect(p)), b = mid(seatRect(t));
     if (!a || !b) { stamp('Bang!'); return; }
     tracer(a, b).then(function () { burst(b, 'BANG!'); shakePlate(t, 'shake'); });
   }
   function gatling(p) {
+    Sound.play('gatling');
     var a = mid(seatRect(p)), g = App.doc.game; if (!a) return;
     burst(a, 'RA-TA-TA!');
     var k = 0;
@@ -156,6 +159,7 @@ var FX = (function () {
     later(300, shakeScreen); shells(a, 6);
   }
   function stampede() {
+    Sound.play('stampede');
     stamp('Stampede!', 'small'); shakeScreen();
     if (reduce) return;
     var H = window.innerHeight;
@@ -169,12 +173,14 @@ var FX = (function () {
   }
   var DUEL = '<svg viewBox="0 0 100 100"><g fill="#2b2b2b" stroke="#f3d58a" stroke-width="2.5"><path d="M18 30l46 0 4-4 12 0 0 10-10 0 0 4-30 0-8 20-12 0 6-20-8 0z" transform="rotate(35 50 50)"/><path d="M18 30l46 0 4-4 12 0 0 10-10 0 0 4-30 0-8 20-12 0 6-20-8 0z" transform="scale(-1 1) translate(-100 0) rotate(35 50 50)"/></g></svg>';
   function duel(a, b) {
+    Sound.play('duel');
     var A = mid(seatRect(a)), B = mid(seatRect(b)); stamp('Sfida!', 'small');
     if (!A || !B) return;
     var d = add(DUEL, 'duel-ico'); d.style.left = (A.x + B.x) / 2 + 'px'; d.style.top = (A.y + B.y) / 2 + 'px';
     anim(d, [{ transform: 'scale(.2) rotate(-90deg)', opacity: 0 }, { transform: 'scale(1.15) rotate(8deg)', opacity: 1, offset: .3 }, { transform: 'scale(1) rotate(0)', opacity: 1, offset: .8 }, { transform: 'scale(.8)', opacity: 0 }], { duration: 1500, easing: 'ease-out' }).then(function () { d.remove(); });
   }
   function hit(i, n) {
+    Sound.play(n >= 3 ? 'boom' : 'hit');
     var r = seatRect(i), c = mid(r); if (!c) return;
     if (n >= 3) { burst(c, 'BOOM!'); dustAt(c, 14, 90); shakeScreen(); }
     var s = add(null, 'splat'); s.style.left = (r.x - 10) + 'px'; s.style.top = (r.y - 10) + 'px'; s.style.width = (r.w + 20) + 'px'; s.style.height = (r.h + 20) + 'px';
@@ -182,8 +188,9 @@ var FX = (function () {
     if (reduce) s.remove();
     shakePlate(i, 'shake'); floatText(c, '−' + n, 'neg'); shells({ x: c.x, y: c.y + 10 }, Math.min(n, 3));
   }
-  function heal(i, n) { var c = mid(seatRect(i)); floatText(c, '+' + n, 'ok'); if (c && !reduce) for (var k = 0; k < 6; k++) later(k * 80, function () { floatText({ x: c.x + (Math.random() - .5) * 60, y: c.y + (Math.random() - .5) * 30 }, '✦', 'ok word', 260); }); }
+  function heal(i, n) { Sound.play('heal'); var c = mid(seatRect(i)); floatText(c, '+' + n, 'ok'); if (c && !reduce) for (var k = 0; k < 6; k++) later(k * 80, function () { floatText({ x: c.x + (Math.random() - .5) * 60, y: c.y + (Math.random() - .5) * 30 }, '✦', 'ok word', 260); }); }
   function death(i) {
+    Sound.play('death');
     var r = seatRect(i), c = mid(r); stamp('Eliminato', 'red');
     if (!c) return;
     var t = add(null); t.style.cssText = 'position:fixed;z-index:51;pointer-events:none;width:84px;height:88px;border-radius:5px;background:url(img/tomb.jpg) center/cover;box-shadow:0 8px 18px rgba(0,0,0,.6);left:' + (c.x - 42) + 'px;top:' + (c.y - 44) + 'px';
@@ -191,8 +198,9 @@ var FX = (function () {
     later(850, function () { dustAt({ x: c.x, y: c.y + 40 }, 10, 70); shakeScreen(); });
     if (reduce) t.remove();
   }
-  function dodge(i) { var c = mid(seatRect(i)); shakePlate(i, 'dodge'); floatText(c, 'Mancato!', 'ok word'); }
+  function dodge(i) { Sound.play('ricochet'); var c = mid(seatRect(i)); shakePlate(i, 'dodge'); floatText(c, 'Mancato!', 'ok word'); }
   function reveal(id, cap, good) {
+    Sound.play('check');
     var html = '<div class="cap">' + cap + '</div>';
     var r = add(html, 'reveal'); var g = cardGhost(id, true, 132); g.classList.remove('fx-card'); g.style.position = 'relative'; r.insertBefore(g, r.firstChild);
     if (good != null) r.insertAdjacentHTML('beforeend', '<div class="verdict ' + (good ? 'good' : 'bad') + '">' + (good ? 'Fortuna!' : 'Niente da fare') + '</div>');
@@ -218,6 +226,7 @@ var FX = (function () {
     })(i);
   }
   function deal(g, me) {
+    Sound.play('shuffle'); setTimeout(function () { Sound.play('deal'); }, 600);
     if (reduce) return;
     banner('Si apre il saloon', 'Lo Sceriffo comincia');
     var deck = rects && rects.deck ? rects.deck : R(document.querySelector('.pile.deck .card')); if (!deck) return;
@@ -312,6 +321,7 @@ var FX = (function () {
         else if (t === 'stampede') later(250, stampede);
         else if (t === 'sfida' && top && top.type === 'duel') later(250, function () { duel(top.a, top.b); });
         else if (t === 'giro') floatText(mid(R(document.querySelector('.felt'))), 'Salute!', 'ok word', 260);
+        if (t === 'giro') Sound.play('cheers'); else if (t === 'cassaforte') Sound.play('safe'); else if (t === 'posta') Sound.play('post'); else if (t === 'bottega') Sound.play('shopbell'); else if (t === 'gattabuia') Sound.play('jail');
         else if (t === 'cassaforte' || t === 'posta') floatText(mid(seatRect(f.p)), t === 'posta' ? 'Posta!' : 'Colpo in banca!', 'word', 220);
       }
     }
@@ -329,8 +339,8 @@ var FX = (function () {
       else if (P.hp > o.hp) later(250, function () { heal(i, P.hp - o.hp); });
     });
     // cambio di turno e fine partita
-    if (g.phase === 'over' && prev.phase !== 'over') later(900, function () { stamp(g.winner === 'legge' ? 'Vince la legge!' : g.winner === 'banditi' ? 'Vincono i banditi!' : 'Vince il traditore!', 'small'); confetti(); });
-    else if (g.turn !== prev.turn && g.phase === 'play' && g.turn === me && g.players[me].alive) later(700, function () { banner('Tocca a te!'); });
+    if (g.phase === 'over' && prev.phase !== 'over') later(900, function () { stamp(g.winner === 'legge' ? 'Vince la legge!' : g.winner === 'banditi' ? 'Vincono i banditi!' : 'Vince il traditore!', 'small'); confetti(); Sound.play('win'); });
+    else if (g.turn !== prev.turn && g.phase === 'play' && g.turn === me && g.players[me].alive) later(700, function () { banner('Tocca a te!'); Sound.play('turn'); });
     prev = snapshot(g); rects = null;
   }
   function whoIn(g, text) { var best = -1, len = 0; g.players.forEach(function (P, i) { if (text.indexOf(P.nick) === 0 && P.nick.length > len) { best = i; len = P.nick.length; } }); return best; }
