@@ -167,7 +167,7 @@ async function enterTable(code, nick) {
     var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost;
     if (sig !== App.netSig) { App.netSig = sig; render(); }
   });
-  if (!ok) { App.screen = 'lobby'; App.code = null; render(); lsSet('pp-table', null); throw 'Nessun tavolo con il codice ' + code + '.'; }
+  if (!ok) { App.screen = 'lobby'; App.code = null; lsSet('pp-table', null); Lobby.forget(code); render(); throw 'Il tavolo ' + code + ' non esiste più (è stato chiuso o è scaduto). L’ho tolto dai tuoi tavoli recenti.'; }
   lsSet('pp-table', code); remember(code);
   if (nick) {
     var out = await Net.send({ t: 'join', nick: nick });
@@ -286,17 +286,8 @@ function lobbyHTML() {
     '<div class="row"><button class="btn ghost small" data-act="gallery">Mazzo e personaggi</button><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section>' +
     '</div></div>';
 }
-function renderLobbyList() {
-  var el = $('#tlist'); if (!el) return;
-  var list = []; try { list = JSON.parse(lsGet('pp-recent') || '[]'); } catch (e) {}
-  list = list.filter(function (t) { return t && /^[A-Z]{4}$/.test(t.code) && Date.now() - t.t < 24 * 3600e3; });
-  if (!list.length) { el.innerHTML = '<p class="lead">Apri un tavolo e manda il link ai tuoi amici: si siedono dal loro telefono, senza registrarsi.</p>'; return; }
-  el.innerHTML = list.map(function (t) {
-    var h = Math.round((Date.now() - t.t) / 60000);
-    return '<div class="trow"><span class="code">' + esc(t.code) + '</span><div class="grow muted" style="font-size:13px">' + (h < 60 ? h + ' min fa' : Math.round(h / 60) + ' ore fa') + '</div>' +
-      '<button class="btn small ghost" data-act="jointable" data-code="' + esc(t.code) + '">Rientra</button></div>';
-  }).join('');
-}
+function renderLobbyList() { var el = $('#tlist'); if (el) el.innerHTML = Lobby.recentRows(); }
+Lobby.setRecentKey('pp-recent');
 
 function roomHTML() {
   var d = App.doc, isHost = d.host === Net.uid, seated = d.seats.some(function (s) { return s.uid === Net.uid; });

@@ -120,7 +120,7 @@ async function enterTable(code, nick) {
     if (!doc) { if (App.screen === 'table' && App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () { var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost; if (sig !== App.netSig) { App.netSig = sig; render(); } });
-  if (!ok) { App.screen = 'lobby'; App.code = null; lsSet(KEY_TABLE, null); render(); throw 'Nessun tavolo con il codice ' + code + '.'; }
+  if (!ok) { App.screen = 'lobby'; App.code = null; lsSet(KEY_TABLE, null); Lobby.forget(code); render(); throw 'Il tavolo ' + code + ' non esiste più (è stato chiuso o è scaduto). L’ho tolto dai tuoi tavoli recenti.'; }
   lsSet(KEY_TABLE, code); remember(code);
   if (nick) { var out = await Net.send({ t: 'join', nick: nick }); if (out === 'spect' && myIdx() < 0) toast('La partita è già iniziata: la guardi da spettatore.'); }
   history.replaceState(null, '', location.pathname + '?t=' + code);
@@ -227,14 +227,10 @@ function lobbyHTML() {
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
-    '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:15px;font-family:var(--f-body);margin-top:6px">I tuoi tavoli recenti</h3><div class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div></div>';
+    '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:15px;font-family:var(--f-body);margin-top:6px">I tuoi tavoli recenti</h3><div id="tlist" class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div></div>';
 }
-function recentHTML() {
-  var list = []; try { list = JSON.parse(lsGet(KEY_RECENT) || '[]'); } catch (e) {}
-  list = list.filter(function (t) { return t && /^[A-Z]{4}$/.test(t.code) && Date.now() - t.t < 24 * 3600e3; });
-  if (!list.length) return '<p class="lead">Apri un tavolo e manda il link ai tuoi amici: si siedono dal loro telefono, senza registrarsi.</p>';
-  return list.map(function (t) { var m = Math.round((Date.now() - t.t) / 60000); return '<div class="trow"><span class="code">' + esc(t.code) + '</span><span class="grow muted" style="font-size:14px">' + (m < 60 ? m + ' min fa' : Math.round(m / 60) + ' ore fa') + '</span><button class="btn small ghost" data-act="jointable" data-code="' + esc(t.code) + '">Rientra</button></div>'; }).join('');
-}
+function recentHTML() { return Lobby.recentRows(); }
+Lobby.setRecentKey(KEY_RECENT);
 function roomHTML() {
   var d = App.doc, isHost = d.host === Net.uid, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), n = d.seats.length, seats = '';
   for (var i = 0; i < 6; i++) {

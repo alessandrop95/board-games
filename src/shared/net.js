@@ -302,6 +302,18 @@ var Net = (function () {
     if (!force && sig === T.lobbySig) return;
     if (T.c.publish(lobbyTopic(d.lobbyId), JSON.stringify(e), true)) { T.lobbySig = sig; T.lastAnn = Date.now(); }
   }
+  // Controlla se un tavolo esiste ancora (senza entrarci). Risponde con lo stato o null; lancia un errore se nessun server è raggiungibile.
+  async function peek(code) {
+    var reached = false;
+    for (var i = 0; i < BROKERS.length; i++) {
+      var c; try { c = await client(i); reached = true; } catch (e) { continue; }
+      var doc = await probeState(c, code, 2200);
+      if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
+      if (doc && doc.code === code && !doc.closed) return doc;
+    }
+    if (!reached) throw new Error('offline');
+    return null;
+  }
   // Lista dal vivo dei tavoli di questo gioco. cb(lista) a ogni cambiamento; restituisce la funzione per smettere.
   async function watchLobby(cb) {
     var b = await firstBroker(), c = b.c, base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false;
@@ -402,7 +414,7 @@ var Net = (function () {
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
-    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby,
+    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },

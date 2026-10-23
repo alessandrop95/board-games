@@ -7,8 +7,43 @@ var Lobby = (function () {
   function ensureCss() { if (!document.getElementById('lobby-css')) { var s = document.createElement('style'); s.id = 'lobby-css'; s.textContent = css; document.head.appendChild(s); } }
   function e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
+  /* --- I tuoi tavoli recenti: promemoria locale, verificato sul server --- */
+  var RKEY = 'pp-recent', rstate = {}, checking = false;
+  function rget() { try { var l = JSON.parse(localStorage.getItem(RKEY) || '[]'); return l.filter(function (t) { return t && /^[A-Z]{4}$/.test(t.code) && Date.now() - t.t < 24 * 3600e3; }); } catch (x) { return []; } }
+  function rset(l) { try { localStorage.setItem(RKEY, JSON.stringify(l)); } catch (x) {} }
+  function forget(code) { rset(rget().filter(function (t) { return t.code !== code; })); delete rstate[code]; paintRecent(); }
+  function recentRows() {
+    var l = rget();
+    if (!l.length) return '<p class="lead">Apri un tavolo e manda il link ai tuoi amici: si siedono dal loro telefono, senza registrarsi.</p>';
+    return l.map(function (t) {
+      var s = rstate[t.code], m = Math.round((Date.now() - t.t) / 60000), when = m < 60 ? m + ' min fa' : Math.round(m / 60) + ' ore fa';
+      var info = !s ? 'controllo…' : s.err ? when : (s.doc.phase === 'play' ? 'in partita' : s.doc.phase === 'over' ? 'partita finita' : 'in attesa') + ' · ' + s.doc.seats.length + ' giocatori' + (s.doc.host === Net.uid ? ' · tuo' : '');
+      return '<div class="trow"><span class="code">' + e(t.code) + '</span><span class="grow muted" style="font-size:13px">' + info + '</span>' +
+        '<button class="btn small ghost" data-act="jointable" data-code="' + e(t.code) + '">Rientra</button>' +
+        '<button type="button" data-lobby="forget" data-code="' + e(t.code) + '" aria-label="Togli ' + e(t.code) + ' dalla lista" style="appearance:none;background:none;border:0;color:inherit;opacity:.6;font-size:22px;line-height:1;padding:4px 6px;cursor:pointer">×</button></div>';
+    }).join('');
+  }
+  function paintRecent() { var el = document.getElementById('tlist'); if (el) el.innerHTML = recentRows(); }
+  // Verifica i recenti: quelli che non esistono più (chiusi o scaduti) vengono tolti da soli.
+  async function checkRecent() {
+    if (checking) return; checking = true;
+    try {
+      await Promise.all(rget().map(function (t) {
+        var s = rstate[t.code]; if (s && !s.err && Date.now() - s.at < 60000) return null;
+        return Net.peek(t.code).then(function (doc) {
+          if (!doc) { forget(t.code); return; }
+          rstate[t.code] = { doc: doc, at: Date.now() }; paintRecent();
+        }, function () { rstate[t.code] = { err: true, at: Date.now() }; paintRecent(); });
+      }));
+    } finally { checking = false; }
+  }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-lobby="forget"]'); if (b) forget(b.getAttribute('data-code'));
+  });
+
   function start() {
     ensureCss();
+    checkRecent();
     if (stop || starting) return;
     starting = true; failed = false;
     Net.watchLobby(function (l) { list = l; paint(); }).then(function (s) { starting = false; stop = s; }).catch(function () { starting = false; failed = true; paint(); });
@@ -50,5 +85,6 @@ var Lobby = (function () {
       (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
       '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option></select></label>';
   }
-  return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML };
+  return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
+    setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget };
 })();

@@ -478,6 +478,18 @@ var Net = (function () {
     if (!force && sig === T.lobbySig) return;
     if (T.c.publish(lobbyTopic(d.lobbyId), JSON.stringify(e), true)) { T.lobbySig = sig; T.lastAnn = Date.now(); }
   }
+  // Controlla se un tavolo esiste ancora (senza entrarci). Risponde con lo stato o null; lancia un errore se nessun server è raggiungibile.
+  async function peek(code) {
+    var reached = false;
+    for (var i = 0; i < BROKERS.length; i++) {
+      var c; try { c = await client(i); reached = true; } catch (e) { continue; }
+      var doc = await probeState(c, code, 2200);
+      if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
+      if (doc && doc.code === code && !doc.closed) return doc;
+    }
+    if (!reached) throw new Error('offline');
+    return null;
+  }
   // Lista dal vivo dei tavoli di questo gioco. cb(lista) a ogni cambiamento; restituisce la funzione per smettere.
   async function watchLobby(cb) {
     var b = await firstBroker(), c = b.c, base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false;
@@ -578,7 +590,7 @@ var Net = (function () {
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
-    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby,
+    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },
@@ -725,8 +737,43 @@ var Lobby = (function () {
   function ensureCss() { if (!document.getElementById('lobby-css')) { var s = document.createElement('style'); s.id = 'lobby-css'; s.textContent = css; document.head.appendChild(s); } }
   function e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
+  /* --- I tuoi tavoli recenti: promemoria locale, verificato sul server --- */
+  var RKEY = 'pp-recent', rstate = {}, checking = false;
+  function rget() { try { var l = JSON.parse(localStorage.getItem(RKEY) || '[]'); return l.filter(function (t) { return t && /^[A-Z]{4}$/.test(t.code) && Date.now() - t.t < 24 * 3600e3; }); } catch (x) { return []; } }
+  function rset(l) { try { localStorage.setItem(RKEY, JSON.stringify(l)); } catch (x) {} }
+  function forget(code) { rset(rget().filter(function (t) { return t.code !== code; })); delete rstate[code]; paintRecent(); }
+  function recentRows() {
+    var l = rget();
+    if (!l.length) return '<p class="lead">Apri un tavolo e manda il link ai tuoi amici: si siedono dal loro telefono, senza registrarsi.</p>';
+    return l.map(function (t) {
+      var s = rstate[t.code], m = Math.round((Date.now() - t.t) / 60000), when = m < 60 ? m + ' min fa' : Math.round(m / 60) + ' ore fa';
+      var info = !s ? 'controllo…' : s.err ? when : (s.doc.phase === 'play' ? 'in partita' : s.doc.phase === 'over' ? 'partita finita' : 'in attesa') + ' · ' + s.doc.seats.length + ' giocatori' + (s.doc.host === Net.uid ? ' · tuo' : '');
+      return '<div class="trow"><span class="code">' + e(t.code) + '</span><span class="grow muted" style="font-size:13px">' + info + '</span>' +
+        '<button class="btn small ghost" data-act="jointable" data-code="' + e(t.code) + '">Rientra</button>' +
+        '<button type="button" data-lobby="forget" data-code="' + e(t.code) + '" aria-label="Togli ' + e(t.code) + ' dalla lista" style="appearance:none;background:none;border:0;color:inherit;opacity:.6;font-size:22px;line-height:1;padding:4px 6px;cursor:pointer">×</button></div>';
+    }).join('');
+  }
+  function paintRecent() { var el = document.getElementById('tlist'); if (el) el.innerHTML = recentRows(); }
+  // Verifica i recenti: quelli che non esistono più (chiusi o scaduti) vengono tolti da soli.
+  async function checkRecent() {
+    if (checking) return; checking = true;
+    try {
+      await Promise.all(rget().map(function (t) {
+        var s = rstate[t.code]; if (s && !s.err && Date.now() - s.at < 60000) return null;
+        return Net.peek(t.code).then(function (doc) {
+          if (!doc) { forget(t.code); return; }
+          rstate[t.code] = { doc: doc, at: Date.now() }; paintRecent();
+        }, function () { rstate[t.code] = { err: true, at: Date.now() }; paintRecent(); });
+      }));
+    } finally { checking = false; }
+  }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-lobby="forget"]'); if (b) forget(b.getAttribute('data-code'));
+  });
+
   function start() {
     ensureCss();
+    checkRecent();
     if (stop || starting) return;
     starting = true; failed = false;
     Net.watchLobby(function (l) { list = l; paint(); }).then(function (s) { starting = false; stop = s; }).catch(function () { starting = false; failed = true; paint(); });
@@ -768,7 +815,8 @@ var Lobby = (function () {
       (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
       '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option></select></label>';
   }
-  return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML };
+  return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
+    setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget };
 })();
 
 /* ===== Presagio: regole (equivalenti al gioco di prese a previsione con Maghi e Giullari) ===== */
@@ -1249,7 +1297,7 @@ async function enterTable(code, nick) {
     if (!doc) { if (App.screen === 'table' && App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () { var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost; if (sig !== App.netSig) { App.netSig = sig; render(); } });
-  if (!ok) { App.screen = 'lobby'; App.code = null; lsSet(KEY_TABLE, null); render(); throw 'Nessun tavolo con il codice ' + code + '.'; }
+  if (!ok) { App.screen = 'lobby'; App.code = null; lsSet(KEY_TABLE, null); Lobby.forget(code); render(); throw 'Il tavolo ' + code + ' non esiste più (è stato chiuso o è scaduto). L’ho tolto dai tuoi tavoli recenti.'; }
   lsSet(KEY_TABLE, code); remember(code);
   if (nick) { var out = await Net.send({ t: 'join', nick: nick }); if (out === 'spect' && myIdx() < 0) toast('La partita è già iniziata: la guardi da spettatore.'); }
   history.replaceState(null, '', location.pathname + '?t=' + code);
@@ -1356,14 +1404,10 @@ function lobbyHTML() {
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
-    '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:15px;font-family:var(--f-body);margin-top:6px">I tuoi tavoli recenti</h3><div class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div></div>';
+    '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:15px;font-family:var(--f-body);margin-top:6px">I tuoi tavoli recenti</h3><div id="tlist" class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div></div>';
 }
-function recentHTML() {
-  var list = []; try { list = JSON.parse(lsGet(KEY_RECENT) || '[]'); } catch (e) {}
-  list = list.filter(function (t) { return t && /^[A-Z]{4}$/.test(t.code) && Date.now() - t.t < 24 * 3600e3; });
-  if (!list.length) return '<p class="lead">Apri un tavolo e manda il link ai tuoi amici: si siedono dal loro telefono, senza registrarsi.</p>';
-  return list.map(function (t) { var m = Math.round((Date.now() - t.t) / 60000); return '<div class="trow"><span class="code">' + esc(t.code) + '</span><span class="grow muted" style="font-size:14px">' + (m < 60 ? m + ' min fa' : Math.round(m / 60) + ' ore fa') + '</span><button class="btn small ghost" data-act="jointable" data-code="' + esc(t.code) + '">Rientra</button></div>'; }).join('');
-}
+function recentHTML() { return Lobby.recentRows(); }
+Lobby.setRecentKey(KEY_RECENT);
 function roomHTML() {
   var d = App.doc, isHost = d.host === Net.uid, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), n = d.seats.length, seats = '';
   for (var i = 0; i < 6; i++) {
