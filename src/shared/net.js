@@ -1,12 +1,19 @@
 /* ===== Rete senza account: MQTT su WebSocket verso broker pubblici gratuiti =====
    Modello: il dispositivo "host" del tavolo tiene la verità. Pubblica lo stato completo
-   come messaggio "retained" (chi arriva lo riceve subito); gli altri inviano solo azioni. */
+   come messaggio "retained" (chi arriva lo riceve subito); gli altri inviano solo azioni.
+   Robustezza: controllo continuo che il server risponda, riconnessione immediata quando
+   la pagina torna in primo piano, subentro automatico se l'host sparisce. */
+
+var NETQ = new URLSearchParams(location.search);
+var NET_PING_MS = +(NETQ.get('ping') || 10000);     // ogni quanto si interroga il server
+var NET_DEAD_MS = +(NETQ.get('dead') || 15000);     // silenzio oltre il quale si verifica la connessione
+var NET_PROBE_MS = 5000;                            // attesa della risposta alla verifica
 
 /* ---------- client MQTT 3.1.1 minimo ---------- */
 function MQ(url) {
   this.url = url; this.subs = {}; this.handlers = []; this.statusHandlers = [];
-  this.connected = false; this.closed = false; this.queue = []; this.pid = 1; this.buf = new Uint8Array(0);
-  this.backoff = 800; this.id = 'pp' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-6);
+  this.connected = false; this.closed = false; this.pid = 1; this.buf = new Uint8Array(0);
+  this.backoff = 800; this.lastRx = Date.now(); this.id = 'pp' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-6);
   var self = this;
   this.ready = new Promise(function (res, rej) { self._res = res; self._rej = rej; });
   this._open();
@@ -22,28 +29,52 @@ MQ.packet = function (head, body) {
 };
 MQ.prototype._open = function () {
   var self = this, ws;
-  try { ws = new WebSocket(this.url, ['mqtt']); } catch (e) { this._down(); return; }
+  clearTimeout(this.retryTimer); this.retryTimer = null;
+  try { ws = new WebSocket(this.url, ['mqtt']); } catch (e) { this.ws = null; this._down(); return; }
   ws.binaryType = 'arraybuffer'; this.ws = ws; this.buf = new Uint8Array(0);
-  var t = setTimeout(function () { if (!self.connected) { try { ws.close(); } catch (e) {} } }, 7000);
+  this.openTimer = setTimeout(function () { if (!self.connected && self.ws === ws) self._drop(); }, 7000);
   ws.onopen = function () {
     var body = MQ.str('MQTT').concat([4, 0x02, 0, 45]).concat(MQ.str(self.id));
     ws.send(MQ.packet(0x10, body));
   };
   ws.onmessage = function (ev) {
+    if (self.ws !== ws) return;
+    self.lastRx = Date.now();
     var chunk = new Uint8Array(ev.data), b = new Uint8Array(self.buf.length + chunk.length);
     b.set(self.buf); b.set(chunk, self.buf.length); self.buf = b; self._parse();
   };
-  ws.onclose = function () { clearTimeout(t); if (self.ws === ws) self._down(); };
+  ws.onclose = function () { if (self.ws === ws) { self.ws = null; self._down(); } };
   ws.onerror = function () {};
+};
+// Chiude subito una connessione sospetta (anche se il browser la crede ancora aperta) e riparte.
+MQ.prototype._drop = function () {
+  var ws = this.ws; this.ws = null;
+  if (ws) { ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null; try { ws.close(); } catch (e) {} }
+  this._down();
 };
 MQ.prototype._down = function () {
   var self = this, was = this.connected;
-  this.connected = false; clearInterval(this.pinger);
+  this.connected = false; clearInterval(this.pinger); clearTimeout(this.openTimer); clearTimeout(this.probeTimer); this.probeTimer = null;
   if (was) this.statusHandlers.forEach(function (f) { f(false); });
   if (this.closed) return;
   if (!this.everUp) { this._rej(new Error('broker non raggiungibile')); this.closed = true; return; }
-  setTimeout(function () { if (!self.closed) self._open(); }, this.backoff);
+  if (this.retryTimer) return;
+  this.retryTimer = setTimeout(function () { self.retryTimer = null; if (!self.closed && !self.ws) self._open(); }, this.backoff);
   this.backoff = Math.min(this.backoff * 1.7, 8000);
+};
+// Verifica attiva: manda un ping e, se entro pochi secondi non arriva nulla, considera la connessione morta.
+MQ.prototype.probe = function () {
+  var self = this;
+  if (!this.connected || this.probeTimer) return;
+  var since = Date.now();
+  this._raw(MQ.packet(0xC0, []));
+  this.probeTimer = setTimeout(function () { self.probeTimer = null; if (self.connected && self.lastRx < since) self._drop(); }, NET_PROBE_MS);
+};
+// Da chiamare quando la pagina torna visibile o la rete torna disponibile.
+MQ.prototype.wake = function () {
+  if (this.closed) return;
+  if (this.connected) { this.probe(); return; }
+  if (!this.ws) { this.backoff = 800; this._open(); }
 };
 MQ.prototype._parse = function () {
   var b = this.buf;
@@ -59,11 +90,14 @@ MQ.prototype._parse = function () {
 MQ.prototype._handle = function (h, body) {
   var type = h >> 4, self = this;
   if (type === 2) { // CONNACK
-    if (body[1] !== 0) { try { this.ws.close(); } catch (e) {} return; }
+    if (body[1] !== 0) { this._drop(); return; }
+    clearTimeout(this.openTimer);
     this.connected = true; this.everUp = true; this.backoff = 800;
-    this.pinger = setInterval(function () { self._raw(MQ.packet(0xC0, [])); }, 25000);
+    this.pinger = setInterval(function () {
+      if (Date.now() - self.lastRx > NET_DEAD_MS) self.probe();
+      else self._raw(MQ.packet(0xC0, []));
+    }, NET_PING_MS);
     var topics = Object.keys(this.subs); if (topics.length) this._sub(topics);
-    var q = this.queue; this.queue = []; q.forEach(function (p) { self._raw(p); });
     this._res(this);
     this.statusHandlers.forEach(function (f) { f(true); });
   } else if (type === 3) { // PUBLISH
@@ -85,28 +119,31 @@ MQ.prototype.unsubscribe = function (topic) {
   if (!this.subs[topic]) return; delete this.subs[topic];
   if (this.connected) this._raw(MQ.packet(0xA2, this._nextId().concat(MQ.str(topic))));
 };
+// Niente coda: un messaggio inviato mentre si è scollegati va perso (chi invia riprova da sé),
+// così una mossa vecchia non può arrivare in ritardo dopo che l'app ha detto che non è passata.
 MQ.prototype.publish = function (topic, payload, retain) {
+  if (!this.connected) return false;
   var body = MQ.str(topic).concat(Array.from(MQ.enc.encode(payload)));
-  var pkt = MQ.packet(0x30 | (retain ? 1 : 0), body);
-  if (this.connected && this._raw(pkt)) return;
-  this.queue.push(pkt); if (this.queue.length > 40) this.queue.shift();
+  return this._raw(MQ.packet(0x30 | (retain ? 1 : 0), body));
 };
 MQ.prototype.onMessage = function (f) { this.handlers.push(f); };
 MQ.prototype.onStatus = function (f) { this.statusHandlers.push(f); };
 
 /* ---------- tavolo condiviso ---------- */
 var Net = (function () {
-  var qs = new URLSearchParams(location.search);
+  var qs = NETQ;
   var BROKERS = qs.get('broker') ? [qs.get('broker')] : [
     'wss://broker.hivemq.com:8884/mqtt',
     'wss://broker.emqx.io:8084/mqtt',
     'wss://test.mosquitto.org:8081/mqtt'
   ];
-  var HOST_TIMEOUT = +(qs.get('hostTimeout') || 20000);
+  var HOST_TIMEOUT = +(qs.get('hostTimeout') || 20000);          // dopo quanto mostrare l'avviso
+  var AUTO_TAKEOVER = +(qs.get('autoTakeover') || HOST_TIMEOUT * 1.5); // dopo quanto subentrare da soli
+  var STAGGER = +(qs.get('stagger') || 6000);                     // attesa extra per ogni giocatore prima di me
   var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
   var uid = lsGet('pp-uid');
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); lsSet('pp-uid', uid); }
-  var clients = {}, reducer = null;
+  var clients = {}, reducer = null, beforePublish = null, onTakeover = null;
   var T = null; // sessione del tavolo aperto
 
   function client(i) {
@@ -118,8 +155,17 @@ var Net = (function () {
   }
   function topic(code, t) { return PREFIX + code + '/' + t; }
 
-  // Cerca lo stato "retained" di un tavolo su un broker: risponde con il documento o null.
-  function probe(c, code, ms) {
+  // Ritorno in primo piano o rete di nuovo disponibile: verifica subito la connessione.
+  function wakeAll() {
+    Object.keys(clients).forEach(function (k) { clients[k].wake(); });
+    if (T) { T.lastPing = Math.max(T.lastPing, Date.now() - 2000); T.graceUntil = Date.now() + 8000; }
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wakeAll(); });
+  window.addEventListener('online', wakeAll);
+  window.addEventListener('pageshow', function (e) { if (e.persisted) wakeAll(); });
+  window.addEventListener('focus', wakeAll);
+
+  function probeState(c, code, ms) {
     return new Promise(function (res) {
       var st = topic(code, 'state'), done = false;
       function fin(v) { if (done) return; done = true; c.handlers = c.handlers.filter(function (x) { return x !== h; }); res(v); }
@@ -138,7 +184,7 @@ var Net = (function () {
     var reached = false;
     for (var i = 0; i < BROKERS.length; i++) {
       var c; try { c = await client(i); reached = true; } catch (e) { continue; }
-      var doc = await probe(c, code, 2600);
+      var doc = await probeState(c, code, 2600);
       if (doc && doc.code === code) return { i: i, c: c, doc: doc };
       c.unsubscribe(topic(code, 'state'));
     }
@@ -152,11 +198,11 @@ var Net = (function () {
     var b = await firstBroker();
     for (var k = 0; k < 6; k++) {
       var code = newCode();
-      var ex = await probe(b.c, code, 1200);
+      var ex = await probeState(b.c, code, 1200);
       b.c.unsubscribe(topic(code, 'state'));
       if (ex && ex.code) continue;
       var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: 1, updated: Date.now() };
-      b.c.publish(topic(code, 'state'), JSON.stringify(doc), true);
+      if (!b.c.publish(topic(code, 'state'), JSON.stringify(doc), true)) throw 'La connessione è caduta. Riprova.';
       return code;
     }
     throw 'Non sono riuscito a creare il tavolo. Riprova.';
@@ -168,7 +214,7 @@ var Net = (function () {
     var f = await find(code);
     if (!f) return false;
     var c = f.c;
-    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: true, timers: [] };
+    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], seenRev: 0, graceUntil: 0 };
     var me = T;
     var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping');
     me.handler = function (t, p) {
@@ -176,7 +222,14 @@ var Net = (function () {
       if (t === tState) {
         if (!p) { me.doc = null; onDoc(null); return; }
         var d = safeParse(p); if (!d) return;
-        if (me.doc && (d.rev || 0) <= (me.doc.rev || 0)) return;
+        me.seenRev = Math.max(me.seenRev, d.rev || 0);
+        if (me.doc) {
+          var dr = d.rev || 0, mr = me.doc.rev || 0;
+          // stessa versione ma host diverso (due subentri quasi simultanei): vince l'id più basso
+          var tie = dr === mr && d.host !== me.doc.host && String(d.host) < String(me.doc.host);
+          if (dr < mr || (dr === mr && !tie)) return;
+        }
+        me.lastPing = Date.now();
         accept(d);
       } else if (t === tPing) { me.lastPing = Date.now(); }
       else if (t === tRes) {
@@ -189,16 +242,39 @@ var Net = (function () {
       }
     };
     c.onMessage(me.handler);
-    me.statusFn = function (up) { if (T === me) { me.up = up; if (up) me.lastPing = Date.now(); if (onStatus) onStatus(); } };
+    me.statusFn = function (up) {
+      if (T !== me) return;
+      me.up = up;
+      if (up) {
+        me.lastPing = Date.now(); me.seenRev = 0; me.graceUntil = Date.now() + 8000;
+        // Host appena ricollegato: se nel frattempo nessuno ha pubblicato uno stato più nuovo, ripubblica il proprio.
+        setTimeout(function () {
+          if (T === me && me.isHost && me.up && me.doc && me.seenRev < (me.doc.rev || 0)) me.c.publish(tState, JSON.stringify(me.doc), true);
+        }, 1500);
+      }
+      if (onStatus) onStatus();
+    };
     c.onStatus(me.statusFn);
     c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState);
     accept(f.doc);
     me.timers.push(setInterval(function () {
       if (T !== me) return;
       if (me.isHost) c.publish(tPing, String(Date.now()), false);
+      else maybeTakeOver(me);
       if (onStatus) onStatus();
-    }, 5000));
+    }, Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4))));
     return true;
+  }
+  // Subentro automatico: solo un giocatore seduto, collegato e con la pagina aperta.
+  // Per evitare due subentri insieme, ognuno aspetta in più in base al suo posto.
+  function maybeTakeOver(me) {
+    if (!me.doc || !me.up || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
+    var humans = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== me.doc.host; }).map(function (s) { return s.uid; });
+    var rank = humans.indexOf(uid);
+    if (rank < 0) return;
+    if (Date.now() - me.lastPing < AUTO_TAKEOVER + rank * STAGGER) return;
+    takeHost();
+    if (onTakeover) onTakeover();
   }
   function accept(d) {
     T.doc = d;
@@ -208,6 +284,7 @@ var Net = (function () {
     T.onDoc(JSON.parse(JSON.stringify(d)));
   }
   function publishState() {
+    if (beforePublish) beforePublish(T.doc);
     T.doc.rev = (T.doc.rev || 0) + 1; T.doc.updated = Date.now();
     T.c.publish(topic(T.code, 'state'), JSON.stringify(T.doc), true);
     accept(T.doc);
@@ -234,18 +311,23 @@ var Net = (function () {
     if (T.isHost) { var r = applyLocal(uid, op); return r.err ? Promise.reject(r.err) : Promise.resolve(r.out || null); }
     var id = uid + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), me = T;
     var msg = JSON.stringify({ id: id, from: uid, op: op });
+    if (!me.up) me.c.wake(); else if (Date.now() - me.c.lastRx > 8000) me.c.probe();
     return new Promise(function (res, rej) {
       var tries = 0;
       function fire() {
         if (T !== me) { clearInterval(pd.timer); delete me.pending[id]; rej('Hai lasciato il tavolo.'); return; }
-        if (tries++ >= 4) { clearInterval(pd.timer); delete me.pending[id]; rej('L’host non risponde. Se è uscito, prendi tu il comando dal menu.'); return; }
+        if (tries++ >= 4) {
+          clearInterval(pd.timer); delete me.pending[id];
+          rej(me.up ? 'L’host non risponde. Se è uscito, il comando passa a un altro giocatore tra poco.' : 'Sei offline: la mossa non è partita. Riprova quando torna la connessione.');
+          return;
+        }
         me.c.publish(topic(me.code, 'act'), msg, false);
       }
       var pd = { res: res, rej: rej, timer: setInterval(fire, 3000) };
       me.pending[id] = pd; fire();
     });
   }
-  // Solo sull'host: modifica diretta (bot)
+  // Solo sull'host: modifica diretta (giocatori automatici, timer)
   function hostApply(fn) {
     if (!T || !T.isHost) return false;
     var work = JSON.parse(JSON.stringify(T.doc));
@@ -270,9 +352,12 @@ var Net = (function () {
   return {
     create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable,
     setReducer: function (f) { reducer = f; },
+    setBeforePublish: function (f) { beforePublish = f; },
+    setOnTakeover: function (f) { onTakeover = f; },
     get uid() { return uid; },
     get isHost() { return !!(T && T.isHost); },
     get connected() { return !!(T && T.up); },
-    hostAlive: function () { return !T || T.isHost || Date.now() - T.lastPing < HOST_TIMEOUT; }
+    hostAlive: function () { return !T || T.isHost || Date.now() - T.lastPing < HOST_TIMEOUT; },
+    _debug: function () { return { clients: clients, T: T }; }
   };
 })();

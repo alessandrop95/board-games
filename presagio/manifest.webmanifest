@@ -1,26 +1,39 @@
 {
+ "id": "./",
  "name": "Presagio",
  "short_name": "Presagio",
+ "description": "Gioco di carte a prese con previsione, da 3 a 6 giocatori.",
  "start_url": "./",
+ "scope": "./",
  "display": "standalone",
+ "orientation": "portrait",
  "background_color": "#12142a",
  "theme_color": "#12142a",
  "lang": "it",
  "icons": [
   {
-   "src": "icon.svg",
-   "sizes": "any",
-   "type": "image/svg+xml"
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
   },
   {
    "src": "icon-512.png",
    "sizes": "512x512",
-   "type": "image/png"
+   "type": "image/png",
+   "purpose": "any"
   },
   {
-   "src": "icon-180.png",
-   "sizes": "180x180",
-   "type": "image/png"
+   "src": "icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "icon.svg",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
   }
  ]
 }

@@ -41,7 +41,22 @@ function tableReducer(doc, from, op) {
       var used = doc.seats.map(function (s) { return s.nick; }), nm = BOTNAMES.filter(function (b) { return used.indexOf(b) < 0; })[0] || 'Astro';
       doc.seats.push({ uid: 'bot-' + Math.random().toString(36).slice(2, 8), nick: nm, bot: true }); return {};
     }
-    case 'opt': if (!isHost) return hostOnly; if (doc.phase !== 'lobby') return { changed: false }; doc.opts = { noEven: !!op.noEven }; return {};
+    case 'opt': {
+      if (!isHost) return hostOnly;
+      if (doc.phase !== 'lobby') return { changed: false };
+      doc.opts = doc.opts || {};
+      if (op.noEven != null) doc.opts.noEven = !!op.noEven;
+      if (op.timer != null) doc.opts.timer = Math.max(0, Math.min(600, +op.timer || 0));
+      return {};
+    }
+    case 'back': {
+      var gb = doc.game; if (!gb) return { changed: false };
+      var pb = -1; gb.players.forEach(function (P, k) { if (P.uid === from) pb = k; });
+      if (pb < 0 || !gb.players[pb].bot) return { changed: false };
+      gb.players[pb].bot = false; gb.players[pb].away = false;
+      gb.log.push({ n: ++gb.logN, t: gb.players[pb].nick + ' è tornato al tavolo.', k: 'sys' });
+      return {};
+    }
     case 'start': {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
@@ -57,7 +72,7 @@ function tableReducer(doc, from, op) {
       var p = -1; g.players.forEach(function (P, k) { if (P.uid === from) p = k; });
       if (op.a && op.a.a === 'next' && g.phase === 'roundEnd' && (isHost || p === g.turn)) p = g.turn;
       if (p < 0) return { err: 'Stai solo guardando questa partita.' };
-      if (g.players[p].bot && g.players[p].uid === from) g.players[p].bot = false;
+      if (g.players[p].bot && g.players[p].uid === from) { g.players[p].bot = false; g.players[p].away = false; }
       var err = E.act(g, p, op.a); if (err) return { err: err };
       if (g.phase === 'over') doc.phase = 'over';
       return {};
@@ -66,6 +81,16 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Turns.setup({
+  decider: function (g) { return E.decider(g); },
+  onTimeout: function (cur, d) {
+    var g = cur.game;
+    // a fine mano non si penalizza nessuno: si passa semplicemente alla mano successiva
+    if (g.phase === 'roundEnd') { if (E.act(g, d, { a: 'next' })) return false; return true; }
+    g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true;
+  }
+});
+Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i giocatori automatici.'); render(); });
 
 /* ---------- azioni ---------- */
 async function run(p) { if (App.busy) return; App.busy = true; render(); try { await p(); } catch (e) { toast(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'); } finally { App.busy = false; render(); } }
@@ -152,7 +177,7 @@ function onDoc() {
     if (!key && App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
     if (App.sel != null && myIdx() >= 0 && g.players[myIdx()].hand.indexOf(App.sel) < 0) App.sel = null;
   } else if (App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
-  render(); playFlash(); driveBots();
+  render(); playFlash(); driveBots(); Turns.watch(App.doc);
 }
 function playFlash() {
   var g = App.doc && App.doc.game; if (!g || !g.flash || g.flash.n <= App.lastFlash) return;
@@ -170,7 +195,7 @@ function connInfo(txt) { return Net.connected ? txt : '<span style="color:var(--
 function hostBanner() {
   var d = App.doc; if (!d || Net.isHost || Net.hostAlive()) return '';
   var h = d.seats.filter(function (s) { return s.uid === d.host; })[0];
-  return '<div class="notice red">' + esc(h ? h.nick : 'L’host') + ' non risponde: forse ha chiuso il gioco o ha il telefono in standby. Se non torna, prendi tu il comando per continuare.<div class="row" style="margin-top:8px"><button class="btn small" data-act="takehost">Prendi il comando</button></div></div>';
+  return '<div class="notice red">' + esc(h ? h.nick : 'L’host') + ' non risponde: forse ha chiuso il gioco o ha il telefono in standby. Tra pochi secondi il comando passa da solo a un altro giocatore, oppure prendilo tu adesso.<div class="row" style="margin-top:8px"><button class="btn small" data-act="takehost">Prendi il comando</button></div></div>';
 }
 function render() {
   var root = $('#app'), hand = $('.hand'), keep = hand ? hand.scrollLeft : 0;
@@ -199,7 +224,7 @@ function lobbyHTML() {
     (App.inviteCode ? '' : '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
-    '<section class="panel"><h2>I tuoi tavoli recenti</h2><div class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button></div></section></div></div>';
+    '<section class="panel"><h2>I tuoi tavoli recenti</h2><div class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div></div>';
 }
 function recentHTML() {
   var list = []; try { list = JSON.parse(lsGet(KEY_RECENT) || '[]'); } catch (e) {}
@@ -223,6 +248,7 @@ function roomHTML() {
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/6)</h2><div class="seats">' + seats + '</div>' +
     '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-noeven"' + (noEven ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Somma delle previsioni diversa dalle prese</b><br><span class="muted" style="font-size:15px">Il mazziere, che dichiara per ultimo, non può dire il numero che renderebbe la somma uguale alle prese della mano.</span></span></label>' +
+    Turns.optionHTML(d, isHost) +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 6 ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 3 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 3 ? '<p class="lead">Mancano ' + (3 - n) + ' giocatori per iniziare.</p>' : '<p class="lead">In ' + n + ' si giocano ' + rounds + ' mani.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
     '</section></div>';
@@ -288,6 +314,8 @@ function dockHTML(g, me, sum) {
     if (myTurn || App.doc.host === Net.uid) extra = '<button class="btn block" data-act="next">Prossima mano</button>';
   } else if (g.phase === 'over') { hint = 'Partita finita.'; extra = '<button class="btn block" data-act="showover">Classifica</button>'; }
   else hint = P.bid == null ? 'Aspetta il tuo turno per la previsione.' : 'Hai previsto ' + P.bid + (P.bid === 1 ? ' presa' : ' prese') + ', ne hai fatte ' + P.tricks + '.';
+  if (myTurn && g.phase !== 'over') hint += '<span id="tt"></span>';
+  if (P.bot && g.phase !== 'over') { hint = '<b>Stai giocando in automatico</b> perché sei stato fermo troppo a lungo.'; extra = '<button class="btn block" data-act="resume">Riprendo io</button>'; }
   return '<div class="dock"><div class="wrap"><div class="hint">' + hint + '</div><div class="hand" aria-label="La tua mano">' + hand + '</div>' + extra + '</div></div>';
 }
 
@@ -390,9 +418,13 @@ document.addEventListener('click', function (ev) {
     case 'trump': act({ a: 'trump', s: +el.getAttribute('data-s') }); break;
     case 'playsel': if (App.sel != null) act({ a: 'play', c: App.sel }); break;
     case 'next': App.sheet = null; act({ a: 'next' }); break;
+    case 'resume': send({ t: 'back' }); break;
   }
 });
-document.addEventListener('change', function (ev) { if (ev.target.id === 'opt-noeven') send({ t: 'opt', noEven: ev.target.checked }); });
+document.addEventListener('change', function (ev) {
+  if (ev.target.id === 'opt-noeven') send({ t: 'opt', noEven: ev.target.checked });
+  if (ev.target.id === 'opt-timer') send({ t: 'opt', timer: +ev.target.value });
+});
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);
   if (e.key === 'Escape' && App.sheet) { App.sheet = null; renderSheet(); }

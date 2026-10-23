@@ -25,3 +25,18 @@ Gioco di carte a prese con previsione, da 3 a 6 giocatori.
 - A ogni mano le carte aumentano di una. Prima si prevede quante prese si faranno, poi si gioca.
 - Previsione esatta: 20 punti + 10 per presa. Sbagliata: −10 per ogni presa di differenza.
 - Opzione del tavolo: la somma delle previsioni non può essere uguale al numero di prese.
+
+## Installare i giochi sul telefono
+
+- **Android (Chrome):** tocca *Installa app* nella pagina del gioco, oppure menu ⋮ → *Installa app* / *Aggiungi a schermata Home*.
+- **iPhone e iPad (Safari):** Condividi → *Aggiungi alla schermata Home* → *Aggiungi*.
+
+## Connessione e assenze
+
+- Se la connessione cade o resta "appesa", il gioco se ne accorge e si ricollega da solo; quando riapri l'app dal background si ricollega subito.
+- Se l'host sparisce, dopo circa 30 secondi il comando passa automaticamente a un altro giocatore.
+- Timer di turno (opzione del tavolo, 60 secondi di base): chi resta fermo oltre il tempo gioca in automatico finché non tocca *Riprendo io*.
+
+## Modificare i giochi
+
+I sorgenti sono in `src/` (parte di rete condivisa in `src/shared/`). Dopo una modifica: `python3 build.py` rigenera le pagine.

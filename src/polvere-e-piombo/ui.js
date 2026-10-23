@@ -93,11 +93,25 @@ function tableReducer(doc, from, op) {
       if (!doc.game || !doc.game.players[op.p]) return { changed: false };
       doc.game.players[op.p].bot = !!op.on; return {};
     }
+    case 'opt': {
+      if (!isHost) return hostOnly();
+      if (doc.phase !== 'lobby') return { changed: false };
+      doc.opts = doc.opts || {}; if (op.timer != null) doc.opts.timer = Math.max(0, Math.min(600, +op.timer || 0));
+      return {};
+    }
+    case 'back': {
+      var gb = doc.game; if (!gb) return { changed: false };
+      var pb = -1; gb.players.forEach(function (P, k) { if (P.uid === from) pb = k; });
+      if (pb < 0 || !gb.players[pb].bot) return { changed: false };
+      gb.players[pb].bot = false; gb.players[pb].away = false;
+      gb.log.push({ n: ++gb.logN, t: gb.players[pb].nick + ' è tornato al tavolo.', k: 'sys' });
+      return {};
+    }
     case 'act': {
       var g = doc.game; if (!g) return { err: 'La partita non è più disponibile.' };
       var p = -1; g.players.forEach(function (P, k) { if (P.uid === from) p = k; });
       if (p < 0) return { err: 'Stai solo guardando questa partita.' };
-      if (g.players[p].bot && !op.fromBot) g.players[p].bot = false; // il giocatore è tornato
+      if (g.players[p].bot && !op.fromBot) { g.players[p].bot = false; g.players[p].away = false; } // il giocatore è tornato
       var err = E.act(g, p, op.a);
       if (err) return { err: err };
       if (g.phase === 'over') doc.phase = 'over';
@@ -107,6 +121,11 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Turns.setup({
+  decider: function (g) { return E.decider(g); },
+  onTimeout: function (cur, d) { var P = cur.game.players[d]; P.bot = true; P.away = true; Turns.awayLog(cur.game, d); return true; }
+});
+Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i pistoleri automatici.'); render(); });
 
 /* ---------- azioni ---------- */
 async function run(p) { if (App.busy) return; App.busy = true; render(); try { await p(); } catch (e) { toast(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'); } finally { App.busy = false; render(); } }
@@ -225,6 +244,7 @@ function onDoc() {
   render();
   playFlash();
   driveBots();
+  Turns.watch(App.doc);
 }
 
 /* ---------- render ---------- */
@@ -248,7 +268,7 @@ function lobbyHTML() {
   var fanItems = [ { h: backHTML() }, { h: charCardHTML('abner') }, { h: typeCardHTML('sparo') } ];
   fanItems.forEach(function (f, i) { fan += f.h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 22) + 'px)" class="card'); });
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b class="mono">' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
-  return '<div class="wrap lobby">' +
+  return '<div class="wrap lobby"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' +
     '<section class="hero"><div><h1>Polvere <span class="amp">&amp;</span> Piombo</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p></div>' +
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
@@ -257,7 +277,7 @@ function lobbyHTML() {
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
     '<section class="panel"><h2>I tuoi tavoli recenti</h2><div id="tlist" class="tables"></div>' +
-    '<div class="row"><button class="btn ghost small" data-act="gallery">Mazzo e personaggi</button><button class="btn ghost small" data-act="rules">Regole</button></div></section>' +
+    '<div class="row"><button class="btn ghost small" data-act="gallery">Mazzo e personaggi</button><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section>' +
     '</div></div>';
 }
 function renderLobbyList() {
@@ -290,14 +310,14 @@ function roomHTML() {
     '<section class="panel"><h2>Al tavolo (' + n + '/7)</h2><div class="seats">' + seats + '</div>' +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 7 ? ' disabled' : '') + '>Aggiungi pistolero automatico</button><button class="btn" data-act="start"' + (n < 4 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 4 ? '<p class="lead">Mancano ' + (4 - n) + ' giocatori per iniziare.</p>' : '')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
-    '</section>' + hostBanner() + '</div>';
+    '</section><section class="panel">' + Turns.optionHTML(d, isHost) + '</section>' + hostBanner() + '</div>';
 }
 
 function connInfo(txt) { return Net.connected ? txt : '<span style="color:#f08070">Riconnessione…</span> ' + txt; }
 function hostBanner() {
   var d = App.doc; if (!d || Net.isHost || Net.hostAlive()) return '';
   var h = d.seats.filter(function (s) { return s.uid === d.host; })[0];
-  return '<div class="notice red">' + esc(h ? h.nick : 'L’host') + ' non risponde: forse ha chiuso il gioco o ha il telefono in standby. Se non torna, prendi tu il comando per continuare.' +
+  return '<div class="notice red">' + esc(h ? h.nick : 'L’host') + ' non risponde: forse ha chiuso il gioco o ha il telefono in standby. Tra pochi secondi il comando passa da solo a un altro giocatore, oppure prendilo tu adesso.' +
     '<div class="row" style="margin-top:8px"><button class="btn small" data-act="takehost">Prendi il comando</button></div></div>';
 }
 function plateHTML(g, i, me, targets) {
@@ -395,6 +415,8 @@ function dockHTML(g, me) {
     else { var st = statusText(g, me); hint = st.big + (st.small ? ' — ' + st.small : ''); }
     if (P.alive && P.char === 'doc' && P.hp < P.max && P.hand.length >= 2 && g.phase === 'play' && App.mode === 'idle' && !(top && top.who === me))
       actions = '<button class="btn ghost" data-act="doc">Ricuciti (2 carte)</button>' + actions;
+    if (g.phase === 'play' && E.decider(g) === me) hint += '<span id="tt"></span>';
+    if (P.bot && P.alive && g.phase === 'play') { hint = '<b>Stai giocando in automatico</b> perché sei stato fermo troppo a lungo.'; actions = '<button class="btn" data-act="resume">Riprendo io</button>'; }
   }
   return '<div class="dock"><div class="wrap"><div class="hint">' + hint + '</div>' + (P ? '<div class="hand" aria-label="La tua mano">' + hand + '</div>' : '') + (actions ? '<div class="actions">' + actions + '</div>' : '') + '</div></div>';
 }
@@ -543,6 +565,7 @@ document.addEventListener('click', function (ev) {
     case 'log': App.sheet = { kind: 'log' }; renderSheet(); var ll = document.querySelector('.sheet'); if (ll) ll.scrollTop = ll.scrollHeight; break;
     case 'menu': App.sheet = { kind: 'menu' }; renderSheet(); break;
     case 'takehost': closeSheet(); takeHost(); break;
+    case 'resume': run(function () { return Net.send({ t: 'back' }); }); break;
     case 'rematch': closeSheet(); rematch(); break;
     case 'close': if (App.sheet && App.sheet.kind === 'decide') App.sheet = null; closeSheet(); render(); break;
     case 'decide': App.sheet = { kind: 'decide' }; renderSheet(); break;
@@ -574,6 +597,7 @@ document.addEventListener('click', function (ev) {
     case 'pickok': if (App.pickDo) App.pickDo(App.picks.slice()); break;
   }
 });
+document.addEventListener('change', function (ev) { if (ev.target.id === 'opt-timer') run(function () { return Net.send({ t: 'opt', timer: +ev.target.value }); }); });
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);
   if (e.key === 'Escape' && App.sheet && App.sheet.kind !== 'decide') { closeSheet(); render(); }
