@@ -46,7 +46,8 @@ function tableReducer(doc, from, op) {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
       doc.opts = doc.opts || {};
-      if (op.noEven != null) doc.opts.noEven = !!op.noEven;
+      if (op.noEven != null) { doc.opts.noEven = !!op.noEven; if (doc.opts.noEven) doc.opts.hidden = false; }
+      if (op.hidden != null) { doc.opts.hidden = !!op.hidden; if (doc.opts.hidden) doc.opts.noEven = false; }
       if (op.timer != null) doc.opts.timer = Math.max(0, Math.min(600, +op.timer || 0));
       return {};
     }
@@ -91,7 +92,7 @@ Turns.setup({
     g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true;
   }
 });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.noEven) notes.push('somma diversa'); if (o.timer === 0) notes.push('senza timer'); return { max: 6, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.noEven) notes.push('somma diversa'); if (o.hidden) notes.push('previsioni coperte'); if (o.timer === 0) notes.push('senza timer'); return { max: 6, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i giocatori automatici.'); render(); });
 
 /* ---------- azioni ---------- */
@@ -207,7 +208,15 @@ function onDoc() {
   if (g) {
     // fogli automatici: riepilogo di fine mano e fine partita
     var key = g.phase === 'roundEnd' ? 'r' + g.round : g.phase === 'over' ? 'over' : null;
-    if (key && key !== App.sheetKey) { App.sheetKey = key; App.sheet = { kind: g.phase === 'over' ? 'over' : 'round' }; }
+    if (key && key !== App.sheetKey) {
+      // il riepilogo arriva dopo che l'ultima presa (e, se coperte, le previsioni) si sono viste sul tavolo
+      var fresh = TV.mounted(), kind = g.phase === 'over' ? 'over' : 'round';
+      App.sheetKey = key;
+      setTimeout(function () {
+        var gg = App.doc && App.doc.game, k2 = gg && (gg.phase === 'roundEnd' ? 'r' + gg.round : gg.phase === 'over' ? 'over' : null);
+        if (k2 === key && App.screen === 'table' && !App.sheet) { App.sheet = { kind: kind }; renderSheet(); }
+      }, fresh ? (g.opts.hidden ? 5000 : 2900) : 0);
+    }
     if (!key && App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
     if (App.sel != null && myIdx() >= 0 && g.players[myIdx()].hand.indexOf(App.sel) < 0) App.sel = null;
   } else if (App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
@@ -264,7 +273,7 @@ function roomHTML() {
       ((isHost && s.uid !== Net.uid) || (s.uid === Net.uid && !isHost) ? '<button class="x" data-act="kick" data-uid="' + esc(s.uid) + '" aria-label="Togli ' + esc(s.nick) + '">×</button>' : '') + '</div>';
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
-  var noEven = !!(d.opts && d.opts.noEven);
+  var noEven = !!(d.opts && d.opts.noEven), hidden = !!(d.opts && d.opts.hidden);
   var rounds = n >= 3 ? 60 / Math.max(3, Math.min(6, n)) : 20;
   return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
@@ -272,6 +281,7 @@ function roomHTML() {
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/6)</h2><div class="seats">' + seats + '</div>' +
     '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-noeven"' + (noEven ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Somma delle previsioni diversa dalle prese</b><br><span class="muted" style="font-size:15px">Il mazziere, che dichiara per ultimo, non può dire il numero che renderebbe la somma uguale alle prese della mano.</span></span></label>' +
+    '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-hidden"' + (hidden ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Previsioni coperte</b><br><span class="muted" style="font-size:15px">Ognuno dichiara senza far vedere il numero: le previsioni di tutti si scoprono solo a fine mano. Non si combina con la somma diversa.</span></span></label>' +
     Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 6 ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 3 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 3 ? '<p class="lead">Mancano ' + (3 - n) + ' giocatori per iniziare.</p>' : '<p class="lead">In ' + n + ' si giocano ' + rounds + ' mani.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
@@ -279,6 +289,8 @@ function roomHTML() {
     '</section></div>';
 }
 
+// Con le previsioni coperte, quella degli altri resta nascosta finché la mano non è finita.
+function bidHidden(g, i, me) { return !!(g.opts && g.opts.hidden) && i !== me && (g.phase === 'bid' || g.phase === 'play' || g.phase === 'trump'); }
 function statusLine(g, me, sum, allBid, short) {
   var who = function (i) { return i === me ? 'tu' : esc(g.players[i].nick); };
   var pr = 'Previsioni: <b>' + sum + '</b> su ' + g.round + (g.round === 1 ? ' presa' : ' prese') + (allBid ? (sum > g.round ? ' · ne mancano per tutti' : sum < g.round ? ' · ne avanzano' : ' · somma pari') : '');
@@ -286,7 +298,7 @@ function statusLine(g, me, sum, allBid, short) {
   if (g.phase === 'over') return 'Partita finita.';
   if (g.phase === 'roundEnd') return 'Fine della mano ' + g.round + '. ' + pr;
   if (g.phase === 'trump') return 'Il mazziere (' + who(g.dealer) + ') sceglie la briscola.';
-  if (g.phase === 'bid') return (g.turn === me ? '<b>Tocca a te prevedere.</b> ' : 'Prevede <b>' + who(g.turn) + '</b>. ') + pr + (g.opts.noEven ? ' · regola somma diversa' : '');
+  if (g.phase === 'bid') return (g.turn === me ? '<b>Tocca a te prevedere.</b> ' : 'Prevede <b>' + who(g.turn) + '</b>. ') + pr + (g.opts.noEven ? ' · regola somma diversa' : '') + (g.opts.hidden ? (g.turn === me ? ' Gli altri non vedranno il tuo numero fino a fine mano.' : ' Previsioni coperte.') : '');
   return (g.turn === me ? '<b>Tocca a te.</b>' : 'Gioca <b>' + who(g.turn) + '</b>.') + ' ' + followNote(g, me) + ' ' + pr;
 }
 // Spiega quale colore va seguito nella presa in corso (o perché la carta è libera).
@@ -349,7 +361,7 @@ function sheetBody(s) {
     '<button class="btn block" style="background:linear-gradient(180deg,#e0705e,#a63a2a);color:#fff" data-act="closeyes">Chiudi per tutti</button><button class="btn block ghost" data-act="close">Annulla</button>';
   if (s.kind === 'player' && g) {
     var P = g.players[s.p];
-    return '<h2>' + esc(P.nick) + '</h2><p class="lead">' + P.score + ' punti · ' + (P.bid == null ? 'non ha ancora previsto' : 'ha previsto ' + P.bid + ', ne ha fatte ' + P.tricks) + ' · ' + P.hand.length + ' carte in mano</p>' +
+    return '<h2>' + esc(P.nick) + '</h2><p class="lead">' + P.score + ' punti · ' + (P.bid == null ? 'non ha ancora previsto' : bidHidden(g, s.p, me) ? 'previsione coperta, ' + P.tricks + (P.tricks === 1 ? ' presa fatta' : ' prese fatte') : 'ha previsto ' + P.bid + ', ne ha fatte ' + P.tricks) + ' · ' + P.hand.length + ' carte in mano</p>' +
       (App.doc.host === Net.uid && s.p !== me && g.phase !== 'over' ? '<button class="btn ghost block" data-act="auto" data-p="' + s.p + '">' + (P.bot ? 'Ridai il controllo al giocatore' : 'Fallo giocare in automatico (se è assente)') + '</button>' : '') +
       '<button class="btn block" data-act="close">Chiudi</button>';
   }
@@ -360,6 +372,7 @@ var RULES = '<p>Si gioca con 60 carte: quattro casate (Fiamme, Maree, Foreste, S
   '<h3>Le mani</h3><p>Nella prima mano ognuno riceve 1 carta, nella seconda 2 e così via, finché il mazzo basta: 20 mani in 3, 15 in 4, 12 in 5, 10 in 6. Il mazziere cambia ogni mano.</p>' +
   '<h3>La briscola</h3><ul><li>Dopo la distribuzione si scopre la prima carta del mazzo: il suo colore è la briscola.</li><li>Se è un Giullare non c’è briscola.</li><li>Se è un Arcimago, il mazziere sceglie il colore.</li><li>Nell’ultima mano non resta niente da scoprire: si gioca senza briscola.</li></ul>' +
   '<h3>La previsione</h3><p>A turno, partendo da chi siede dopo il mazziere, ognuno dichiara quante prese farà. Con la regola <b>somma diversa</b>, il mazziere non può dichiarare il numero che renderebbe la somma uguale alle prese della mano.</p>' +
+  '<h3>Previsioni coperte (opzione del tavolo)</h3><p>Ognuno dichiara a turno ma il numero resta nascosto agli altri: si vede solo chi ha già previsto e quante prese ha fatto. A fine mano si scoprono tutte le previsioni e si contano i punti.</p>' +
   '<h3>Le prese</h3><ul><li>Apre chi siede dopo il mazziere; poi apre chi ha vinto l’ultima presa.</li><li>Bisogna rispondere al colore di chi apre, se lo si ha. Arcimaghi e Giullari si possono giocare sempre.</li><li>Se si apre con un Arcimago, gli altri giocano quello che vogliono. Se si apre con un Giullare, il colore lo decide la prima carta numerata.</li><li>Vince il primo Arcimago; altrimenti la briscola più alta; altrimenti la carta più alta del colore di uscita. Se tutti giocano Giullari, vince il primo.</li></ul>' +
   '<h3>Punti</h3><ul><li>Previsione esatta: 20 punti più 10 per ogni presa.</li><li>Previsione sbagliata: −10 per ogni presa di differenza.</li></ul>' +
   '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p>' +
@@ -413,6 +426,7 @@ document.addEventListener('click', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   if (ev.target.id === 'opt-noeven') send({ t: 'opt', noEven: ev.target.checked });
+  if (ev.target.id === 'opt-hidden') send({ t: 'opt', hidden: ev.target.checked });
   if (ev.target.id === 'opt-timer') send({ t: 'opt', timer: +ev.target.value });
   if (ev.target.id === 'opt-vis') send({ t: 'vis', vis: ev.target.value });
 });

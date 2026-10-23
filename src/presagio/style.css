@@ -198,6 +198,8 @@ input.field.code { font-family: var(--f-label); font-weight: 700; letter-spacing
 .tv-me.turn .nm { color: var(--gold); text-shadow: 0 0 10px rgba(230, 194, 120, .7); }
 .tv { --hw: clamp(64px, min(21vw, 11.5vh), 104px); }
 .tv-hand { position: relative; height: calc(var(--hw) * 1.4 + 30px); margin-top: 2px; }
+.tv-hand.two { height: calc(var(--hw) * 1.4 * 1.56 + 30px); }
+.tv-hand.two .card { --cw: calc(var(--hw) * .92); }
 .tv-hand .card { position: absolute; left: 50%; bottom: 10px; --cw: var(--hw); margin-left: calc(var(--cw) / -2); transform-origin: 50% 120%;
   transition: transform .42s var(--ease), filter .25s, box-shadow .25s; cursor: pointer; will-change: transform; }
 .tv-hand .card.no { filter: brightness(.45) saturate(.5); }
@@ -245,3 +247,15 @@ table.sc .small { font-size: 12px; color: var(--muted); display: block; }
   .tv-top .brand { display: none; }
   .tv-top .iconbtn { padding: 4px 10px; font-size: 12px; letter-spacing: .02em; }
 }
+
+/* chat fissata sul tavolo */
+.tv .chat-dock { font-family: var(--f-body); font-size: 15.5px; margin: 0 12px 4px; background: rgba(14, 11, 30, .66); border-color: rgba(230, 194, 120, .22); }
+/* previsioni coperte */
+.gems .seal { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 2px; background: linear-gradient(135deg, #e6defd, #7c5cff); box-shadow: 0 0 8px rgba(124, 92, 255, .8); margin-right: 3px; }
+.gems i.tk { background: #f3ecff; border-color: #f3ecff; box-shadow: 0 0 6px rgba(255, 255, 255, .5); }
+.gems.sealed { align-items: center; }
+.tv-pr.sealed .orb { box-shadow: 0 0 16px rgba(124, 92, 255, .7); }
+.reveal { position: fixed; z-index: 21; pointer-events: none; display: grid; justify-items: center; min-width: 58px; padding: 5px 10px 6px; border-radius: 12px; font: 700 24px/1 var(--f-label); color: #fff3cf;
+  background: radial-gradient(circle at 40% 30%, rgba(124, 92, 255, .95), rgba(30, 22, 70, .96)); border: 1px solid rgba(230, 194, 120, .7); box-shadow: 0 0 22px rgba(124, 92, 255, .7), 0 8px 18px #000a; }
+.reveal small { font: 600 9.5px/1.2 var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: #d9cffc; margin-bottom: 2px; }
+.reveal.hit { border-color: var(--ok); box-shadow: 0 0 22px rgba(90, 220, 150, .7), 0 8px 18px #000a; }

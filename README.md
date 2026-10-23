@@ -25,6 +25,8 @@ Gioco di carte a prese con previsione, da 3 a 6 giocatori.
 - A ogni mano le carte aumentano di una. Prima si prevede quante prese si faranno, poi si gioca.
 - Previsione esatta: 20 punti + 10 per presa. Sbagliata: −10 per ogni presa di differenza.
 - Opzione del tavolo: la somma delle previsioni non può essere uguale al numero di prese.
+- Opzione del tavolo: previsioni coperte, che si scoprono tutte insieme a fine mano.
+- Con tante carte in mano il ventaglio passa su due file, così ogni carta resta leggibile.
 - Tavolo animato: le carte volano dalla mano al centro, la presa va al vincitore, la distribuzione parte dal mazzo.
 
 Illustrazioni: incisioni antiche di pubblico dominio da Wikimedia Commons (Gustave Doré, l'incisione di Will Sommers,
@@ -46,6 +48,7 @@ Originali e crediti in `presagio/img/src/` (scaricati dalla Action «assets»).
 
 - Pulsante **Chat** in alto, nella sala d'attesa e durante la partita, con il numero di messaggi nuovi e un'anteprima quando arriva un messaggio.
 - Frasi rapide ("Ben giocata!", "Tocca a te!"…); chi entra dopo vede gli ultimi messaggi; i messaggi arrivano anche se l'host è assente.
+- **Fissa sul tavolo**: gli ultimi messaggi restano sempre in vista sopra il tavolo (si sgancia con la ×). La scelta vale per il tuo telefono.
 
 ## Connessione e assenze
 

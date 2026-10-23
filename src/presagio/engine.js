@@ -28,12 +28,12 @@ var PREngine = (function () {
     if (k < 3 || k > 6) throw new Error('Servono da 3 a 6 giocatori.');
     var s = {
       v: 1, phase: 'bid', winner: null, seq: 0, logN: 0, log: [], flash: null,
-      opts: { noEven: !!(opts && opts.noEven) },
+      opts: { hidden: !!(opts && opts.hidden), noEven: !!(opts && opts.noEven && !opts.hidden) },
       players: seats.map(function (st) { return { uid: st.uid, nick: st.nick, bot: !!st.bot, score: 0, hand: [], bid: null, tricks: 0, hist: [] }; }),
       rounds: 60 / k, round: 0, dealer: Math.floor(Math.random() * k),
       trump: null, trumpCard: null, turn: 0, leader: 0, trick: [], lastTrick: null, deckLeft: 0
     };
-    log(s, 'Si apre la partita a ' + k + ' giocatori: ' + s.rounds + ' mani.' + (s.opts.noEven ? ' Regola attiva: la somma delle previsioni non può essere uguale alle prese.' : ''), 'turn');
+    log(s, 'Si apre la partita a ' + k + ' giocatori: ' + s.rounds + ' mani.' + (s.opts.noEven ? ' Regola attiva: la somma delle previsioni non può essere uguale alle prese.' : '') + (s.opts.hidden ? ' Previsioni coperte: si scoprono a fine mano.' : ''), 'turn');
     startRound(s);
     return s;
   }
@@ -106,6 +106,7 @@ var PREngine = (function () {
   }
 
   function scoreRound(s) {
+    if (s.opts.hidden) log(s, 'Si scoprono le previsioni: ' + s.players.map(function (P) { return P.nick + ' ' + P.bid; }).join(', ') + '.', 'sys');
     s.players.forEach(function (P) {
       var d = P.bid === P.tricks ? 20 + 10 * P.tricks : -10 * Math.abs(P.bid - P.tricks);
       P.score += d; P.hist.push({ bid: P.bid, tricks: P.tricks, delta: d, score: P.score });
@@ -134,11 +135,12 @@ var PREngine = (function () {
       var b = a.b;
       if (a.a !== 'bid' || typeof b !== 'number' || b !== Math.floor(b) || b < 0 || b > s.round) return 'Previsione non valida.';
       if (forbiddenBid(s, p) === b) return 'Con la regola della somma diversa non puoi dichiarare ' + b + '.';
-      P.bid = b; log(s, nm(s, p) + ' prevede ' + b + (b === 1 ? ' presa.' : ' prese.'), 'bid');
+      P.bid = b; log(s, s.opts.hidden ? nm(s, p) + ' ha fatto la sua previsione.' : nm(s, p) + ' prevede ' + b + (b === 1 ? ' presa.' : ' prese.'), 'bid');
       s.flash = { kind: 'bid', p: p, n: s.logN };
       if (p === s.dealer) {
         var sum = bidSum(s);
-        log(s, 'Previsioni: ' + sum + ' su ' + s.round + (sum > s.round ? ' (più delle prese: qualcuno resterà deluso)' : sum < s.round ? ' (meno delle prese: qualcuno ne farà di troppo)' : '') + '.', 'sys');
+        if (s.opts.hidden) log(s, 'Previsioni fatte: restano coperte fino alla fine della mano.', 'sys');
+        else log(s, 'Previsioni: ' + sum + ' su ' + s.round + (sum > s.round ? ' (più delle prese: qualcuno resterà deluso)' : sum < s.round ? ' (meno delle prese: qualcuno ne farà di troppo)' : '') + '.', 'sys');
         s.phase = 'play'; s.leader = next(s, s.dealer); s.turn = s.leader;
       } else s.turn = next(s, p);
     } else if (s.phase === 'play') {

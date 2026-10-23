@@ -406,7 +406,7 @@ function tableHTML() {
   }
   return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code) + ' · ' + g.players.filter(function (P) { return P.alive; }).length + ' in vita') + '</span>' +
     '<button class="iconbtn" data-act="log">Registro</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
-    '<main class="wrap board">' + hostBanner() + '<div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
+    '<main class="wrap board">' + hostBanner() + Chat.dockHTML('position:sticky;top:calc(58px + env(safe-area-inset-top,0px));z-index:15;margin:0') + '<div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
     '<section class="center"><div class="pile">' + backHTML() + '<span>' + g.deck.length + ' nel mazzo</span></div><div class="pile">' + disc + '<span>scarti</span></div>' +
     '<div class="status"><div class="big">' + st.big + '</div><div class="small">' + st.small + '</div><div class="feed" style="margin-top:6px">' + feed + '</div></div></section>' +
     store + meHTML + '</main>' + dockHTML(g, me);

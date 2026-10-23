@@ -217,6 +217,8 @@ input.field.code { font-family: var(--f-label); font-weight: 700; letter-spacing
 .tv-me.turn .nm { color: var(--gold); text-shadow: 0 0 10px rgba(230, 194, 120, .7); }
 .tv { --hw: clamp(64px, min(21vw, 11.5vh), 104px); }
 .tv-hand { position: relative; height: calc(var(--hw) * 1.4 + 30px); margin-top: 2px; }
+.tv-hand.two { height: calc(var(--hw) * 1.4 * 1.56 + 30px); }
+.tv-hand.two .card { --cw: calc(var(--hw) * .92); }
 .tv-hand .card { position: absolute; left: 50%; bottom: 10px; --cw: var(--hw); margin-left: calc(var(--cw) / -2); transform-origin: 50% 120%;
   transition: transform .42s var(--ease), filter .25s, box-shadow .25s; cursor: pointer; will-change: transform; }
 .tv-hand .card.no { filter: brightness(.45) saturate(.5); }
@@ -264,6 +266,18 @@ table.sc .small { font-size: 12px; color: var(--muted); display: block; }
   .tv-top .brand { display: none; }
   .tv-top .iconbtn { padding: 4px 10px; font-size: 12px; letter-spacing: .02em; }
 }
+
+/* chat fissata sul tavolo */
+.tv .chat-dock { font-family: var(--f-body); font-size: 15.5px; margin: 0 12px 4px; background: rgba(14, 11, 30, .66); border-color: rgba(230, 194, 120, .22); }
+/* previsioni coperte */
+.gems .seal { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 2px; background: linear-gradient(135deg, #e6defd, #7c5cff); box-shadow: 0 0 8px rgba(124, 92, 255, .8); margin-right: 3px; }
+.gems i.tk { background: #f3ecff; border-color: #f3ecff; box-shadow: 0 0 6px rgba(255, 255, 255, .5); }
+.gems.sealed { align-items: center; }
+.tv-pr.sealed .orb { box-shadow: 0 0 16px rgba(124, 92, 255, .7); }
+.reveal { position: fixed; z-index: 21; pointer-events: none; display: grid; justify-items: center; min-width: 58px; padding: 5px 10px 6px; border-radius: 12px; font: 700 24px/1 var(--f-label); color: #fff3cf;
+  background: radial-gradient(circle at 40% 30%, rgba(124, 92, 255, .95), rgba(30, 22, 70, .96)); border: 1px solid rgba(230, 194, 120, .7); box-shadow: 0 0 22px rgba(124, 92, 255, .7), 0 8px 18px #000a; }
+.reveal small { font: 600 9.5px/1.2 var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: #d9cffc; margin-bottom: 2px; }
+.reveal.hit { border-color: var(--ok); box-shadow: 0 0 22px rgba(90, 220, 150, .7), 0 8px 18px #000a; }
 
 </style>
 </head>
@@ -992,6 +1006,7 @@ var Nav = (function () {
    così il testo che stai scrivendo non si perde quando arriva una mossa. ===== */
 var Chat = (function () {
   var isOpen = false, unread = 0, root = null, code = null, bubbleTimer = null;
+  var pinned = (function () { try { return localStorage.getItem('pp-chatpin') === '1'; } catch (e) { return false; } })();
   var QUICK = ['Ben giocata!', 'Che fortuna…', 'Tocca a te!', 'Arrivo subito', 'Rivincita?'];
   var css = '.chat-n{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:#c8443a;color:#fff;font:700 11px/1 system-ui,sans-serif}.chat-n[hidden],.chat-err[hidden]{display:none}' +
     '.chat-back{position:fixed;inset:0;z-index:70;background:rgba(5,5,12,.55);display:flex;align-items:flex-end;justify-content:center}' +
@@ -1008,7 +1023,12 @@ var Chat = (function () {
     '.chat-form input{flex:1;min-width:0;font:16px system-ui,sans-serif;color:#1b1a20;background:#f3eee2;border:0;border-radius:999px;padding:11px 16px}' +
     '.chat-form button{appearance:none;border:0;border-radius:999px;padding:0 18px;font:700 15px system-ui,sans-serif;background:#d9a441;color:#231a08;cursor:pointer}' +
     '.chat-bubble{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:65;max-width:min(88vw,440px);background:#1c1a26f2;color:#f1ebdd;border:1px solid #d9a44188;border-radius:12px;padding:8px 12px;font:15px/1.35 system-ui,sans-serif;box-shadow:0 8px 20px #0008;cursor:pointer;overflow-wrap:anywhere}' +
-    '.chat-bubble b{color:#e6c27a}.chat-err{color:#ff9c8c;font-size:13px;padding:0 16px}';
+    '.chat-bubble b{color:#e6c27a}.chat-err{color:#ff9c8c;font-size:13px;padding:0 16px}' +
+    '.chat-pin{appearance:none;border:1px solid #ffffff2a;background:transparent;color:inherit;border-radius:999px;padding:5px 12px;font:13px system-ui,sans-serif;cursor:pointer}.chat-pin.on{border-color:#d9a441;color:#e6c27a}' +
+    '.chat-dock{position:relative;display:grid;gap:1px;margin:0 12px 6px;padding:5px 30px 5px 11px;border-radius:12px;background:rgba(18,15,34,.62);border:1px solid #ffffff1c;color:#efe9f8;font:14px/1.3 system-ui,sans-serif;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}.chat-dock[hidden]{display:none}' +
+    '.chat-dock .cd-m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chat-dock .cd-m:not(:last-of-type){opacity:.62}.chat-dock .cd-m b{color:#e6c27a;font-weight:700}.chat-dock .cd-e{opacity:.6;font-style:italic}' +
+    '.chat-dock .cd-x{position:absolute;top:2px;right:2px;appearance:none;border:0;background:none;color:inherit;opacity:.6;font-size:18px;line-height:1;padding:4px 7px;cursor:pointer}' +
+    '.chat-dock.flash{animation:cdflash 1.2s ease}@keyframes cdflash{0%{border-color:#e6c27a;box-shadow:0 0 14px #e6c27a88}100%{border-color:#ffffff1c;box-shadow:none}}';
   function ensureCss() { if (!document.getElementById('chat-css')) { var s = document.createElement('style'); s.id = 'chat-css'; s.textContent = css; document.head.appendChild(s); } }
   function myNick() {
     var d = window.App && App.doc, s = d && d.seats && d.seats.filter(function (x) { return x.uid === Net.uid; })[0];
@@ -1017,6 +1037,32 @@ var Chat = (function () {
   }
   function hhmm(ts) { var d = new Date(ts); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
 
+  /* chat fissata sul tavolo: gli ultimi messaggi restano sempre in vista */
+  function dockInner() {
+    var msgs = (Net.tableCode ? Net.chatList() : []).slice(-3), h = '';
+    var e = function (t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; };
+    if (!msgs.length) h = '<div class="cd-m cd-e">Chat fissata: i messaggi del tavolo compaiono qui.</div>';
+    msgs.forEach(function (m) { h += '<div class="cd-m"><b>' + e(m.uid === Net.uid ? 'Tu' : m.nick) + ':</b> ' + e(m.text) + '</div>'; });
+    return h + '<button class="cd-x" data-chat="unpin" aria-label="Sgancia la chat dal tavolo">×</button>';
+  }
+  function dockHTML(style) {
+    ensureCss();
+    return '<div class="chat-dock" data-chat="open" role="log" aria-label="Ultimi messaggi della chat"' + (style ? ' style="' + style + '"' : '') + (pinned ? '' : ' hidden') + '>' + (pinned ? dockInner() : '') + '</div>';
+  }
+  function paintDock(flash) {
+    document.querySelectorAll('.chat-dock').forEach(function (d) {
+      d.hidden = !pinned; if (!pinned) return;
+      d.innerHTML = dockInner();
+      if (flash) { d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash'); }
+    });
+  }
+  function setPinned(v) {
+    pinned = !!v; try { localStorage.setItem('pp-chatpin', pinned ? '1' : '0'); } catch (e) {}
+    if (pinned) { unread = 0; paintBadges(); hideBubble(); }
+    paintDock(false);
+    var b = root && root.querySelector('.chat-pin'); if (b) { b.classList.toggle('on', pinned); b.textContent = pinned ? 'Sgancia dal tavolo' : 'Fissa sul tavolo'; }
+    window.dispatchEvent(new Event('resize'));
+  }
   function badgeHTML() {
     ensureCss();
     return '<button class="iconbtn" data-chat="open" aria-label="Chat del tavolo' + (unread ? ', ' + unread + ' messaggi nuovi' : '') + '">Chat<span class="chat-n"' + (unread ? '' : ' hidden') + '>' + unread + '</span></button>';
@@ -1047,7 +1093,7 @@ var Chat = (function () {
     ensureCss(); close(true);
     isOpen = true; unread = 0; paintBadges(); hideBubble();
     root = document.createElement('div'); root.className = 'chat-back';
-    root.innerHTML = '<div class="chat-box" role="dialog" aria-modal="true" aria-label="Chat del tavolo"><div class="chat-head"><b>Chat del tavolo</b><button class="chat-x" data-chat="close" aria-label="Chiudi la chat">×</button></div>' +
+    root.innerHTML = '<div class="chat-box" role="dialog" aria-modal="true" aria-label="Chat del tavolo"><div class="chat-head"><b>Chat del tavolo</b><button type="button" class="chat-pin' + (pinned ? ' on' : '') + '" data-chat="pin" aria-pressed="' + pinned + '" title="Mostra sempre gli ultimi messaggi sullo schermo del tavolo">' + (pinned ? 'Sgancia dal tavolo' : 'Fissa sul tavolo') + '</button><button class="chat-x" data-chat="close" aria-label="Chiudi la chat">×</button></div>' +
       '<div class="chat-list" aria-live="polite"></div><div class="chat-err" hidden></div><div class="chat-quick">' + QUICK.map(function (q) { return '<button type="button" data-chat="quick">' + q + '</button>'; }).join('') + '</div>' +
       '<form class="chat-form"><input id="chat-input" maxlength="240" autocomplete="off" enterkeyhint="send" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><button type="submit">Invia</button></form></div>';
     root.addEventListener('click', function (e) { if (e.target === root) close(); });
@@ -1059,7 +1105,7 @@ var Chat = (function () {
   function close(silent) { if (root) { root.remove(); root = null; } isOpen = false; }
   function send(text) {
     var ok = Net.sendChat(text, myNick()), err = root && root.querySelector('.chat-err');
-    if (ok) { if (root) { root.querySelector('#chat-input').value = ''; if (err) err.hidden = true; paintList(); root.querySelector('.chat-list').scrollTop = 1e9; } }
+    if (ok) { paintDock(false); if (root) { root.querySelector('#chat-input').value = ''; if (err) err.hidden = true; paintList(); root.querySelector('.chat-list').scrollTop = 1e9; } }
     else if (err && String(text || '').trim()) { err.textContent = 'Sei offline: il messaggio non è partito. Riprova quando torna la connessione.'; err.hidden = false; }
   }
   function hideBubble() { var b = document.querySelector('.chat-bubble'); if (b) b.remove(); clearTimeout(bubbleTimer); }
@@ -1072,17 +1118,19 @@ var Chat = (function () {
   }
   Net.onChat(function (m, fromLog) {
     if (Net.tableCode !== code) { code = Net.tableCode; unread = 0; }
+    paintDock(!fromLog && m.uid !== Net.uid);
     if (isOpen) { paintList(); return; }
-    if (!fromLog && m.uid !== Net.uid) { unread++; paintBadges(); bubble(m); }
+    if (!fromLog && m.uid !== Net.uid && !pinned) { unread++; paintBadges(); bubble(m); }
   });
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-chat]'); if (!b) return;
     var a = b.getAttribute('data-chat');
     if (a === 'open') open(); else if (a === 'close') close(); else if (a === 'quick') send(b.textContent);
+    else if (a === 'pin') setPinned(!pinned); else if (a === 'unpin') setPinned(false);
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) close(); });
-  function reset() { close(); hideBubble(); unread = 0; code = Net.tableCode; paintBadges(); }
-  return { badgeHTML: badgeHTML, open: open, close: close, reset: reset, isOpen: function () { return isOpen; } };
+  function reset() { close(); hideBubble(); unread = 0; code = Net.tableCode; paintBadges(); paintDock(false); }
+  return { badgeHTML: badgeHTML, dockHTML: dockHTML, isPinned: function () { return pinned; }, open: open, close: close, reset: reset, isOpen: function () { return isOpen; } };
 })();
 
 /* ===== Presagio: regole (equivalenti al gioco di prese a previsione con Maghi e Giullari) ===== */
@@ -1115,12 +1163,12 @@ var PREngine = (function () {
     if (k < 3 || k > 6) throw new Error('Servono da 3 a 6 giocatori.');
     var s = {
       v: 1, phase: 'bid', winner: null, seq: 0, logN: 0, log: [], flash: null,
-      opts: { noEven: !!(opts && opts.noEven) },
+      opts: { hidden: !!(opts && opts.hidden), noEven: !!(opts && opts.noEven && !opts.hidden) },
       players: seats.map(function (st) { return { uid: st.uid, nick: st.nick, bot: !!st.bot, score: 0, hand: [], bid: null, tricks: 0, hist: [] }; }),
       rounds: 60 / k, round: 0, dealer: Math.floor(Math.random() * k),
       trump: null, trumpCard: null, turn: 0, leader: 0, trick: [], lastTrick: null, deckLeft: 0
     };
-    log(s, 'Si apre la partita a ' + k + ' giocatori: ' + s.rounds + ' mani.' + (s.opts.noEven ? ' Regola attiva: la somma delle previsioni non può essere uguale alle prese.' : ''), 'turn');
+    log(s, 'Si apre la partita a ' + k + ' giocatori: ' + s.rounds + ' mani.' + (s.opts.noEven ? ' Regola attiva: la somma delle previsioni non può essere uguale alle prese.' : '') + (s.opts.hidden ? ' Previsioni coperte: si scoprono a fine mano.' : ''), 'turn');
     startRound(s);
     return s;
   }
@@ -1193,6 +1241,7 @@ var PREngine = (function () {
   }
 
   function scoreRound(s) {
+    if (s.opts.hidden) log(s, 'Si scoprono le previsioni: ' + s.players.map(function (P) { return P.nick + ' ' + P.bid; }).join(', ') + '.', 'sys');
     s.players.forEach(function (P) {
       var d = P.bid === P.tricks ? 20 + 10 * P.tricks : -10 * Math.abs(P.bid - P.tricks);
       P.score += d; P.hist.push({ bid: P.bid, tricks: P.tricks, delta: d, score: P.score });
@@ -1221,11 +1270,12 @@ var PREngine = (function () {
       var b = a.b;
       if (a.a !== 'bid' || typeof b !== 'number' || b !== Math.floor(b) || b < 0 || b > s.round) return 'Previsione non valida.';
       if (forbiddenBid(s, p) === b) return 'Con la regola della somma diversa non puoi dichiarare ' + b + '.';
-      P.bid = b; log(s, nm(s, p) + ' prevede ' + b + (b === 1 ? ' presa.' : ' prese.'), 'bid');
+      P.bid = b; log(s, s.opts.hidden ? nm(s, p) + ' ha fatto la sua previsione.' : nm(s, p) + ' prevede ' + b + (b === 1 ? ' presa.' : ' prese.'), 'bid');
       s.flash = { kind: 'bid', p: p, n: s.logN };
       if (p === s.dealer) {
         var sum = bidSum(s);
-        log(s, 'Previsioni: ' + sum + ' su ' + s.round + (sum > s.round ? ' (più delle prese: qualcuno resterà deluso)' : sum < s.round ? ' (meno delle prese: qualcuno ne farà di troppo)' : '') + '.', 'sys');
+        if (s.opts.hidden) log(s, 'Previsioni fatte: restano coperte fino alla fine della mano.', 'sys');
+        else log(s, 'Previsioni: ' + sum + ' su ' + s.round + (sum > s.round ? ' (più delle prese: qualcuno resterà deluso)' : sum < s.round ? ' (meno delle prese: qualcuno ne farà di troppo)' : '') + '.', 'sys');
         s.phase = 'play'; s.leader = next(s, s.dealer); s.turn = s.leader;
       } else s.turn = next(s, p);
     } else if (s.phase === 'play') {
@@ -1397,7 +1447,7 @@ var TV = (function () {
     var root = $id('app');
     root.innerHTML = '<div class="tv" id="tv"><div class="tv-sky"></div>' +
       '<div class="tv-top"><span class="brand">Presagio</span><span class="info" id="tv-info"></span><button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
-      '<div id="tv-banner" class="tv-banner"></div>' +
+      '<div id="tv-banner" class="tv-banner"></div>' + Chat.dockHTML() +
       '<div class="tv-table" id="tv-table"><div class="tv-oval"></div><div class="tv-trump" id="tv-trump"></div><div class="tv-pr" id="tv-pr"></div><div class="tv-msg" id="tv-msg"></div><div class="tv-zone" id="tv-zone"></div><div id="tv-seats"></div></div>' +
       '<div class="tv-status" id="tv-status" aria-live="polite"></div><div class="tv-me" id="tv-me"></div><div class="tv-hand" id="tv-hand" aria-label="La tua mano"></div><div class="tv-actions" id="tv-actions"></div></div>';
     st = { code: App.code, round: null, shown: [], sweptN: 0, running: false, latest: null, handRects: {}, flashN: 0, scoredRound: 0, first: true, seatPos: {} };
@@ -1424,13 +1474,17 @@ var TV = (function () {
       var turn = g.turn === i && g.phase !== 'over';
       out += '<button class="tv-seat' + (turn ? ' turn' : '') + (P.bot ? ' bot' : '') + '" data-pl="' + i + '" style="left:' + p.x + '%;top:' + p.y + '%">' +
         '<span class="tv-ava">' + esc((P.nick || '?').charAt(0).toUpperCase()) + (g.dealer === i ? '<span class="dl" title="Mazziere">M</span>' : '') + '</span>' +
-        '<span class="nm">' + esc(P.nick) + '</span>' + gemsHTML(P) + '<span class="sc">' + P.score + ' pt' + (P.bot ? ' · auto' : '') + '</span></button>';
+        '<span class="nm">' + esc(P.nick) + '</span>' + gemsHTML(P, bidHidden(g, i, me)) + '<span class="sc">' + P.score + ' pt' + (P.bot ? ' · auto' : '') + '</span></button>';
     });
     st.seatPos[me] = 0;
     return out;
   }
-  function gemsHTML(P) {
+  function gemsHTML(P, hide) {
     if (P.bid == null) return '<span class="gems"><span class="nb">prevede…</span></span>';
+    if (hide) { // previsione coperta: si vede solo che c'è, più le prese già fatte
+      var t = ''; for (var k = 0; k < P.tricks; k++) t += '<i class="tk"></i>';
+      return '<span class="gems sealed" title="Previsione coperta · ' + P.tricks + (P.tricks === 1 ? ' presa' : ' prese') + '"><span class="seal" aria-label="previsione coperta"></span>' + (t || '<span class="nb">coperta</span>') + '</span>';
+    }
     var n = Math.max(P.bid, P.tricks), s = '';
     for (var i = 0; i < n; i++) s += '<i class="' + (i < P.tricks ? (i < P.bid ? 'on' : 'over') : '') + '"></i>';
     if (!n) s = '<span class="nb">0 prese</span>';
@@ -1530,13 +1584,24 @@ var TV = (function () {
   }
 
   /* ---------- mano a ventaglio ---------- */
-  function layoutHand(n, w, cw) {
-    var spread = Math.min(34, n * 3.4), step = n > 1 ? Math.min(cw * 0.64, (w - cw - 16) / (n - 1)) : 0, out = [];
+  // Una fila a ventaglio. Tiene conto di quanto le carte inclinate sporgono ai lati,
+  // così anche la prima carta a sinistra resta tutta dentro lo schermo.
+  function fanRow(n, w, cw, maxSpread) {
+    var ch = cw * 1.4, spread = Math.min(maxSpread, n * 3.4), half = spread / 2 * Math.PI / 180;
+    var over = Math.max(0, ch * 1.2 * Math.sin(half) - cw / 2 * (1 - Math.cos(half)));
+    var avail = Math.max(0, w - 12 - cw - 2 * over), step = n > 1 ? Math.min(cw * 0.64, avail / (n - 1)) : 0, out = [];
     for (var i = 0; i < n; i++) {
-      var f = n > 1 ? i / (n - 1) - 0.5 : 0, a = spread * f;
-      out.push({ x: (i - (n - 1) / 2) * step, y: Math.abs(f) * Math.abs(f) * 34, a: a });
+      var f = n > 1 ? i / (n - 1) - 0.5 : 0;
+      out.push({ x: (i - (n - 1) / 2) * step, y: f * f * spread, a: spread * f });
     }
-    return out;
+    return { cards: out, step: step };
+  }
+  // Se in una fila le carte si coprirebbero troppo (non si legge il valore), si va su due file.
+  function layoutHand(n, w, cw) {
+    var one = fanRow(n, w, cw, 34);
+    if (n < 8 || one.step >= cw * 0.42) return { two: false, cards: one.cards };
+    var top = Math.ceil(n / 2), a = fanRow(top, w, cw, 14), b = fanRow(n - top, w, cw, 14), lift = cw * 1.4 * 0.56;
+    return { two: true, cards: a.cards.map(function (c) { c.y -= lift; c.row = 0; return c; }).concat(b.cards.map(function (c) { c.row = 1; return c; })) };
   }
   function renderHand(g, me, dealing) {
     var box = $id('tv-hand'); if (!box) return;
@@ -1556,12 +1621,13 @@ var TV = (function () {
     Object.keys(have).forEach(function (c) { if (!keep[c]) have[c].remove(); });
     if (!P.hand.length) { box.insertAdjacentHTML('beforeend', '<div class="empty">' + (g.phase === 'over' ? 'Partita finita.' : 'Nessuna carta in mano.') + '</div>'); return; }
     var w = box.clientWidth, sample = keep[P.hand[0]], cw = sample.offsetWidth || 90;
-    var lay = layoutHand(P.hand.length, w, cw);
+    var L0 = layoutHand(P.hand.length, w, cw), lay = L0.cards;
+    if (box.classList.contains('two') !== L0.two) { box.classList.toggle('two', L0.two); cw = sample.offsetWidth || cw; lay = layoutHand(P.hand.length, w, cw).cards; }
     P.hand.forEach(function (c, i) {
       var el = keep[c], L = lay[i], ok = playable && playable.indexOf(c) >= 0;
       el.classList.toggle('ok', !!ok); el.classList.toggle('no', !!playable && !ok); el.classList.toggle('sel', App.sel === c);
       var lift = App.sel === c ? -30 : ok ? -12 : 0;
-      el.style.zIndex = i + 1;
+      el.style.zIndex = App.sel === c ? 99 : i + 1;
       el.style.transform = 'translate(' + L.x.toFixed(1) + 'px,' + (L.y + lift).toFixed(1) + 'px) rotate(' + L.a.toFixed(1) + 'deg)';
     });
     if (dealing) {
@@ -1610,14 +1676,34 @@ var TV = (function () {
   function effects(g, me) {
     if (g.flash && g.flash.n > st.flashN) {
       var fl = g.flash; st.flashN = fl.n;
-      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; floatAt(seatPoint(fl.p), (fl.p === me ? 'Prevedi ' : 'Prevede ') + P.bid, false); }
+      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; floatAt(seatPoint(fl.p), fl.p === me ? 'Prevedi ' + P.bid : bidHidden(g, fl.p, me) ? 'Ha previsto ✦' : 'Prevede ' + P.bid, false); }
     }
     if (g.phase === 'roundEnd' && st.scoredRound !== g.round) {
       st.scoredRound = g.round;
+      var wait = 1500;
+      if (!st.first && g.opts.hidden) { // si scoprono le previsioni, poi i punti
+        wait = 3300;
+        setTimeout(function () { revealBids(g, me); }, 1300);
+      }
       if (!st.first) setTimeout(function () {
         g.players.forEach(function (P, i) { var h = P.hist[P.hist.length - 1]; if (h) floatAt(seatPoint(i), (h.delta > 0 ? '+' : '') + h.delta, h.delta < 0); });
-      }, 1500);
+      }, wait);
     }
+  }
+
+  function revealBids(g, me) {
+    g.players.forEach(function (P, i) {
+      var h = P.hist[P.hist.length - 1]; if (!h) return;
+      var pt = seatPoint(i), f = document.createElement('div');
+      f.className = 'reveal' + (h.bid === h.tricks ? ' hit' : '');
+      f.innerHTML = '<small>' + (i === me ? 'Prevedevi' : 'Prevedeva') + '</small>' + h.bid;
+      f.style.left = pt.x + 'px'; f.style.top = (pt.y - 34) + 'px';
+      document.body.appendChild(f);
+      anim(f, [{ transform: 'translate(-50%,-50%) rotateY(90deg) scale(.6)', opacity: 0 }, { transform: 'translate(-50%,-50%) rotateY(0) scale(1.1)', opacity: 1, offset: .2 },
+        { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: .85 }, { transform: 'translate(-50%,-70%) scale(.95)', opacity: 0 }], { duration: 2000, delay: i * 120, easing: 'ease-out', fill: 'both' })
+        .then(function () { f.remove(); });
+      if (reduce) setTimeout(function () { f.remove(); }, 1500);
+    });
   }
 
   /* ---------- timer ad anello sul posto di chi deve giocare ---------- */
@@ -1637,8 +1723,11 @@ var TV = (function () {
     var first = st.first;
     $id('tv-info').innerHTML = '<b>' + connInfo('Mano ' + g.round + ' / ' + g.rounds) + '</b><small>Tavolo ' + esc(doc.code) + '</small>';
     var tone = allBid ? (sum > g.round ? 'over' : sum < g.round ? 'under' : 'even') : '';
-    $id('tv-pr').className = 'tv-pr ' + tone;
-    $id('tv-pr').innerHTML = '<span class="orb">' + sum + '<small>/' + g.round + '</small></span><span>Previste<b>' + (!allBid ? 'in corso…' : tone === 'over' ? 'troppe' : tone === 'under' ? 'poche' : 'somma pari') + '</b></span>';
+    var covered = g.opts.hidden && (g.phase === 'bid' || g.phase === 'play' || g.phase === 'trump');
+    $id('tv-pr').className = 'tv-pr ' + (covered ? 'sealed' : tone);
+    $id('tv-pr').innerHTML = covered
+      ? '<span class="orb">?<small>/' + g.round + '</small></span><span>Previsioni<b>coperte</b></span>'
+      : '<span class="orb">' + sum + '<small>/' + g.round + '</small></span><span>Previste<b>' + (!allBid ? 'in corso…' : tone === 'over' ? 'troppe' : tone === 'under' ? 'poche' : 'somma pari') + '</b></span>';
     $id('tv-banner').innerHTML = hostBanner();
     $id('tv-seats').innerHTML = seatsHTML(g, me);
     var tc = g.trump != null ? ['var(--fiamme)', 'var(--maree)', 'var(--foreste)', 'var(--sabbie)'][g.trump] : null;
@@ -1728,7 +1817,8 @@ function tableReducer(doc, from, op) {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
       doc.opts = doc.opts || {};
-      if (op.noEven != null) doc.opts.noEven = !!op.noEven;
+      if (op.noEven != null) { doc.opts.noEven = !!op.noEven; if (doc.opts.noEven) doc.opts.hidden = false; }
+      if (op.hidden != null) { doc.opts.hidden = !!op.hidden; if (doc.opts.hidden) doc.opts.noEven = false; }
       if (op.timer != null) doc.opts.timer = Math.max(0, Math.min(600, +op.timer || 0));
       return {};
     }
@@ -1773,7 +1863,7 @@ Turns.setup({
     g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true;
   }
 });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.noEven) notes.push('somma diversa'); if (o.timer === 0) notes.push('senza timer'); return { max: 6, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.noEven) notes.push('somma diversa'); if (o.hidden) notes.push('previsioni coperte'); if (o.timer === 0) notes.push('senza timer'); return { max: 6, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i giocatori automatici.'); render(); });
 
 /* ---------- azioni ---------- */
@@ -1889,7 +1979,15 @@ function onDoc() {
   if (g) {
     // fogli automatici: riepilogo di fine mano e fine partita
     var key = g.phase === 'roundEnd' ? 'r' + g.round : g.phase === 'over' ? 'over' : null;
-    if (key && key !== App.sheetKey) { App.sheetKey = key; App.sheet = { kind: g.phase === 'over' ? 'over' : 'round' }; }
+    if (key && key !== App.sheetKey) {
+      // il riepilogo arriva dopo che l'ultima presa (e, se coperte, le previsioni) si sono viste sul tavolo
+      var fresh = TV.mounted(), kind = g.phase === 'over' ? 'over' : 'round';
+      App.sheetKey = key;
+      setTimeout(function () {
+        var gg = App.doc && App.doc.game, k2 = gg && (gg.phase === 'roundEnd' ? 'r' + gg.round : gg.phase === 'over' ? 'over' : null);
+        if (k2 === key && App.screen === 'table' && !App.sheet) { App.sheet = { kind: kind }; renderSheet(); }
+      }, fresh ? (g.opts.hidden ? 5000 : 2900) : 0);
+    }
     if (!key && App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
     if (App.sel != null && myIdx() >= 0 && g.players[myIdx()].hand.indexOf(App.sel) < 0) App.sel = null;
   } else if (App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
@@ -1946,7 +2044,7 @@ function roomHTML() {
       ((isHost && s.uid !== Net.uid) || (s.uid === Net.uid && !isHost) ? '<button class="x" data-act="kick" data-uid="' + esc(s.uid) + '" aria-label="Togli ' + esc(s.nick) + '">×</button>' : '') + '</div>';
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
-  var noEven = !!(d.opts && d.opts.noEven);
+  var noEven = !!(d.opts && d.opts.noEven), hidden = !!(d.opts && d.opts.hidden);
   var rounds = n >= 3 ? 60 / Math.max(3, Math.min(6, n)) : 20;
   return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
@@ -1954,6 +2052,7 @@ function roomHTML() {
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/6)</h2><div class="seats">' + seats + '</div>' +
     '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-noeven"' + (noEven ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Somma delle previsioni diversa dalle prese</b><br><span class="muted" style="font-size:15px">Il mazziere, che dichiara per ultimo, non può dire il numero che renderebbe la somma uguale alle prese della mano.</span></span></label>' +
+    '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-hidden"' + (hidden ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Previsioni coperte</b><br><span class="muted" style="font-size:15px">Ognuno dichiara senza far vedere il numero: le previsioni di tutti si scoprono solo a fine mano. Non si combina con la somma diversa.</span></span></label>' +
     Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 6 ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 3 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 3 ? '<p class="lead">Mancano ' + (3 - n) + ' giocatori per iniziare.</p>' : '<p class="lead">In ' + n + ' si giocano ' + rounds + ' mani.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
@@ -1961,6 +2060,8 @@ function roomHTML() {
     '</section></div>';
 }
 
+// Con le previsioni coperte, quella degli altri resta nascosta finché la mano non è finita.
+function bidHidden(g, i, me) { return !!(g.opts && g.opts.hidden) && i !== me && (g.phase === 'bid' || g.phase === 'play' || g.phase === 'trump'); }
 function statusLine(g, me, sum, allBid, short) {
   var who = function (i) { return i === me ? 'tu' : esc(g.players[i].nick); };
   var pr = 'Previsioni: <b>' + sum + '</b> su ' + g.round + (g.round === 1 ? ' presa' : ' prese') + (allBid ? (sum > g.round ? ' · ne mancano per tutti' : sum < g.round ? ' · ne avanzano' : ' · somma pari') : '');
@@ -1968,7 +2069,7 @@ function statusLine(g, me, sum, allBid, short) {
   if (g.phase === 'over') return 'Partita finita.';
   if (g.phase === 'roundEnd') return 'Fine della mano ' + g.round + '. ' + pr;
   if (g.phase === 'trump') return 'Il mazziere (' + who(g.dealer) + ') sceglie la briscola.';
-  if (g.phase === 'bid') return (g.turn === me ? '<b>Tocca a te prevedere.</b> ' : 'Prevede <b>' + who(g.turn) + '</b>. ') + pr + (g.opts.noEven ? ' · regola somma diversa' : '');
+  if (g.phase === 'bid') return (g.turn === me ? '<b>Tocca a te prevedere.</b> ' : 'Prevede <b>' + who(g.turn) + '</b>. ') + pr + (g.opts.noEven ? ' · regola somma diversa' : '') + (g.opts.hidden ? (g.turn === me ? ' Gli altri non vedranno il tuo numero fino a fine mano.' : ' Previsioni coperte.') : '');
   return (g.turn === me ? '<b>Tocca a te.</b>' : 'Gioca <b>' + who(g.turn) + '</b>.') + ' ' + followNote(g, me) + ' ' + pr;
 }
 // Spiega quale colore va seguito nella presa in corso (o perché la carta è libera).
@@ -2031,7 +2132,7 @@ function sheetBody(s) {
     '<button class="btn block" style="background:linear-gradient(180deg,#e0705e,#a63a2a);color:#fff" data-act="closeyes">Chiudi per tutti</button><button class="btn block ghost" data-act="close">Annulla</button>';
   if (s.kind === 'player' && g) {
     var P = g.players[s.p];
-    return '<h2>' + esc(P.nick) + '</h2><p class="lead">' + P.score + ' punti · ' + (P.bid == null ? 'non ha ancora previsto' : 'ha previsto ' + P.bid + ', ne ha fatte ' + P.tricks) + ' · ' + P.hand.length + ' carte in mano</p>' +
+    return '<h2>' + esc(P.nick) + '</h2><p class="lead">' + P.score + ' punti · ' + (P.bid == null ? 'non ha ancora previsto' : bidHidden(g, s.p, me) ? 'previsione coperta, ' + P.tricks + (P.tricks === 1 ? ' presa fatta' : ' prese fatte') : 'ha previsto ' + P.bid + ', ne ha fatte ' + P.tricks) + ' · ' + P.hand.length + ' carte in mano</p>' +
       (App.doc.host === Net.uid && s.p !== me && g.phase !== 'over' ? '<button class="btn ghost block" data-act="auto" data-p="' + s.p + '">' + (P.bot ? 'Ridai il controllo al giocatore' : 'Fallo giocare in automatico (se è assente)') + '</button>' : '') +
       '<button class="btn block" data-act="close">Chiudi</button>';
   }
@@ -2042,6 +2143,7 @@ var RULES = '<p>Si gioca con 60 carte: quattro casate (Fiamme, Maree, Foreste, S
   '<h3>Le mani</h3><p>Nella prima mano ognuno riceve 1 carta, nella seconda 2 e così via, finché il mazzo basta: 20 mani in 3, 15 in 4, 12 in 5, 10 in 6. Il mazziere cambia ogni mano.</p>' +
   '<h3>La briscola</h3><ul><li>Dopo la distribuzione si scopre la prima carta del mazzo: il suo colore è la briscola.</li><li>Se è un Giullare non c’è briscola.</li><li>Se è un Arcimago, il mazziere sceglie il colore.</li><li>Nell’ultima mano non resta niente da scoprire: si gioca senza briscola.</li></ul>' +
   '<h3>La previsione</h3><p>A turno, partendo da chi siede dopo il mazziere, ognuno dichiara quante prese farà. Con la regola <b>somma diversa</b>, il mazziere non può dichiarare il numero che renderebbe la somma uguale alle prese della mano.</p>' +
+  '<h3>Previsioni coperte (opzione del tavolo)</h3><p>Ognuno dichiara a turno ma il numero resta nascosto agli altri: si vede solo chi ha già previsto e quante prese ha fatto. A fine mano si scoprono tutte le previsioni e si contano i punti.</p>' +
   '<h3>Le prese</h3><ul><li>Apre chi siede dopo il mazziere; poi apre chi ha vinto l’ultima presa.</li><li>Bisogna rispondere al colore di chi apre, se lo si ha. Arcimaghi e Giullari si possono giocare sempre.</li><li>Se si apre con un Arcimago, gli altri giocano quello che vogliono. Se si apre con un Giullare, il colore lo decide la prima carta numerata.</li><li>Vince il primo Arcimago; altrimenti la briscola più alta; altrimenti la carta più alta del colore di uscita. Se tutti giocano Giullari, vince il primo.</li></ul>' +
   '<h3>Punti</h3><ul><li>Previsione esatta: 20 punti più 10 per ogni presa.</li><li>Previsione sbagliata: −10 per ogni presa di differenza.</li></ul>' +
   '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p>' +
@@ -2095,6 +2197,7 @@ document.addEventListener('click', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   if (ev.target.id === 'opt-noeven') send({ t: 'opt', noEven: ev.target.checked });
+  if (ev.target.id === 'opt-hidden') send({ t: 'opt', hidden: ev.target.checked });
   if (ev.target.id === 'opt-timer') send({ t: 'opt', timer: +ev.target.value });
   if (ev.target.id === 'opt-vis') send({ t: 'vis', vis: ev.target.value });
 });

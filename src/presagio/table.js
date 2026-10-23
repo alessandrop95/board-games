@@ -17,7 +17,7 @@ var TV = (function () {
     var root = $id('app');
     root.innerHTML = '<div class="tv" id="tv"><div class="tv-sky"></div>' +
       '<div class="tv-top"><span class="brand">Presagio</span><span class="info" id="tv-info"></span><button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
-      '<div id="tv-banner" class="tv-banner"></div>' +
+      '<div id="tv-banner" class="tv-banner"></div>' + Chat.dockHTML() +
       '<div class="tv-table" id="tv-table"><div class="tv-oval"></div><div class="tv-trump" id="tv-trump"></div><div class="tv-pr" id="tv-pr"></div><div class="tv-msg" id="tv-msg"></div><div class="tv-zone" id="tv-zone"></div><div id="tv-seats"></div></div>' +
       '<div class="tv-status" id="tv-status" aria-live="polite"></div><div class="tv-me" id="tv-me"></div><div class="tv-hand" id="tv-hand" aria-label="La tua mano"></div><div class="tv-actions" id="tv-actions"></div></div>';
     st = { code: App.code, round: null, shown: [], sweptN: 0, running: false, latest: null, handRects: {}, flashN: 0, scoredRound: 0, first: true, seatPos: {} };
@@ -44,13 +44,17 @@ var TV = (function () {
       var turn = g.turn === i && g.phase !== 'over';
       out += '<button class="tv-seat' + (turn ? ' turn' : '') + (P.bot ? ' bot' : '') + '" data-pl="' + i + '" style="left:' + p.x + '%;top:' + p.y + '%">' +
         '<span class="tv-ava">' + esc((P.nick || '?').charAt(0).toUpperCase()) + (g.dealer === i ? '<span class="dl" title="Mazziere">M</span>' : '') + '</span>' +
-        '<span class="nm">' + esc(P.nick) + '</span>' + gemsHTML(P) + '<span class="sc">' + P.score + ' pt' + (P.bot ? ' · auto' : '') + '</span></button>';
+        '<span class="nm">' + esc(P.nick) + '</span>' + gemsHTML(P, bidHidden(g, i, me)) + '<span class="sc">' + P.score + ' pt' + (P.bot ? ' · auto' : '') + '</span></button>';
     });
     st.seatPos[me] = 0;
     return out;
   }
-  function gemsHTML(P) {
+  function gemsHTML(P, hide) {
     if (P.bid == null) return '<span class="gems"><span class="nb">prevede…</span></span>';
+    if (hide) { // previsione coperta: si vede solo che c'è, più le prese già fatte
+      var t = ''; for (var k = 0; k < P.tricks; k++) t += '<i class="tk"></i>';
+      return '<span class="gems sealed" title="Previsione coperta · ' + P.tricks + (P.tricks === 1 ? ' presa' : ' prese') + '"><span class="seal" aria-label="previsione coperta"></span>' + (t || '<span class="nb">coperta</span>') + '</span>';
+    }
     var n = Math.max(P.bid, P.tricks), s = '';
     for (var i = 0; i < n; i++) s += '<i class="' + (i < P.tricks ? (i < P.bid ? 'on' : 'over') : '') + '"></i>';
     if (!n) s = '<span class="nb">0 prese</span>';
@@ -150,13 +154,24 @@ var TV = (function () {
   }
 
   /* ---------- mano a ventaglio ---------- */
-  function layoutHand(n, w, cw) {
-    var spread = Math.min(34, n * 3.4), step = n > 1 ? Math.min(cw * 0.64, (w - cw - 16) / (n - 1)) : 0, out = [];
+  // Una fila a ventaglio. Tiene conto di quanto le carte inclinate sporgono ai lati,
+  // così anche la prima carta a sinistra resta tutta dentro lo schermo.
+  function fanRow(n, w, cw, maxSpread) {
+    var ch = cw * 1.4, spread = Math.min(maxSpread, n * 3.4), half = spread / 2 * Math.PI / 180;
+    var over = Math.max(0, ch * 1.2 * Math.sin(half) - cw / 2 * (1 - Math.cos(half)));
+    var avail = Math.max(0, w - 12 - cw - 2 * over), step = n > 1 ? Math.min(cw * 0.64, avail / (n - 1)) : 0, out = [];
     for (var i = 0; i < n; i++) {
-      var f = n > 1 ? i / (n - 1) - 0.5 : 0, a = spread * f;
-      out.push({ x: (i - (n - 1) / 2) * step, y: Math.abs(f) * Math.abs(f) * 34, a: a });
+      var f = n > 1 ? i / (n - 1) - 0.5 : 0;
+      out.push({ x: (i - (n - 1) / 2) * step, y: f * f * spread, a: spread * f });
     }
-    return out;
+    return { cards: out, step: step };
+  }
+  // Se in una fila le carte si coprirebbero troppo (non si legge il valore), si va su due file.
+  function layoutHand(n, w, cw) {
+    var one = fanRow(n, w, cw, 34);
+    if (n < 8 || one.step >= cw * 0.42) return { two: false, cards: one.cards };
+    var top = Math.ceil(n / 2), a = fanRow(top, w, cw, 14), b = fanRow(n - top, w, cw, 14), lift = cw * 1.4 * 0.56;
+    return { two: true, cards: a.cards.map(function (c) { c.y -= lift; c.row = 0; return c; }).concat(b.cards.map(function (c) { c.row = 1; return c; })) };
   }
   function renderHand(g, me, dealing) {
     var box = $id('tv-hand'); if (!box) return;
@@ -176,12 +191,13 @@ var TV = (function () {
     Object.keys(have).forEach(function (c) { if (!keep[c]) have[c].remove(); });
     if (!P.hand.length) { box.insertAdjacentHTML('beforeend', '<div class="empty">' + (g.phase === 'over' ? 'Partita finita.' : 'Nessuna carta in mano.') + '</div>'); return; }
     var w = box.clientWidth, sample = keep[P.hand[0]], cw = sample.offsetWidth || 90;
-    var lay = layoutHand(P.hand.length, w, cw);
+    var L0 = layoutHand(P.hand.length, w, cw), lay = L0.cards;
+    if (box.classList.contains('two') !== L0.two) { box.classList.toggle('two', L0.two); cw = sample.offsetWidth || cw; lay = layoutHand(P.hand.length, w, cw).cards; }
     P.hand.forEach(function (c, i) {
       var el = keep[c], L = lay[i], ok = playable && playable.indexOf(c) >= 0;
       el.classList.toggle('ok', !!ok); el.classList.toggle('no', !!playable && !ok); el.classList.toggle('sel', App.sel === c);
       var lift = App.sel === c ? -30 : ok ? -12 : 0;
-      el.style.zIndex = i + 1;
+      el.style.zIndex = App.sel === c ? 99 : i + 1;
       el.style.transform = 'translate(' + L.x.toFixed(1) + 'px,' + (L.y + lift).toFixed(1) + 'px) rotate(' + L.a.toFixed(1) + 'deg)';
     });
     if (dealing) {
@@ -230,14 +246,34 @@ var TV = (function () {
   function effects(g, me) {
     if (g.flash && g.flash.n > st.flashN) {
       var fl = g.flash; st.flashN = fl.n;
-      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; floatAt(seatPoint(fl.p), (fl.p === me ? 'Prevedi ' : 'Prevede ') + P.bid, false); }
+      if (fl.kind === 'bid' && !st.first) { var P = g.players[fl.p]; floatAt(seatPoint(fl.p), fl.p === me ? 'Prevedi ' + P.bid : bidHidden(g, fl.p, me) ? 'Ha previsto ✦' : 'Prevede ' + P.bid, false); }
     }
     if (g.phase === 'roundEnd' && st.scoredRound !== g.round) {
       st.scoredRound = g.round;
+      var wait = 1500;
+      if (!st.first && g.opts.hidden) { // si scoprono le previsioni, poi i punti
+        wait = 3300;
+        setTimeout(function () { revealBids(g, me); }, 1300);
+      }
       if (!st.first) setTimeout(function () {
         g.players.forEach(function (P, i) { var h = P.hist[P.hist.length - 1]; if (h) floatAt(seatPoint(i), (h.delta > 0 ? '+' : '') + h.delta, h.delta < 0); });
-      }, 1500);
+      }, wait);
     }
+  }
+
+  function revealBids(g, me) {
+    g.players.forEach(function (P, i) {
+      var h = P.hist[P.hist.length - 1]; if (!h) return;
+      var pt = seatPoint(i), f = document.createElement('div');
+      f.className = 'reveal' + (h.bid === h.tricks ? ' hit' : '');
+      f.innerHTML = '<small>' + (i === me ? 'Prevedevi' : 'Prevedeva') + '</small>' + h.bid;
+      f.style.left = pt.x + 'px'; f.style.top = (pt.y - 34) + 'px';
+      document.body.appendChild(f);
+      anim(f, [{ transform: 'translate(-50%,-50%) rotateY(90deg) scale(.6)', opacity: 0 }, { transform: 'translate(-50%,-50%) rotateY(0) scale(1.1)', opacity: 1, offset: .2 },
+        { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: .85 }, { transform: 'translate(-50%,-70%) scale(.95)', opacity: 0 }], { duration: 2000, delay: i * 120, easing: 'ease-out', fill: 'both' })
+        .then(function () { f.remove(); });
+      if (reduce) setTimeout(function () { f.remove(); }, 1500);
+    });
   }
 
   /* ---------- timer ad anello sul posto di chi deve giocare ---------- */
@@ -257,8 +293,11 @@ var TV = (function () {
     var first = st.first;
     $id('tv-info').innerHTML = '<b>' + connInfo('Mano ' + g.round + ' / ' + g.rounds) + '</b><small>Tavolo ' + esc(doc.code) + '</small>';
     var tone = allBid ? (sum > g.round ? 'over' : sum < g.round ? 'under' : 'even') : '';
-    $id('tv-pr').className = 'tv-pr ' + tone;
-    $id('tv-pr').innerHTML = '<span class="orb">' + sum + '<small>/' + g.round + '</small></span><span>Previste<b>' + (!allBid ? 'in corso…' : tone === 'over' ? 'troppe' : tone === 'under' ? 'poche' : 'somma pari') + '</b></span>';
+    var covered = g.opts.hidden && (g.phase === 'bid' || g.phase === 'play' || g.phase === 'trump');
+    $id('tv-pr').className = 'tv-pr ' + (covered ? 'sealed' : tone);
+    $id('tv-pr').innerHTML = covered
+      ? '<span class="orb">?<small>/' + g.round + '</small></span><span>Previsioni<b>coperte</b></span>'
+      : '<span class="orb">' + sum + '<small>/' + g.round + '</small></span><span>Previste<b>' + (!allBid ? 'in corso…' : tone === 'over' ? 'troppe' : tone === 'under' ? 'poche' : 'somma pari') + '</b></span>';
     $id('tv-banner').innerHTML = hostBanner();
     $id('tv-seats').innerHTML = seatsHTML(g, me);
     var tc = g.trump != null ? ['var(--fiamme)', 'var(--maree)', 'var(--foreste)', 'var(--sabbie)'][g.trump] : null;
