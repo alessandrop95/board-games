@@ -40,6 +40,18 @@ Illustrazioni: incisioni antiche di pubblico dominio da Wikimedia Commons (Gusta
 il planisfero di Cellarius e la xilografia Flammarion), ricolorate in stile fantasy da `tools/process_assets.py`.
 Originali e crediti in `presagio/img/src/` (scaricati dalla Action «assets»).
 
+## Gattomina
+
+Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori (regole equivalenti al gioco base dei gattini esplosivi, con nomi e grafica originali).
+
+**Gioca:** https://alessandrop95.github.io/board-games/gattomina/
+
+- 56 carte: 4 Gattomine, 6 Scatolette (disinnesco), Agguato, Pisolino, Fusa, Gomitolo, Sfera, Soffio! e cinque tipi di Micio da giocare in coppia.
+- Ognuno riceve 7 carte e una Scatoletta; nel mazzo ci sono tante Gattomine quanti i giocatori meno uno.
+- Dopo ogni carta giocata ci sono alcuni secondi per rispondere con un Soffio! (anche a catena).
+- Combinazioni: coppia (rubi a caso), tris (chiedi una carta precisa), cinque diverse (prendi dagli scarti).
+- Grafica: emoji 3D di [Noto Emoji](https://github.com/googlefonts/noto-emoji) di Google, licenza Apache 2.0 (copia in `gattomina/img/e/`), composte in carte cartoon.
+
 ## Installare i giochi sul telefono
 
 - **Android (Chrome):** tocca *Installa app* nella pagina del gioco, oppure menu ⋮ → *Installa app* / *Aggiungi a schermata Home*.

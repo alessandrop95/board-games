@@ -52,4 +52,9 @@ pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, 
 open(os.path.join(ROOT, 'presagio', 'index.html'), 'w', encoding='utf-8').write(page(
     'Presagio', 'Gioco di carte a prese con previsione, da 3 a 6 giocatori, ognuno dal proprio telefono.', '#06050d',
     'family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:wght@500;600;700', r(pr, 'style.css'), pr_js, 'Presagio'))
+gm = 'src/gattomina/'
+gm_js = "window.GAME_PREFIX = 'gattomina/v1/';\n" + net + '\n' + '\n'.join(r(gm, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'ui.js'])
+open(os.path.join(ROOT, 'gattomina', 'index.html'), 'w', encoding='utf-8').write(page(
+    'Gattomina', 'Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori, ognuno dal proprio telefono.', '#2a1446',
+    'family=Fredoka:wght@400;500;600;700&family=Luckiest+Guy', r(gm, 'style.css'), gm_js, 'Gattomina'))
 print('ok')

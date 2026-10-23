@@ -1,0 +1,1 @@
+Emoji 3D da Noto Emoji di Google (https://github.com/googlefonts/noto-emoji), licenza Apache 2.0 (vedi LICENSE-Apache-2.0.txt). Convertite in WebP 320 px.
