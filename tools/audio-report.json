@@ -1,0 +1,142 @@
+{
+ "polvere-e-piombo/m1": {
+  "title": "Western Streets (ISRC USUAN1100348).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Western_Streets_%28ISRC_USUAN1100348%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 4422091,
+  "duration": 108.982875,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "Kevin MacLeod",
+  "file": "m1.mp3"
+ },
+ "polvere-e-piombo/m2": {
+  "title": "Maple Leaf Rag - played by Scott Joplin 1916 sample.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/e/e9/Maple_Leaf_Rag_-_played_by_Scott_Joplin_1916_sample.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 1607177,
+  "duration": 131.2391836734694,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Scott_Joplin\" class=\"extiw\" title=\"w:en:Scott Joplin\"><span title=\"American composer, musician, pianist (1867/68-1917)\">Scott Joplin</span></a></bdi>",
+  "file": "m2.ogg"
+ },
+ "polvere-e-piombo/gunshot": {
+  "title": "Gunshots 8.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Gunshots_8.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 84809,
+  "duration": 5.851428571428571,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "aradlaw",
+  "file": "gunshot.ogg"
+ },
+ "polvere-e-piombo/explosion": {
+  "title": "Explosion 10.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/3/37/Explosion_10.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 24083,
+  "duration": 2.7206122448979593,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "tcpp",
+  "file": "explosion.ogg"
+ },
+ "polvere-e-piombo/horse": {
+  "title": "Wiehern.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/d/db/Wiehern.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 17541,
+  "duration": 2.27265306122449,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:H%C3%BC&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Hü (page does not exist)\">Hü</a>.",
+  "file": "horse.ogg"
+ },
+ "presagio/m1": {
+  "title": "Fireflies and Stardust (ISRC USUAN1600061).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Fireflies_and_Stardust_%28ISRC_USUAN1600061%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 8164148,
+  "duration": 255.059625,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
+  "file": "m1.mp3"
+ },
+ "presagio/m2": {
+  "title": "Enchanted Valley (ISRC USUAN1200093).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Enchanted_Valley_%28ISRC_USUAN1200093%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 7613259,
+  "duration": 190.275925,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "Kevin MacLeod",
+  "file": "m2.mp3"
+ },
+ "gattomina/m1": {
+  "title": "Monkeys Spinning Monkeys (ISRC USUAN1400011).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/e/e9/Monkeys_Spinning_Monkeys_%28ISRC_USUAN1400011%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 5005207,
+  "duration": 125.0743,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
+  "file": "m1.mp3"
+ },
+ "gattomina/m2": {
+  "title": "Sneaky Snitch (ISRC USUAN1100772).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/1/1f/Sneaky_Snitch_%28ISRC_USUAN1100772%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 5466943,
+  "duration": 136.620425,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "Kevin MacLeod",
+  "file": "m2.mp3"
+ },
+ "gattomina/meow": {
+  "title": "Meow.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/62/Meow.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 14306,
+  "duration": 0.7787981859410431,
+  "mediatype": "AUDIO",
+  "license": "CC BY-SA 3.0",
+  "artist": "The original uploader was <a href=\"https://en.wikipedia.org/wiki/User:Dcrosby\" class=\"extiw\" title=\"wikipedia:User:Dcrosby\">Dcrosby</a> at <a href=\"https://en.wikipedia.org/wiki/\" class=\"extiw\" title=\"wikipedia:\">English Wikipedia</a>.",
+  "file": "meow.ogg"
+ },
+ "gattomina/meow2": {
+  "title": "Meow of a pleading cat.oga",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Meow_of_a_pleading_cat.oga?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 33297,
+  "duration": 11.851875,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Heismark&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Heismark (page does not exist)\">Heismark</a>",
+  "file": "meow2.oga"
+ },
+ "gattomina/purr": {
+  "title": "Purring cat bertie.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/69/Purring_cat_bertie.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 112983,
+  "duration": 8.724897959183673,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "jim_mowatt",
+  "file": "purr.ogg"
+ },
+ "gattomina/explosion": {
+  "title": "Explosion 10.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/3/37/Explosion_10.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 24083,
+  "duration": 2.7206122448979593,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "tcpp",
+  "file": "explosion.ogg"
+ },
+ "gattomina/hiss": {
+  "title": "Cat hissing - Zabuhailo.wav",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Cat_hissing_-_Zabuhailo.wav?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 665906,
+  "duration": 2.3120208333333334,
+  "mediatype": "AUDIO",
+  "license": "CC0",
+  "artist": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.freesound.org/people/Zabuhailo/\">Zabuhailo</a>",
+  "file": "hiss.wav"
+ }
+}
