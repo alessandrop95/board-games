@@ -21,7 +21,7 @@ def catm(c, n):
 def info(titles):
     out = {}
     for i in range(0, len(titles), 40):
-        j = get(API + urllib.parse.urlencode({'action': 'query', 'format': 'json', 'prop': 'imageinfo', 'iiprop': 'size|extmetadata|url', 'iiurlwidth': 260,
+        j = get(API + urllib.parse.urlencode({'action': 'query', 'format': 'json', 'prop': 'imageinfo', 'iiprop': 'size|extmetadata|url', 'iiurlwidth': 520,
               'iiextmetadatafilter': 'LicenseShortName|DateTimeOriginal|Artist|ImageDescription', 'titles': '|'.join('File:' + t for t in titles[i:i + 40])}))
         for p in (j or {}).get('query', {}).get('pages', {}).values():
             if 'imageinfo' not in p: continue
@@ -41,7 +41,7 @@ for name, spec in cfg.items():
     titles = [t for i, t in enumerate(titles) if t not in titles[:i] and not t.lower().endswith(('.pdf', '.djvu', '.svg', '.tif', '.tiff', '.webm', '.ogv'))]
     meta = info(titles)
     titles = [t for t in titles if t in meta]
-    cols = 6; tw, th = 220, 200; rows = (len(titles) + cols - 1) // cols
+    cols = spec.get('cols', 6); tw, th = spec.get('tw', 220), spec.get('th', 200); rows = (len(titles) + cols - 1) // cols
     sheet = Image.new('RGB', (cols * tw, max(1, rows) * (th + 30)), 'white'); d = ImageDraw.Draw(sheet)
     for i, t in enumerate(titles):
         x, y = (i % cols) * tw, (i // cols) * (th + 30)

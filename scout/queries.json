@@ -1,32 +1,52 @@
 {
- "guns": {"search": ["Colt advertisement", "revolver advertisement 1875", "Winchester advertisement", "Sharps rifle", "carbine engraving", "shotgun advertisement", "Spencer carbine"], "n": 8},
- "objects": {"search": ["safe advertisement", "bank vault engraving", "country store", "general store 1880", "jail interior", "prison cell engraving", "dynamite", "giant powder", "spyglass", "field glass engraving", "whiskey barrel engraving"], "n": 6},
- "women": {"search": ["cowgirl 1900", "Russell cowgirl", "frontier woman engraving", "Gibson girl", "dance hall girl", "woman rifle 1890 illustration", "faro dealer", "Harper's Weekly woman west", "Calamity Jane illustration", "pioneer woman sunbonnet"], "n": 8},
- "remington_men": {"search": ["Remington drawing cowboy", "Remington sketch", "Remington Century illustration", "Remington Outing magazine", "Remington drawings 1897", "Remington cow-boy"], "n": 12},
- "scenes": {"search": ["gunfight", "shooting saloon", "train robbery engraving", "stagecoach robbery", "hold up stage", "faro game", "saloon interior 1880", "Gatling gun"], "n": 8},
- "picked": {"files": [
-  "Cowboys coming to town for Christmas - drawn by Frederic Remington. LCCN92516875.jpg",
-  "A quarrel over cards-a sketch from a New Mexican ranch - drawn by Frederic Remington ; R. Stauden Baur. LCCN91483074.jpg",
-  "Painting the town red - drawn by R.F. Zogbaum. LCCN92516873.jpg",
-  "The Stampede by Frederic Remington LCCN92520384.jpg",
-  "Cattle Raid on the Texas Border LCCN2004678783.jpg",
-  "Alhambra Saloon Tombstone 1880.jpg",
-  "Remington Coming and Going of the Pony Express.jpg",
-  "Frederic Remington - Fired On - Google Art Project.jpg",
-  "Frederic Remington - Battle of Beecher's Island - Google Art Project.jpg",
-  "A Texas Pony by Frederic Remington 1889.jpeg",
-  "Shotgun Hospitality by Frederic Remington, 1908, oil on canvas - Hood Museum of Art - DSC09239.JPG",
-  "Downing-the-nigh-leader.jpg",
-  "Holding Up the Pay Escort Remington.jpg",
-  "Hands Up! -- The Capture of Finnigan.jpg",
-  "An East-Side Politician by Frederic Remington - BMA.jpg",
-  "Frederic Remington - A Mexican Vaquero - 1982.799 - Art Institute of Chicago.jpg",
-  "Frederic Remington - Arizona cow-boy.jpg",
-  "The Cowboy, 1902, by Frederic S. Remington.jpg",
-  "Frederic Remington - The Cowboy - Google Art Project.jpg",
-  "Miners Prospecting, Frederic Remington.jpg",
-  "Cow-boys of Arizona--roused by a scout 1882.jpg",
-  "Frontis--Wolfville.jpg", "P 001--Wolfsville.jpg", "P 003--Wolfville.jpg", "P 007--Wolfville.jpg", "P 009--Wolfville.jpg", "P 031--Wolfville.jpg", "P 056--Wolfville.jpg", "P 087--Wolfville.jpg", "P 120--Wolfville.jpg", "P 135--Wolfville.jpg", "P 146--Wolfville.jpg", "P 172--Wolfville.jpg", "P 203--Wolfville.jpg", "P 227--Wolfville.jpg", "P 268--Wolfville.jpg", "P 278--Wolfville.jpg", "P 328--Wolfville.jpg", "Tailpiece--Wolfville.jpg", "Title illus--Wolfville.jpg"
- ]},
- "more_figures": {"cat": ["Stories of the West (1914)", "Drawings by Frederic Remington by museum"], "search": ["Pony Tracks Remington illustration", "Remington Harper's Weekly cover"], "n": 30}
+ "find": {
+  "search": [
+   "Elliot's New Repeaters",
+   "Doomed Remington LCCN",
+   "revolver engraving",
+   "Smith Wesson advertisement",
+   "Colt's patent fire arms",
+   "explosion engraving",
+   "blasting rock engraving",
+   "nitro-glycerine",
+   "powder explosion Harper's",
+   "sheriff badge",
+   "derringer"
+  ],
+  "n": 8
+ },
+ "women_big": {
+  "files": [
+   "Take Care! (cowgirl) (NBY 428936).jpg",
+   "I'll Catch You! (Cowgirl (NBY 429064).jpg",
+   "Arizona by Augustus Thomas. LCCN2014637248.jpg",
+   "A Bunco Game (NBY 428813).jpg",
+   "Russellrodeocowgirlonabuckinghorse.gif",
+   "Pin-Up.jpg",
+   "Cowgirl Standing with Horse (4666519521).jpg",
+   "Two Cowgirls with Bear Tooth Ranch Pennant (4666554101).jpg"
+  ],
+  "cols": 4,
+  "tw": 330,
+  "th": 420
+ },
+ "big_scenes": {
+  "files": [
+   "The revolver fight on the street (Das interessante Blatt, 1891).jpg",
+   "Pony tracks MET DP-12258-002.jpg",
+   "Hands Up! -- The Capture of Finnigan.jpg",
+   "Holding Up the Pay Escort Remington.jpg",
+   "Stories of the West (1914) (14590836687).jpg",
+   "Stories of the West (1914) (14774159661).jpg",
+   "Stories of the West (1914) (14777323415).jpg",
+   "Stories of the West (1914) (14797241543).jpg",
+   "Ochs-safe-ad-1870.png",
+   "Rupps General Store, Waterville, Ohio (approximately 1880) - DPLA - f9c72ecb95a8666a4eb66424f87eb885.jpg",
+   "Berdan Sharps rifle.jpg",
+   "Remington A cracker cowboy.jpg"
+  ],
+  "cols": 4,
+  "tw": 330,
+  "th": 300
+ }
 }
