@@ -1,0 +1,25 @@
+{
+ "polvere-e-piombo": {
+  "m1": {"file": "Western Streets (ISRC USUAN1100348).mp3"},
+  "m2": {"search": "Maple Leaf Rag Joplin piano roll", "maxdur": 300},
+  "gunshot": {"file": "Gunshots 8.ogg"},
+  "explosion": {"file": "Explosion 10.ogg"},
+  "ricochet": {"search": "ricochet bullet", "maxdur": 10},
+  "horse": {"search": "horse neigh", "maxdur": 10},
+  "glass": {"search": "glass clink toast", "maxdur": 8},
+  "bell": {"search": "church bell single strike", "maxdur": 12}
+ },
+ "presagio": {
+  "m1": {"file": "Fireflies and Stardust (ISRC USUAN1600061).mp3"},
+  "m2": {"file": "Enchanted Valley (ISRC USUAN1200093).mp3"}
+ },
+ "gattomina": {
+  "m1": {"file": "Monkeys Spinning Monkeys (ISRC USUAN1400011).mp3"},
+  "m2": {"file": "Sneaky Snitch (ISRC USUAN1100772).mp3"},
+  "meow": {"file": "Meow.ogg"},
+  "meow2": {"file": "Meow of a pleading cat.oga"},
+  "purr": {"search": "cat purring", "maxdur": 60},
+  "explosion": {"file": "Explosion 10.ogg"},
+  "hiss": {"search": "cat hissing", "maxdur": 20}
+ }
+}
