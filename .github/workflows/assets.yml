@@ -2,7 +2,7 @@ name: Scarica illustrazioni
 on:
   push:
     branches: [main]
-    paths: ['tools/assets.json', 'tools/fetch_assets.py', '.github/workflows/assets.yml']
+    paths: ['tools/assets*.json', 'tools/fetch_assets.py', '.github/workflows/assets.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -17,5 +17,5 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add presagio/img/src
+          git add presagio/img/src polvere-e-piombo/img/src
           git diff --cached --quiet || (git commit -m "Illustrazioni di pubblico dominio da Wikimedia Commons" && git push)
