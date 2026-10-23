@@ -41,6 +41,7 @@ function tableReducer(doc, from, op) {
       var used = doc.seats.map(function (s) { return s.nick; }), nm = BOTNAMES.filter(function (b) { return used.indexOf(b) < 0; })[0] || 'Astro';
       doc.seats.push({ uid: 'bot-' + Math.random().toString(36).slice(2, 8), nick: nm, bot: true }); return {};
     }
+    case 'vis': if (!isHost) return hostOnly; doc.vis = op.vis === 'invite' ? 'invite' : 'public'; return {};
     case 'opt': {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
@@ -90,13 +91,14 @@ Turns.setup({
     g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true;
   }
 });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.noEven) notes.push('somma diversa'); if (o.timer === 0) notes.push('senza timer'); return { max: 6, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i giocatori automatici.'); render(); });
 
 /* ---------- azioni ---------- */
 async function run(p) { if (App.busy) return; App.busy = true; render(); try { await p(); } catch (e) { toast(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'); } finally { App.busy = false; render(); } }
 function requireNick() {
   var n = ($('#nick') && $('#nick').value.trim()) || myNick();
-  if (!n) { toast('Scrivi il tuo nome.'); if ($('#nick')) $('#nick').focus(); return null; }
+  if (!n) { toast('Scrivi il tuo nome.'); if ($('#nick')) { $('#nick').focus(); $('#nick').scrollIntoView({ block: 'center' }); } return null; }
   lsSet('pp-nick', n.slice(0, 18)); return n.slice(0, 18);
 }
 function remember(code) {
@@ -104,7 +106,7 @@ function remember(code) {
   list = list.filter(function (x) { return x.code !== code; }); list.unshift({ code: code, t: Date.now() });
   lsSet(KEY_RECENT, JSON.stringify(list.slice(0, 5)));
 }
-function createTable() { var nick = requireNick(); if (!nick) return; App.status = 'Apro un tavolo…'; run(async function () { var code = await Net.create(nick); await enterTable(code, nick); }); }
+function createTable() { var nick = requireNick(); if (!nick) return; var vis = Lobby.pickedVis(); App.status = 'Apro un tavolo…'; run(async function () { var code = await Net.create(nick, { vis: vis }); await enterTable(code, nick); }); }
 function joinTable(code) {
   code = (code || '').trim().toUpperCase();
   if (!/^[A-Z]{4}$/.test(code)) { toast('Il codice del tavolo ha 4 lettere.'); return; }
@@ -115,7 +117,7 @@ async function enterTable(code, nick) {
   App.code = code; App.doc = null; App.flashInit = false; App.sheet = null; App.sel = null; App.botKey = null; App.sheetKey = null;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
-    if (!doc) { if (App.screen === 'table' && App.code === code) { toast('Il tavolo ' + code + ' è stato chiuso.'); leaveTable(true); } return; }
+    if (!doc) { if (App.screen === 'table' && App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () { var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost; if (sig !== App.netSig) { App.netSig = sig; render(); } });
   if (!ok) { App.screen = 'lobby'; App.code = null; lsSet(KEY_TABLE, null); render(); throw 'Nessun tavolo con il codice ' + code + '.'; }
@@ -204,6 +206,7 @@ function render() {
   else if (App.doc.phase === 'lobby' || !App.doc.game) root.innerHTML = roomHTML();
   else root.innerHTML = tableHTML();
   if ($('.hand')) { $('.hand').scrollLeft = keep; fitHand(); }
+  if (App.screen === 'lobby') Lobby.start(); else Lobby.end();
   renderSheet();
 }
 function fitHand() {
@@ -221,10 +224,10 @@ function lobbyHTML() {
   return '<div class="wrap lobby"><a class="back-link" href="../">← Tutti i giochi</a>' +
     '<section class="hero"><div><h1>Presagio</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
-    (App.inviteCode ? '' : '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
+    (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
-    '<section class="panel"><h2>I tuoi tavoli recenti</h2><div class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div></div>';
+    '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:15px;font-family:var(--f-body);margin-top:6px">I tuoi tavoli recenti</h3><div class="tables" style="display:grid;gap:8px">' + recentHTML() + '</div><div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div></div>';
 }
 function recentHTML() {
   var list = []; try { list = JSON.parse(lsGet(KEY_RECENT) || '[]'); } catch (e) {}
@@ -248,9 +251,10 @@ function roomHTML() {
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/6)</h2><div class="seats">' + seats + '</div>' +
     '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-noeven"' + (noEven ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Somma delle previsioni diversa dalle prese</b><br><span class="muted" style="font-size:15px">Il mazziere, che dichiara per ultimo, non può dire il numero che renderebbe la somma uguale alle prese della mano.</span></span></label>' +
-    Turns.optionHTML(d, isHost) +
+    Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 6 ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 3 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 3 ? '<p class="lead">Mancano ' + (3 - n) + ' giocatori per iniziare.</p>' : '<p class="lead">In ' + n + ' si giocano ' + rounds + ' mani.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
+    (isHost ? '<button class="btn ghost small" data-act="closetable" style="justify-self:start">Chiudi il tavolo</button>' : '') +
     '</section></div>';
 }
 
@@ -362,8 +366,11 @@ function sheetBody(s) {
       '<button class="btn ghost block" data-act="invite">Invita amici al tavolo</button><button class="btn ghost block" data-act="rules">Regole</button>' +
       (d.host !== Net.uid ? '<button class="btn ghost block" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="btn ghost block" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
+      (d.host === Net.uid ? '<button class="btn ghost block" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +
       '<button class="btn ghost block" data-act="leave">Esci dal tavolo</button></div><button class="btn block" data-act="close">Chiudi</button>';
   }
+  if (s.kind === 'closeconfirm' && App.doc) return '<h2>Chiudere il tavolo ' + esc(App.doc.code) + '?</h2><p class="lead">Il tavolo sparisce dalla lista' + (App.doc.game && App.doc.phase === 'play' ? ', la partita in corso finisce' : '') + ' e tutti tornano alla schermata iniziale. Non si può annullare.</p>' +
+    '<button class="btn block" style="background:linear-gradient(180deg,#e0705e,#a63a2a);color:#fff" data-act="closeyes">Chiudi per tutti</button><button class="btn block ghost" data-act="close">Annulla</button>';
   if (s.kind === 'player' && g) {
     var P = g.players[s.p];
     return '<h2>' + esc(P.nick) + '</h2><p class="lead">' + P.score + ' punti · ' + (P.bid == null ? 'non ha ancora previsto' : 'ha previsto ' + P.bid + ', ne ha fatte ' + P.tricks) + ' · ' + P.hand.length + ' carte in mano</p>' +
@@ -412,6 +419,10 @@ document.addEventListener('click', function (ev) {
     case 'kick': send({ t: 'kick', uid: el.getAttribute('data-uid') }); if (el.getAttribute('data-uid') === Net.uid) leaveTable(true); break;
     case 'start': send({ t: 'start' }); break;
     case 'rematch': App.sheet = null; send({ t: 'rematch' }); break;
+    case 'lobbyjoin': joinTable(el.getAttribute('data-code')); break;
+    case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + (el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); break; }
+    case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); break;
+    case 'closeyes': App.sheet = null; renderSheet(); App.closing = true; if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); } break;
     case 'takehost': App.sheet = null; Net.takeHost(); toast('Ora sei tu a reggere il tavolo e a muovere i giocatori automatici.'); break;
     case 'auto': App.sheet = null; send({ t: 'auto', p: +el.getAttribute('data-p'), on: !g.players[+el.getAttribute('data-p')].bot }); break;
     case 'bid': act({ a: 'bid', b: +el.getAttribute('data-b') }); break;
@@ -424,6 +435,7 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('change', function (ev) {
   if (ev.target.id === 'opt-noeven') send({ t: 'opt', noEven: ev.target.checked });
   if (ev.target.id === 'opt-timer') send({ t: 'opt', timer: +ev.target.value });
+  if (ev.target.id === 'opt-vis') send({ t: 'vis', vis: ev.target.value });
 });
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);

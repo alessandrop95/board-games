@@ -1720,7 +1720,11 @@ var Net = (function () {
   var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
   var uid = lsGet('pp-uid');
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); lsSet('pp-uid', uid); }
-  var clients = {}, reducer = null, beforePublish = null, onTakeover = null;
+  var clients = {}, reducer = null, beforePublish = null, onTakeover = null, lobbyInfo = null;
+  var LOBBY_BEAT = +(qs.get('lobbyBeat') || 25000);   // ogni quanto l'host conferma che il tavolo è vivo
+  var LOBBY_TTL = +(qs.get('lobbyTtl') || 75000);     // oltre questo silenzio il tavolo sparisce dalla lista
+  function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
+  function rid() { return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6); }
   var T = null; // sessione del tavolo aperto
 
   function client(i) {
@@ -1762,7 +1766,7 @@ var Net = (function () {
     for (var i = 0; i < BROKERS.length; i++) {
       var c; try { c = await client(i); reached = true; } catch (e) { continue; }
       var doc = await probeState(c, code, 2600);
-      if (doc && doc.code === code) return { i: i, c: c, doc: doc };
+      if (doc && doc.code === code && !doc.closed) return { i: i, c: c, doc: doc };
       c.unsubscribe(topic(code, 'state'));
     }
     if (!reached) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
@@ -1771,14 +1775,15 @@ var Net = (function () {
 
   function newCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 
-  async function create(nick) {
+  async function create(nick, opts) {
     var b = await firstBroker();
     for (var k = 0; k < 6; k++) {
       var code = newCode();
       var ex = await probeState(b.c, code, 1200);
       b.c.unsubscribe(topic(code, 'state'));
-      if (ex && ex.code) continue;
-      var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: 1, updated: Date.now() };
+      if (ex && ex.code && !ex.closed) continue;
+      var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
+        vis: opts && opts.vis === 'invite' ? 'invite' : 'public', lobbyId: rid() };
       if (!b.c.publish(topic(code, 'state'), JSON.stringify(doc), true)) throw 'La connessione è caduta. Riprova.';
       return code;
     }
@@ -1799,6 +1804,7 @@ var Net = (function () {
       if (t === tState) {
         if (!p) { me.doc = null; onDoc(null); return; }
         var d = safeParse(p); if (!d) return;
+        if (d.closed) { if (!me.doc || (d.rev || 0) >= (me.doc.rev || 0)) { me.doc = null; me.closed = true; onDoc(null); } return; }
         me.seenRev = Math.max(me.seenRev, d.rev || 0);
         if (me.doc) {
           var dr = d.rev || 0, mr = me.doc.rev || 0;
@@ -1836,7 +1842,7 @@ var Net = (function () {
     accept(f.doc);
     me.timers.push(setInterval(function () {
       if (T !== me) return;
-      if (me.isHost) c.publish(tPing, String(Date.now()), false);
+      if (me.isHost) { c.publish(tPing, String(Date.now()), false); if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true); }
       else maybeTakeOver(me);
       if (onStatus) onStatus();
     }, Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4))));
@@ -1845,7 +1851,7 @@ var Net = (function () {
   // Subentro automatico: solo un giocatore seduto, collegato e con la pagina aperta.
   // Per evitare due subentri insieme, ognuno aspetta in più in base al suo posto.
   function maybeTakeOver(me) {
-    if (!me.doc || !me.up || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
+    if (!me.doc || me.closed || !me.up || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
     var humans = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== me.doc.host; }).map(function (s) { return s.uid; });
     var rank = humans.indexOf(uid);
     if (rank < 0) return;
@@ -1858,7 +1864,43 @@ var Net = (function () {
     var shouldHost = d.host === uid;
     if (shouldHost && !T.isHost) { T.isHost = true; T.c.subscribe(topic(T.code, 'act')); T.c.publish(topic(T.code, 'ping'), String(Date.now()), false); }
     if (!shouldHost && T.isHost) { T.isHost = false; T.c.unsubscribe(topic(T.code, 'act')); }
+    if (T.isHost && !d.lobbyId) { setTimeout(function () { hostApply(function (w) { if (w.lobbyId) return false; w.lobbyId = rid(); w.vis = w.vis || 'public'; return true; }); }, 0); }
+    else if (T.isHost) announce(false);
     T.onDoc(JSON.parse(JSON.stringify(d)));
+  }
+  // Annuncio del tavolo nella lista pubblica (messaggio "retained" per tavolo, aggiornato dall'host).
+  // I tavoli "solo su invito" compaiono senza codice.
+  function announce(force) {
+    if (!T || !T.isHost || !T.doc || !T.doc.lobbyId) return;
+    var d = T.doc, info = lobbyInfo ? lobbyInfo(d) : {}, vis = d.vis === 'invite' ? 'invite' : 'public';
+    var host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
+    var e = { v: 1, id: d.lobbyId, vis: vis, code: vis === 'public' ? d.code : null, host: host ? host.nick : '', n: d.seats.length, max: info.max || null, phase: d.phase, note: info.note || '', t: Date.now() };
+    var sig = JSON.stringify([e.vis, e.code, e.host, e.n, e.phase, e.note]);
+    if (!force && sig === T.lobbySig) return;
+    if (T.c.publish(lobbyTopic(d.lobbyId), JSON.stringify(e), true)) { T.lobbySig = sig; T.lastAnn = Date.now(); }
+  }
+  // Lista dal vivo dei tavoli di questo gioco. cb(lista) a ogni cambiamento; restituisce la funzione per smettere.
+  async function watchLobby(cb) {
+    var b = await firstBroker(), c = b.c, base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false;
+    function emit() {
+      if (stopped) return;
+      var now = Date.now();
+      cb(Object.keys(items).map(function (k) { return items[k]; }).filter(function (e) { return now - e.t < LOBBY_TTL && (e.phase === 'lobby' || e.phase === 'play'); })
+        .sort(function (a, b) { return (a.phase === 'lobby' ? 0 : 1) - (b.phase === 'lobby' ? 0 : 1) || b.t - a.t; }));
+    }
+    function h(t, p) {
+      if (t.indexOf(base) !== 0) return;
+      var id = t.slice(base.length);
+      if (!p) { delete items[id]; emit(); return; }
+      var e = safeParse(p);
+      if (!e || e.id !== id || typeof e.t !== 'number') return;
+      if (Date.now() - e.t > 3600e3) { c.publish(t, '', true); delete items[id]; emit(); return; } // pulizia dei tavoli abbandonati
+      e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
+      items[id] = e; emit();
+    }
+    c.onMessage(h); c.subscribe(filt);
+    var iv = setInterval(emit, 10000);
+    return function () { stopped = true; clearInterval(iv); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(filt); };
   }
   function publishState() {
     if (beforePublish) beforePublish(T.doc);
@@ -1916,7 +1958,17 @@ var Net = (function () {
     var work = JSON.parse(JSON.stringify(T.doc)); work.host = uid;
     T.doc = work; publishState(); return true;
   }
-  function clearTable() { if (T) T.c.publish(topic(T.code, 'state'), '', true); }
+  // Chiude il tavolo per tutti: lascia una "lapide" (stato chiuso) così nessuno può riaprirlo per errore
+  // ricollegandosi, e lo toglie dalla lista pubblica.
+  function closeTable() {
+    if (!T || !T.doc) return false;
+    var d = T.doc, tomb = { code: d.code, closed: true, rev: (d.rev || 0) + 1, updated: Date.now() };
+    var ok = T.c.publish(topic(T.code, 'state'), JSON.stringify(tomb), true);
+    if (d.lobbyId) T.c.publish(lobbyTopic(d.lobbyId), '', true);
+    T.closed = true;
+    return ok;
+  }
+  function clearTable() { return closeTable(); }
   function close() {
     if (!T) return;
     var me = T; T = null;
@@ -1927,7 +1979,8 @@ var Net = (function () {
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
-    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable,
+    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby,
+    setLobbyInfo: function (f) { lobbyInfo = f; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },
     setOnTakeover: function (f) { onTakeover = f; },
@@ -2064,6 +2117,61 @@ var PWA = (function () {
   return { buttonHTML: buttonHTML, install: install, available: available, standalone: standalone, onChange: function (f) { listeners.push(f); } };
 })();
 
+/* ===== Lista dei tavoli aperti (condivisa tra i giochi) ===== */
+var Lobby = (function () {
+  var stop = null, starting = false, list = null, failed = false;
+  var css = '.vis-b{display:inline-block;font-size:11.5px;line-height:1;padding:3px 7px;border-radius:999px;border:1px solid currentColor;margin-left:6px;vertical-align:2px;white-space:nowrap;opacity:.85}' +
+    '.vis-pick{display:flex;gap:8px;flex-wrap:wrap}.vis-pick label{flex:1;min-width:140px;display:flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid rgba(255,255,255,.16);border-radius:10px;cursor:pointer}' +
+    '.vis-pick input{width:18px;height:18px;margin:0;flex:none;accent-color:#d9a441}.vis-pick label:has(input:checked){border-color:currentColor}.olist{display:grid;gap:8px}';
+  function ensureCss() { if (!document.getElementById('lobby-css')) { var s = document.createElement('style'); s.id = 'lobby-css'; s.textContent = css; document.head.appendChild(s); } }
+  function e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  function start() {
+    ensureCss();
+    if (stop || starting) return;
+    starting = true; failed = false;
+    Net.watchLobby(function (l) { list = l; paint(); }).then(function (s) { starting = false; stop = s; }).catch(function () { starting = false; failed = true; paint(); });
+  }
+  function end() { if (stop) { stop(); stop = null; } list = null; }
+  function paint() { var el = document.getElementById('olist'); if (el) el.innerHTML = rows(); }
+  function rows() {
+    if (failed) return '<p class="lead">Non riesco a caricare la lista dei tavoli. Controlla la connessione; puoi sempre entrare con il codice.</p>';
+    if (!list) return '<p class="lead">Cerco i tavoli aperti…</p>';
+    if (!list.length) return '<p class="lead">Nessun tavolo aperto in questo momento. Aprine uno tu: comparirà qui per tutti.</p>';
+    return list.map(function (t) {
+      var full = t.max && t.n >= t.max, pub = t.vis === 'public';
+      var state = t.phase === 'play' ? 'in partita' : full ? 'completo' : 'in attesa';
+      var btn;
+      if (!pub) btn = '<button class="btn small ghost" data-act="lobbycode" data-host="' + e(t.host) + '">Ho il codice</button>';
+      else if (t.phase === 'play') btn = '<button class="btn small ghost" data-act="lobbyjoin" data-code="' + e(t.code) + '">Guarda</button>';
+      else if (full) btn = '<button class="btn small ghost" disabled>Completo</button>';
+      else btn = '<button class="btn small" data-act="lobbyjoin" data-code="' + e(t.code) + '">Siediti</button>';
+      return '<div class="trow"><div class="grow" style="min-width:0"><div style="overflow-wrap:anywhere"><b>Tavolo di ' + e(t.host || '…') + '</b><span class="vis-b">' + (pub ? 'Aperto a tutti' : 'Solo su invito') + '</span></div>' +
+        '<div class="muted" style="font-size:13px">' + t.n + (t.max ? '/' + t.max : '') + ' giocatori · ' + state + (t.note ? ' · ' + e(t.note) : '') + '</div></div>' + btn + '</div>';
+    }).join('');
+  }
+  function panelHTML() { ensureCss(); return '<div id="olist" class="olist">' + rows() + '</div>'; }
+  function pickHTML() {
+    var v = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })() === 'invite' ? 'invite' : 'public';
+    return '<div class="vis-pick" role="radiogroup" aria-label="Chi può sedersi">' +
+      '<label><input type="radio" name="vis" value="public"' + (v === 'public' ? ' checked' : '') + '><span><b>Aperto a tutti</b><br><span class="muted" style="font-size:13px">compare nella lista, ci si siede con un tocco</span></span></label>' +
+      '<label><input type="radio" name="vis" value="invite"' + (v === 'invite' ? ' checked' : '') + '><span><b>Solo su invito</b><br><span class="muted" style="font-size:13px">compare nella lista, ma serve il codice</span></span></label></div>';
+  }
+  function pickedVis() {
+    var el = document.querySelector('input[name="vis"]:checked'), v = el && el.value === 'invite' ? 'invite' : 'public';
+    try { localStorage.setItem('pp-vis', v); } catch (x) {}
+    return v;
+  }
+  function roomHTML(doc, isHost) {
+    ensureCss();
+    var v = doc.vis === 'invite' ? 'invite' : 'public';
+    return '<label style="display:grid;gap:6px"><span><b>Chi può sedersi</b><br><span class="muted" style="font-size:15px">' +
+      (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
+      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option></select></label>';
+  }
+  return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML };
+})();
+
 /* ===== Interfaccia ===== */
 var D = PPData, E = PPEngine, ART = PPArt, BOT = PPBot;
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -2159,6 +2267,10 @@ function tableReducer(doc, from, op) {
       if (!doc.game || !doc.game.players[op.p]) return { changed: false };
       doc.game.players[op.p].bot = !!op.on; return {};
     }
+    case 'vis': {
+      if (!isHost) return hostOnly();
+      doc.vis = op.vis === 'invite' ? 'invite' : 'public'; return {};
+    }
     case 'opt': {
       if (!isHost) return hostOnly();
       if (doc.phase !== 'lobby') return { changed: false };
@@ -2191,13 +2303,14 @@ Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var P = cur.game.players[d]; P.bot = true; P.away = true; Turns.awayLog(cur.game, d); return true; }
 });
+Net.setLobbyInfo(function (d) { return { max: 7, note: d.opts && d.opts.timer === 0 ? 'senza timer' : '' }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i pistoleri automatici.'); render(); });
 
 /* ---------- azioni ---------- */
 async function run(p) { if (App.busy) return; App.busy = true; render(); try { await p(); } catch (e) { toast(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'); } finally { App.busy = false; render(); } }
 function requireNick() {
   var n = ($('#nick') && $('#nick').value.trim()) || myNick();
-  if (!n) { toast('Scrivi il tuo nome da pistolero.'); if ($('#nick')) $('#nick').focus(); return null; }
+  if (!n) { toast('Scrivi il tuo nome da pistolero.'); if ($('#nick')) { $('#nick').focus(); $('#nick').scrollIntoView({ block: 'center' }); } return null; }
   lsSet('pp-nick', n.slice(0, 18)); return n.slice(0, 18);
 }
 function remember(code) {
@@ -2208,7 +2321,8 @@ function remember(code) {
 function createTable() {
   var nick = requireNick(); if (!nick) return;
   App.status = 'Apro un tavolo…';
-  run(async function () { var code = await Net.create(nick); await enterTable(code, nick); });
+  var vis = Lobby.pickedVis();
+  run(async function () { var code = await Net.create(nick, { vis: vis }); await enterTable(code, nick); });
 }
 function joinTable(code) {
   code = (code || '').trim().toUpperCase();
@@ -2221,7 +2335,7 @@ async function enterTable(code, nick) {
   App.code = code; App.doc = null; App.flashInit = false; App.mode = 'idle'; App.sheet = null; App.botKey = null;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
-    if (!doc) { if (App.screen === 'table' && App.code === code) { toast('Il tavolo ' + code + ' è stato chiuso.'); leaveTable(true); } return; }
+    if (!doc) { if (App.screen === 'table' && App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () {
     var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost;
@@ -2325,7 +2439,7 @@ function render() {
     else root.innerHTML = tableHTML();
   }
   if ($('.hand')) $('.hand').scrollLeft = keepHand;
-  if (App.screen === 'lobby') renderLobbyList();
+  if (App.screen === 'lobby') { renderLobbyList(); Lobby.start(); } else Lobby.end();
   renderSheet();
 }
 
@@ -2339,10 +2453,10 @@ function lobbyHTML() {
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
     '<section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Rattlesnake Ale" value="' + esc(myNick()) + '">' +
-    (App.inviteCode ? '' : '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
+    (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
-    '<section class="panel"><h2>I tuoi tavoli recenti</h2><div id="tlist" class="tables"></div>' +
+    '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:15px;margin-top:6px">I tuoi tavoli recenti</h3><div id="tlist" class="tables"></div>' +
     '<div class="row"><button class="btn ghost small" data-act="gallery">Mazzo e personaggi</button><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section>' +
     '</div></div>';
 }
@@ -2376,7 +2490,8 @@ function roomHTML() {
     '<section class="panel"><h2>Al tavolo (' + n + '/7)</h2><div class="seats">' + seats + '</div>' +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 7 ? ' disabled' : '') + '>Aggiungi pistolero automatico</button><button class="btn" data-act="start"' + (n < 4 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 4 ? '<p class="lead">Mancano ' + (4 - n) + ' giocatori per iniziare.</p>' : '')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
-    '</section><section class="panel">' + Turns.optionHTML(d, isHost) + '</section>' + hostBanner() + '</div>';
+    '</section><section class="panel">' + Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) +
+    (isHost ? '<button class="btn ghost small" data-act="closetable" style="justify-self:start">Chiudi il tavolo</button>' : '') + '</section>' + hostBanner() + '</div>';
 }
 
 function connInfo(txt) { return Net.connected ? txt : '<span style="color:#f08070">Riconnessione…</span> ' + txt; }
@@ -2516,8 +2631,11 @@ function sheetBody(s) {
       '<button class="opt" data-act="invite">Invita amici al tavolo</button>' +
       (d.host !== Net.uid ? '<button class="opt" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="opt" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
+      (d.host === Net.uid ? '<button class="opt" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +
       '<button class="opt" data-act="leave">Esci dal tavolo</button></div><button class="btn block ghost" data-act="close">Chiudi</button>';
   }
+  if (s.kind === 'closeconfirm' && App.doc) return '<h2>Chiudere il tavolo ' + esc(App.doc.code) + '?</h2><p class="lead" style="margin:0">Il tavolo sparisce dalla lista' + (App.doc.game && App.doc.phase === 'play' ? ', la partita in corso finisce' : '') + ' e tutti tornano alla schermata iniziale. Non si può annullare.</p>' +
+    '<button class="btn red block" data-act="closeyes">Chiudi per tutti</button><button class="btn block ghost" data-act="close">Annulla</button>';
   if (s.kind === 'zoomchar') return '<div class="zoom">' + charCardHTML(s.id) + '</div><button class="btn block" data-act="close">Chiudi</button>';
   if (s.kind === 'role' && me >= 0) { var r = g.players[me].role; return '<div class="zoom">' + roleCardHTML(r) + '</div><p class="muted" style="text-align:center;margin:0">Tienilo per te: gli altri non lo vedono.</p><button class="btn block" data-act="close">Chiudi</button>'; }
   if (s.kind === 'card' && g) {
@@ -2631,6 +2749,10 @@ document.addEventListener('click', function (ev) {
     case 'log': App.sheet = { kind: 'log' }; renderSheet(); var ll = document.querySelector('.sheet'); if (ll) ll.scrollTop = ll.scrollHeight; break;
     case 'menu': App.sheet = { kind: 'menu' }; renderSheet(); break;
     case 'takehost': closeSheet(); takeHost(); break;
+    case 'lobbyjoin': joinTable(el.getAttribute('data-code')); break;
+    case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + (el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); break; }
+    case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); break;
+    case 'closeyes': closeSheet(); App.closing = true; if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); } break;
     case 'resume': run(function () { return Net.send({ t: 'back' }); }); break;
     case 'rematch': closeSheet(); rematch(); break;
     case 'close': if (App.sheet && App.sheet.kind === 'decide') App.sheet = null; closeSheet(); render(); break;
@@ -2663,7 +2785,10 @@ document.addEventListener('click', function (ev) {
     case 'pickok': if (App.pickDo) App.pickDo(App.picks.slice()); break;
   }
 });
-document.addEventListener('change', function (ev) { if (ev.target.id === 'opt-timer') run(function () { return Net.send({ t: 'opt', timer: +ev.target.value }); }); });
+document.addEventListener('change', function (ev) {
+  if (ev.target.id === 'opt-timer') run(function () { return Net.send({ t: 'opt', timer: +ev.target.value }); });
+  if (ev.target.id === 'opt-vis') run(function () { return Net.send({ t: 'vis', vis: ev.target.value }); });
+});
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);
   if (e.key === 'Escape' && App.sheet && App.sheet.kind !== 'decide') { closeSheet(); render(); }

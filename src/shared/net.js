@@ -143,7 +143,11 @@ var Net = (function () {
   var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
   var uid = lsGet('pp-uid');
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); lsSet('pp-uid', uid); }
-  var clients = {}, reducer = null, beforePublish = null, onTakeover = null;
+  var clients = {}, reducer = null, beforePublish = null, onTakeover = null, lobbyInfo = null;
+  var LOBBY_BEAT = +(qs.get('lobbyBeat') || 25000);   // ogni quanto l'host conferma che il tavolo è vivo
+  var LOBBY_TTL = +(qs.get('lobbyTtl') || 75000);     // oltre questo silenzio il tavolo sparisce dalla lista
+  function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
+  function rid() { return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6); }
   var T = null; // sessione del tavolo aperto
 
   function client(i) {
@@ -185,7 +189,7 @@ var Net = (function () {
     for (var i = 0; i < BROKERS.length; i++) {
       var c; try { c = await client(i); reached = true; } catch (e) { continue; }
       var doc = await probeState(c, code, 2600);
-      if (doc && doc.code === code) return { i: i, c: c, doc: doc };
+      if (doc && doc.code === code && !doc.closed) return { i: i, c: c, doc: doc };
       c.unsubscribe(topic(code, 'state'));
     }
     if (!reached) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
@@ -194,14 +198,15 @@ var Net = (function () {
 
   function newCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 
-  async function create(nick) {
+  async function create(nick, opts) {
     var b = await firstBroker();
     for (var k = 0; k < 6; k++) {
       var code = newCode();
       var ex = await probeState(b.c, code, 1200);
       b.c.unsubscribe(topic(code, 'state'));
-      if (ex && ex.code) continue;
-      var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: 1, updated: Date.now() };
+      if (ex && ex.code && !ex.closed) continue;
+      var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
+        vis: opts && opts.vis === 'invite' ? 'invite' : 'public', lobbyId: rid() };
       if (!b.c.publish(topic(code, 'state'), JSON.stringify(doc), true)) throw 'La connessione è caduta. Riprova.';
       return code;
     }
@@ -222,6 +227,7 @@ var Net = (function () {
       if (t === tState) {
         if (!p) { me.doc = null; onDoc(null); return; }
         var d = safeParse(p); if (!d) return;
+        if (d.closed) { if (!me.doc || (d.rev || 0) >= (me.doc.rev || 0)) { me.doc = null; me.closed = true; onDoc(null); } return; }
         me.seenRev = Math.max(me.seenRev, d.rev || 0);
         if (me.doc) {
           var dr = d.rev || 0, mr = me.doc.rev || 0;
@@ -259,7 +265,7 @@ var Net = (function () {
     accept(f.doc);
     me.timers.push(setInterval(function () {
       if (T !== me) return;
-      if (me.isHost) c.publish(tPing, String(Date.now()), false);
+      if (me.isHost) { c.publish(tPing, String(Date.now()), false); if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true); }
       else maybeTakeOver(me);
       if (onStatus) onStatus();
     }, Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4))));
@@ -268,7 +274,7 @@ var Net = (function () {
   // Subentro automatico: solo un giocatore seduto, collegato e con la pagina aperta.
   // Per evitare due subentri insieme, ognuno aspetta in più in base al suo posto.
   function maybeTakeOver(me) {
-    if (!me.doc || !me.up || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
+    if (!me.doc || me.closed || !me.up || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
     var humans = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== me.doc.host; }).map(function (s) { return s.uid; });
     var rank = humans.indexOf(uid);
     if (rank < 0) return;
@@ -281,7 +287,43 @@ var Net = (function () {
     var shouldHost = d.host === uid;
     if (shouldHost && !T.isHost) { T.isHost = true; T.c.subscribe(topic(T.code, 'act')); T.c.publish(topic(T.code, 'ping'), String(Date.now()), false); }
     if (!shouldHost && T.isHost) { T.isHost = false; T.c.unsubscribe(topic(T.code, 'act')); }
+    if (T.isHost && !d.lobbyId) { setTimeout(function () { hostApply(function (w) { if (w.lobbyId) return false; w.lobbyId = rid(); w.vis = w.vis || 'public'; return true; }); }, 0); }
+    else if (T.isHost) announce(false);
     T.onDoc(JSON.parse(JSON.stringify(d)));
+  }
+  // Annuncio del tavolo nella lista pubblica (messaggio "retained" per tavolo, aggiornato dall'host).
+  // I tavoli "solo su invito" compaiono senza codice.
+  function announce(force) {
+    if (!T || !T.isHost || !T.doc || !T.doc.lobbyId) return;
+    var d = T.doc, info = lobbyInfo ? lobbyInfo(d) : {}, vis = d.vis === 'invite' ? 'invite' : 'public';
+    var host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
+    var e = { v: 1, id: d.lobbyId, vis: vis, code: vis === 'public' ? d.code : null, host: host ? host.nick : '', n: d.seats.length, max: info.max || null, phase: d.phase, note: info.note || '', t: Date.now() };
+    var sig = JSON.stringify([e.vis, e.code, e.host, e.n, e.phase, e.note]);
+    if (!force && sig === T.lobbySig) return;
+    if (T.c.publish(lobbyTopic(d.lobbyId), JSON.stringify(e), true)) { T.lobbySig = sig; T.lastAnn = Date.now(); }
+  }
+  // Lista dal vivo dei tavoli di questo gioco. cb(lista) a ogni cambiamento; restituisce la funzione per smettere.
+  async function watchLobby(cb) {
+    var b = await firstBroker(), c = b.c, base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false;
+    function emit() {
+      if (stopped) return;
+      var now = Date.now();
+      cb(Object.keys(items).map(function (k) { return items[k]; }).filter(function (e) { return now - e.t < LOBBY_TTL && (e.phase === 'lobby' || e.phase === 'play'); })
+        .sort(function (a, b) { return (a.phase === 'lobby' ? 0 : 1) - (b.phase === 'lobby' ? 0 : 1) || b.t - a.t; }));
+    }
+    function h(t, p) {
+      if (t.indexOf(base) !== 0) return;
+      var id = t.slice(base.length);
+      if (!p) { delete items[id]; emit(); return; }
+      var e = safeParse(p);
+      if (!e || e.id !== id || typeof e.t !== 'number') return;
+      if (Date.now() - e.t > 3600e3) { c.publish(t, '', true); delete items[id]; emit(); return; } // pulizia dei tavoli abbandonati
+      e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
+      items[id] = e; emit();
+    }
+    c.onMessage(h); c.subscribe(filt);
+    var iv = setInterval(emit, 10000);
+    return function () { stopped = true; clearInterval(iv); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(filt); };
   }
   function publishState() {
     if (beforePublish) beforePublish(T.doc);
@@ -339,7 +381,17 @@ var Net = (function () {
     var work = JSON.parse(JSON.stringify(T.doc)); work.host = uid;
     T.doc = work; publishState(); return true;
   }
-  function clearTable() { if (T) T.c.publish(topic(T.code, 'state'), '', true); }
+  // Chiude il tavolo per tutti: lascia una "lapide" (stato chiuso) così nessuno può riaprirlo per errore
+  // ricollegandosi, e lo toglie dalla lista pubblica.
+  function closeTable() {
+    if (!T || !T.doc) return false;
+    var d = T.doc, tomb = { code: d.code, closed: true, rev: (d.rev || 0) + 1, updated: Date.now() };
+    var ok = T.c.publish(topic(T.code, 'state'), JSON.stringify(tomb), true);
+    if (d.lobbyId) T.c.publish(lobbyTopic(d.lobbyId), '', true);
+    T.closed = true;
+    return ok;
+  }
+  function clearTable() { return closeTable(); }
   function close() {
     if (!T) return;
     var me = T; T = null;
@@ -350,7 +402,8 @@ var Net = (function () {
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
-    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable,
+    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby,
+    setLobbyInfo: function (f) { lobbyInfo = f; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },
     setOnTakeover: function (f) { onTakeover = f; },

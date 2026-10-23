@@ -31,6 +31,12 @@ Gioco di carte a prese con previsione, da 3 a 6 giocatori.
 - **Android (Chrome):** tocca *Installa app* nella pagina del gioco, oppure menu ⋮ → *Installa app* / *Aggiungi a schermata Home*.
 - **iPhone e iPad (Safari):** Condividi → *Aggiungi alla schermata Home* → *Aggiungi*.
 
+## Tavoli aperti e chiusura
+
+- Nella schermata iniziale di ogni gioco c'è la lista dal vivo dei **Tavoli aperti**.
+- Chi apre un tavolo sceglie: **Aperto a tutti** (ci si siede con un tocco; in partita si può guardare) oppure **Solo su invito** (compare nella lista ma serve il codice o il link). L'host può cambiarlo dalla sala d'attesa.
+- L'host può **chiudere il tavolo** (sala d'attesa o Menu): tutti tornano alla home e il tavolo sparisce dalla lista. I tavoli abbandonati spariscono da soli dopo poco più di un minuto.
+
 ## Connessione e assenze
 
 - Se la connessione cade o resta "appesa", il gioco se ne accorge e si ricollega da solo; quando riapri l'app dal background si ricollega subito.

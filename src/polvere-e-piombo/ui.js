@@ -93,6 +93,10 @@ function tableReducer(doc, from, op) {
       if (!doc.game || !doc.game.players[op.p]) return { changed: false };
       doc.game.players[op.p].bot = !!op.on; return {};
     }
+    case 'vis': {
+      if (!isHost) return hostOnly();
+      doc.vis = op.vis === 'invite' ? 'invite' : 'public'; return {};
+    }
     case 'opt': {
       if (!isHost) return hostOnly();
       if (doc.phase !== 'lobby') return { changed: false };
@@ -125,13 +129,14 @@ Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var P = cur.game.players[d]; P.bot = true; P.away = true; Turns.awayLog(cur.game, d); return true; }
 });
+Net.setLobbyInfo(function (d) { return { max: 7, note: d.opts && d.opts.timer === 0 ? 'senza timer' : '' }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i pistoleri automatici.'); render(); });
 
 /* ---------- azioni ---------- */
 async function run(p) { if (App.busy) return; App.busy = true; render(); try { await p(); } catch (e) { toast(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'); } finally { App.busy = false; render(); } }
 function requireNick() {
   var n = ($('#nick') && $('#nick').value.trim()) || myNick();
-  if (!n) { toast('Scrivi il tuo nome da pistolero.'); if ($('#nick')) $('#nick').focus(); return null; }
+  if (!n) { toast('Scrivi il tuo nome da pistolero.'); if ($('#nick')) { $('#nick').focus(); $('#nick').scrollIntoView({ block: 'center' }); } return null; }
   lsSet('pp-nick', n.slice(0, 18)); return n.slice(0, 18);
 }
 function remember(code) {
@@ -142,7 +147,8 @@ function remember(code) {
 function createTable() {
   var nick = requireNick(); if (!nick) return;
   App.status = 'Apro un tavolo…';
-  run(async function () { var code = await Net.create(nick); await enterTable(code, nick); });
+  var vis = Lobby.pickedVis();
+  run(async function () { var code = await Net.create(nick, { vis: vis }); await enterTable(code, nick); });
 }
 function joinTable(code) {
   code = (code || '').trim().toUpperCase();
@@ -155,7 +161,7 @@ async function enterTable(code, nick) {
   App.code = code; App.doc = null; App.flashInit = false; App.mode = 'idle'; App.sheet = null; App.botKey = null;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
-    if (!doc) { if (App.screen === 'table' && App.code === code) { toast('Il tavolo ' + code + ' è stato chiuso.'); leaveTable(true); } return; }
+    if (!doc) { if (App.screen === 'table' && App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () {
     var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost;
@@ -259,7 +265,7 @@ function render() {
     else root.innerHTML = tableHTML();
   }
   if ($('.hand')) $('.hand').scrollLeft = keepHand;
-  if (App.screen === 'lobby') renderLobbyList();
+  if (App.screen === 'lobby') { renderLobbyList(); Lobby.start(); } else Lobby.end();
   renderSheet();
 }
 
@@ -273,10 +279,10 @@ function lobbyHTML() {
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
     '<section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Rattlesnake Ale" value="' + esc(myNick()) + '">' +
-    (App.inviteCode ? '' : '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
+    (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
-    '<section class="panel"><h2>I tuoi tavoli recenti</h2><div id="tlist" class="tables"></div>' +
+    '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:15px;margin-top:6px">I tuoi tavoli recenti</h3><div id="tlist" class="tables"></div>' +
     '<div class="row"><button class="btn ghost small" data-act="gallery">Mazzo e personaggi</button><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section>' +
     '</div></div>';
 }
@@ -310,7 +316,8 @@ function roomHTML() {
     '<section class="panel"><h2>Al tavolo (' + n + '/7)</h2><div class="seats">' + seats + '</div>' +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 7 ? ' disabled' : '') + '>Aggiungi pistolero automatico</button><button class="btn" data-act="start"' + (n < 4 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 4 ? '<p class="lead">Mancano ' + (4 - n) + ' giocatori per iniziare.</p>' : '')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
-    '</section><section class="panel">' + Turns.optionHTML(d, isHost) + '</section>' + hostBanner() + '</div>';
+    '</section><section class="panel">' + Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) +
+    (isHost ? '<button class="btn ghost small" data-act="closetable" style="justify-self:start">Chiudi il tavolo</button>' : '') + '</section>' + hostBanner() + '</div>';
 }
 
 function connInfo(txt) { return Net.connected ? txt : '<span style="color:#f08070">Riconnessione…</span> ' + txt; }
@@ -450,8 +457,11 @@ function sheetBody(s) {
       '<button class="opt" data-act="invite">Invita amici al tavolo</button>' +
       (d.host !== Net.uid ? '<button class="opt" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="opt" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
+      (d.host === Net.uid ? '<button class="opt" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +
       '<button class="opt" data-act="leave">Esci dal tavolo</button></div><button class="btn block ghost" data-act="close">Chiudi</button>';
   }
+  if (s.kind === 'closeconfirm' && App.doc) return '<h2>Chiudere il tavolo ' + esc(App.doc.code) + '?</h2><p class="lead" style="margin:0">Il tavolo sparisce dalla lista' + (App.doc.game && App.doc.phase === 'play' ? ', la partita in corso finisce' : '') + ' e tutti tornano alla schermata iniziale. Non si può annullare.</p>' +
+    '<button class="btn red block" data-act="closeyes">Chiudi per tutti</button><button class="btn block ghost" data-act="close">Annulla</button>';
   if (s.kind === 'zoomchar') return '<div class="zoom">' + charCardHTML(s.id) + '</div><button class="btn block" data-act="close">Chiudi</button>';
   if (s.kind === 'role' && me >= 0) { var r = g.players[me].role; return '<div class="zoom">' + roleCardHTML(r) + '</div><p class="muted" style="text-align:center;margin:0">Tienilo per te: gli altri non lo vedono.</p><button class="btn block" data-act="close">Chiudi</button>'; }
   if (s.kind === 'card' && g) {
@@ -565,6 +575,10 @@ document.addEventListener('click', function (ev) {
     case 'log': App.sheet = { kind: 'log' }; renderSheet(); var ll = document.querySelector('.sheet'); if (ll) ll.scrollTop = ll.scrollHeight; break;
     case 'menu': App.sheet = { kind: 'menu' }; renderSheet(); break;
     case 'takehost': closeSheet(); takeHost(); break;
+    case 'lobbyjoin': joinTable(el.getAttribute('data-code')); break;
+    case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + (el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); break; }
+    case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); break;
+    case 'closeyes': closeSheet(); App.closing = true; if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); } break;
     case 'resume': run(function () { return Net.send({ t: 'back' }); }); break;
     case 'rematch': closeSheet(); rematch(); break;
     case 'close': if (App.sheet && App.sheet.kind === 'decide') App.sheet = null; closeSheet(); render(); break;
@@ -597,7 +611,10 @@ document.addEventListener('click', function (ev) {
     case 'pickok': if (App.pickDo) App.pickDo(App.picks.slice()); break;
   }
 });
-document.addEventListener('change', function (ev) { if (ev.target.id === 'opt-timer') run(function () { return Net.send({ t: 'opt', timer: +ev.target.value }); }); });
+document.addEventListener('change', function (ev) {
+  if (ev.target.id === 'opt-timer') run(function () { return Net.send({ t: 'opt', timer: +ev.target.value }); });
+  if (ev.target.id === 'opt-vis') run(function () { return Net.send({ t: 'vis', vis: ev.target.value }); });
+});
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);
   if (e.key === 'Escape' && App.sheet && App.sheet.kind !== 'decide') { closeSheet(); render(); }
