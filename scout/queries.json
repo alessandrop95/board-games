@@ -1,49 +1,28 @@
 {
- "find": {
+ "store": {
   "search": [
-   "Elliot's New Repeaters",
-   "Doomed Remington LCCN",
-   "revolver engraving",
-   "Smith Wesson advertisement",
-   "Colt's patent fire arms",
-   "explosion engraving",
-   "blasting rock engraving",
-   "nitro-glycerine",
-   "powder explosion Harper's",
-   "sheriff badge",
-   "derringer"
+   "trading post engraving",
+   "store interior engraving",
+   "Harper's Weekly store",
+   "general store interior 1880",
+   "mercantile store 1880",
+   "buffalo hunt engraving",
+   "buffalo hunter Remington",
+   "Doomed buffalo",
+   "slaughtered for the hide"
   ],
   "n": 8
  },
- "women_big": {
+ "extra": {
   "files": [
-   "Take Care! (cowgirl) (NBY 428936).jpg",
-   "I'll Catch You! (Cowgirl (NBY 429064).jpg",
-   "Arizona by Augustus Thomas. LCCN2014637248.jpg",
-   "A Bunco Game (NBY 428813).jpg",
-   "Russellrodeocowgirlonabuckinghorse.gif",
-   "Pin-Up.jpg",
-   "Cowgirl Standing with Horse (4666519521).jpg",
-   "Two Cowgirls with Bear Tooth Ranch Pennant (4666554101).jpg"
-  ],
-  "cols": 4,
-  "tw": 330,
-  "th": 420
- },
- "big_scenes": {
-  "files": [
-   "The revolver fight on the street (Das interessante Blatt, 1891).jpg",
-   "Pony tracks MET DP-12258-002.jpg",
-   "Hands Up! -- The Capture of Finnigan.jpg",
-   "Holding Up the Pay Escort Remington.jpg",
-   "Stories of the West (1914) (14590836687).jpg",
-   "Stories of the West (1914) (14774159661).jpg",
-   "Stories of the West (1914) (14777323415).jpg",
-   "Stories of the West (1914) (14797241543).jpg",
-   "Ochs-safe-ad-1870.png",
-   "Rupps General Store, Waterville, Ohio (approximately 1880) - DPLA - f9c72ecb95a8666a4eb66424f87eb885.jpg",
-   "Berdan Sharps rifle.jpg",
-   "Remington A cracker cowboy.jpg"
+   "P 268--Wolfville.jpg",
+   "P 203--Wolfville.jpg",
+   "P 087--Wolfville.jpg",
+   "Frontis--Wolfville.jpg",
+   "Tailpiece--Wolfville.jpg",
+   "Cattle Raid on the Texas Border LCCN2004678783.jpg",
+   "Painting the town red - drawn by R.F. Zogbaum. LCCN92516873.jpg",
+   "A quarrel over cards-a sketch from a New Mexican ranch - drawn by Frederic Remington ; R. Stauden Baur. LCCN91483074.jpg"
   ],
   "cols": 4,
   "tw": 330,
