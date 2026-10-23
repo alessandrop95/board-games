@@ -134,6 +134,7 @@ async function enterTable(code, nick) {
   lsSet(KEY_TABLE, code); remember(code);
   if (nick) { var out = await Net.send({ t: 'join', nick: nick }); if (out === 'spect' && myIdx() < 0) toast('La partita è già iniziata: la guardi da spettatore.'); }
   Nav.guard(code);
+  Chat.reset();
 }
 function send(op) { return run(function () { return Net.send(op); }); }
 function act(a) { App.sel = null; return send({ t: 'act', a: a }); }
@@ -157,6 +158,7 @@ Nav.setup(function (state) {
   if (state && state.ppTable && state.ppTable === App.code && App.doc) { App.screen = 'table'; onDoc(); }
 });
 function leaveTable(silent) {
+  Chat.reset();
   var d = App.doc;
   if (!silent && d && d.phase === 'lobby' && d.seats.some(function (s) { return s.uid === Net.uid; })) {
     var humans = d.seats.filter(function (s) { return !s.bot && s.uid !== Net.uid; });
@@ -271,7 +273,7 @@ function roomHTML() {
   }
   var noEven = !!(d.opts && d.opts.noEven);
   var rounds = n >= 3 ? 60 / Math.max(3, Math.min(6, n)) : 20;
-  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span><button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
@@ -304,7 +306,7 @@ function tableHTML() {
   if (!show.length) trick = '<div class="msg">' + (g.phase === 'bid' ? 'Si fanno le previsioni.' : g.phase === 'trump' ? 'Si sceglie la briscola.' : 'Il tavolo è vuoto.') + '</div>';
   var status = statusLine(g, me, sum, allBid);
   var feed = g.log.slice(-3).map(function (l) { return '<div>' + esc(l.t) + '</div>'; }).join('');
-  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Mano ' + g.round + ' di ' + g.rounds + ' · ' + esc(d.code)) + '</span><button class="iconbtn" data-act="scores">Punti</button><button class="iconbtn" data-act="menu">Menu</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Mano ' + g.round + ' di ' + g.rounds + ' · ' + esc(d.code)) + '</span><button class="iconbtn" data-act="scores">Punti</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
     '<main class="wrap board">' + hostBanner() + '<div class="players">' + pls + '</div>' +
     '<section class="felt"><div class="trumpbox">' + trumpCard + '<span>' + trumpTxt + '</span></div><div class="trick">' + trick + '</div><div class="status">' + status + '<div class="feed" style="margin-top:6px">' + feed + '</div></div></section></main>' + dockHTML(g, me, sum);
 }
@@ -315,8 +317,16 @@ function statusLine(g, me, sum, allBid) {
   if (g.phase === 'roundEnd') return 'Fine della mano ' + g.round + '. ' + pr;
   if (g.phase === 'trump') return 'Il mazziere (' + who(g.dealer) + ') sceglie la briscola.';
   if (g.phase === 'bid') return (g.turn === me ? '<b>Tocca a te prevedere.</b> ' : 'Prevede <b>' + who(g.turn) + '</b>. ') + pr + (g.opts.noEven ? ' · regola somma diversa' : '');
-  var ls = E.leadSuit(g);
-  return (g.turn === me ? '<b>Tocca a te.</b>' : 'Gioca <b>' + who(g.turn) + '</b>.') + (ls != null ? ' Si risponde a ' + suitName(ls) + '.' : '') + ' ' + pr;
+  return (g.turn === me ? '<b>Tocca a te.</b>' : 'Gioca <b>' + who(g.turn) + '</b>.') + ' ' + followNote(g, me) + ' ' + pr;
+}
+// Spiega quale colore va seguito nella presa in corso (o perché la carta è libera).
+function followNote(g, me) {
+  if (!g.trick.length) return g.turn === me ? 'Apri tu: gioca la carta che vuoi.' : '';
+  var ls = E.leadSuit(g), opener = g.trick[0].p, by = opener === me ? 'hai aperto' : esc(g.players[opener].nick) + ' ha aperto';
+  if (ls != null) return 'Si risponde a <b>' + suitName(ls) + '</b> (se non ne hai, carta libera; Arcimago e Giullare sempre).';
+  var firstNonJ = g.trick.filter(function (t) { return CARDS[t.c].k !== 'j'; })[0];
+  if (firstNonJ && CARDS[firstNonJ.c].k === 'w') return (firstNonJ === g.trick[0] ? by + ' con un Arcimago' : 'È uscito un Arcimago prima di qualsiasi colore') + ': <b>carta libera</b>, nessun colore da seguire.';
+  return 'Finora solo Giullari: il colore lo decide la prima carta numerata.';
 }
 function dockHTML(g, me, sum) {
   if (me < 0) return '<div class="dock"><div class="wrap"><div class="hint">Stai guardando la partita.</div></div></div>';
@@ -337,7 +347,9 @@ function dockHTML(g, me, sum) {
     extra = '<div class="suits">' + D.SUITS.map(function (s) { return '<button data-act="trump" data-s="' + s.id + '">' + ART.emblem(s.id, 24) + s.n + '</button>'; }).join('') + '</div>';
   } else if (g.phase === 'play' && myTurn) {
     var need = P.bid - P.tricks;
-    hint = '<b>Tocca a te.</b> ' + (need > 0 ? 'Ti servono ancora ' + need + (need === 1 ? ' presa.' : ' prese.') : need === 0 ? 'Hai le prese che volevi: ora evitale.' : 'Hai già ' + (-need) + (need === -1 ? ' presa' : ' prese') + ' di troppo.') + (App.sel != null ? '' : ' Tocca una carta.');
+    var lsH = E.leadSuit(g), wiz = g.trick.length && lsH == null && g.trick.some(function (t) { return CARDS[t.c].k === 'w'; });
+    hint = '<b>Tocca a te.</b> ' + (need > 0 ? 'Ti servono ancora ' + need + (need === 1 ? ' presa.' : ' prese.') : need === 0 ? 'Hai le prese che volevi: ora evitale.' : 'Hai già ' + (-need) + (need === -1 ? ' presa' : ' prese') + ' di troppo.') +
+      (lsH != null ? ' Rispondi a ' + suitName(lsH) + ' se puoi.' : wiz ? ' Arcimago in apertura: carta libera.' : '') + (App.sel != null ? '' : ' Tocca una carta.');
     if (App.sel != null) extra = '<button class="btn block" data-act="playsel">Gioca ' + esc(E.cardName(App.sel)) + '</button>';
   } else if (g.phase === 'roundEnd') {
     hint = myTurn || App.doc.host === Net.uid ? 'Mano finita. Quando siete pronti, avvia la prossima.' : 'Mano finita. Attendi che ' + esc(g.players[g.turn].nick) + ' avvii la prossima.';

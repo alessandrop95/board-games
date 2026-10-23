@@ -230,9 +230,9 @@ var Net = (function () {
     if (f && f.offline) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     var c = f.c;
-    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], seenRev: 0, graceUntil: 0 };
+    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], seenRev: 0, graceUntil: 0, chat: [], chatIds: {} };
     var me = T;
-    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping');
+    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog');
     me.handler = function (t, p) {
       if (T !== me) return;
       if (t === tState) {
@@ -253,6 +253,11 @@ var Net = (function () {
         var r = safeParse(p); if (!r || !me.pending[r.id]) return;
         var pd = me.pending[r.id]; delete me.pending[r.id]; clearInterval(pd.timer);
         if (r.err) pd.rej(r.err); else pd.res(r.out || null);
+      } else if (t === tChat) {
+        if (addChat(me, safeParse(p), false) && me.isHost) saveChatLog(me);
+      } else if (t === tLog) {
+        var arr = p ? safeParse(p) : null;
+        if (Array.isArray(arr)) arr.forEach(function (m) { addChat(me, m, true); });
       } else if (t === tAct && me.isHost) {
         var m = safeParse(p); if (!m || !m.id || !m.from) return;
         hostHandle(m);
@@ -272,7 +277,7 @@ var Net = (function () {
       if (onStatus) onStatus();
     };
     c.onStatus(me.statusFn);
-    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState);
+    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat);
     accept(f.doc);
     me.timers.push(setInterval(function () {
       if (T !== me) return;
@@ -418,22 +423,50 @@ var Net = (function () {
     var d = T.doc, tomb = { code: d.code, closed: true, rev: (d.rev || 0) + 1, updated: Date.now() };
     var ok = T.c.publish(topic(T.code, 'state'), JSON.stringify(tomb), true);
     if (d.lobbyId) T.c.publish(lobbyTopic(d.lobbyId), '', true);
+    T.c.publish(topic(T.code, 'chatlog'), '', true);
     T.closed = true;
     return ok;
   }
   function clearTable() { return closeTable(); }
+
+  /* --- Chat del tavolo: i messaggi passano direttamente tra i giocatori (arrivano anche se l'host è assente);
+     l'host conserva gli ultimi messaggi come cronologia per chi entra dopo. --- */
+  var chatCb = null;
+  function addChat(me, m, fromLog) {
+    if (!m || typeof m.id !== 'string' || typeof m.text !== 'string' || me.chatIds[m.id]) return false;
+    var clean = { id: m.id.slice(0, 40), uid: String(m.uid || '').slice(0, 40), nick: String(m.nick || '').trim().slice(0, 18) || 'Giocatore', text: m.text.trim().slice(0, 240), ts: +m.ts || Date.now() };
+    if (!clean.text) return false;
+    me.chatIds[clean.id] = 1; me.chat.push(clean);
+    me.chat.sort(function (a, b) { return a.ts - b.ts; });
+    if (me.chat.length > 80) me.chat.splice(0, me.chat.length - 80);
+    if (chatCb && T === me) chatCb(clean, fromLog);
+    return true;
+  }
+  function saveChatLog(me) {
+    clearTimeout(me.chatTimer);
+    me.chatTimer = setTimeout(function () { if (T === me && me.isHost) me.c.publish(topic(me.code, 'chatlog'), JSON.stringify(me.chat.slice(-50)), true); }, 600);
+  }
+  function sendChat(text, nick) {
+    if (!T) return false;
+    text = String(text || '').trim().slice(0, 240); if (!text) return false;
+    var m = { id: uid + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), uid: uid, nick: nick, text: text, ts: Date.now() };
+    if (!T.c.publish(topic(T.code, 'chat'), JSON.stringify(m), false)) return false;
+    if (addChat(T, m, false) && T.isHost) saveChatLog(T);
+    return true;
+  }
   function close() {
     if (!T) return;
     var me = T; T = null;
     me.timers.forEach(clearInterval);
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
-    ['state', 'act', 'ping', 'res/' + uid].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
     me.c.handlers = me.c.handlers.filter(function (h) { return h !== me.handler; });
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
     create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
+    sendChat: sendChat, onChat: function (f) { chatCb = f; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },
     setOnTakeover: function (f) { onTakeover = f; },

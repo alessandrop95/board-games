@@ -38,7 +38,7 @@ def page(title, desc, theme, fonts, css, js, short):
 </html>
 '''
 
-net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js')
+net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js')
 
 pp = 'src/polvere-e-piombo/'
 pp_css = 'html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}\n' + r(pp, 'style.css')

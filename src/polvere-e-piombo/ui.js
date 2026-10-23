@@ -184,6 +184,7 @@ async function enterTable(code, nick) {
     if (out === 'spect' && myIdx() < 0) toast('La partita è già in corso: la guardi da spettatore.');
   }
   Nav.guard(code);
+  Chat.reset();
 }
 function addBot() { run(function () { return Net.send({ t: 'addbot' }); }); }
 function removeSeat(uid) { run(function () { return Net.send({ t: 'kick', uid: uid }); }); }
@@ -241,6 +242,7 @@ Nav.setup(function (state) {
   if (state && state.ppTable && state.ppTable === App.code && App.doc) { App.screen = 'table'; onDoc(); }
 });
 function leaveTable(silent) {
+  Chat.reset();
   var d = App.doc;
   if (!silent && d && d.phase === 'lobby' && d.seats.some(function (s) { return s.uid === Net.uid; })) {
     var humans = d.seats.filter(function (s) { return !s.bot && s.uid !== Net.uid; });
@@ -329,7 +331,7 @@ function roomHTML() {
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
   var n = d.seats.length;
-  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span><button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' +
     '<section class="panel"><span class="lead">Codice del tavolo</span><div class="row"><span class="codebig">' + esc(d.code) + '</span></div>' +
     '<div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
@@ -403,7 +405,7 @@ function tableHTML() {
       (P.eq.length ? '<div class="eq">' + P.eq.map(function (c) { return cardHTML(c); }).join('') + '</div>' : '') + '</div></section>';
   }
   return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code) + ' · ' + g.players.filter(function (P) { return P.alive; }).length + ' in vita') + '</span>' +
-    '<button class="iconbtn" data-act="log">Registro</button><button class="iconbtn" data-act="menu">Menu</button></div></div>' +
+    '<button class="iconbtn" data-act="log">Registro</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
     '<main class="wrap board">' + hostBanner() + '<div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
     '<section class="center"><div class="pile">' + backHTML() + '<span>' + g.deck.length + ' nel mazzo</span></div><div class="pile">' + disc + '<span>scarti</span></div>' +
     '<div class="status"><div class="big">' + st.big + '</div><div class="small">' + st.small + '</div><div class="feed" style="margin-top:6px">' + feed + '</div></div></section>' +

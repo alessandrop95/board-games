@@ -9,6 +9,10 @@ var Nav = (function () {
     if (history.state && history.state.ppTable === code) history.replaceState({ ppTable: code }, '', url);
     else history.pushState({ ppTable: code }, '', url);
   }
-  window.addEventListener('popstate', function (ev) { if (handler) handler(ev.state || null); });
+  window.addEventListener('popstate', function (ev) {
+    // la chat aperta si chiude con "indietro", restando al tavolo
+    if (window.Chat && Chat.isOpen()) { Chat.close(); if (window.App && App.code && App.screen === 'table') guard(App.code); return; }
+    if (handler) handler(ev.state || null);
+  });
   return { setup: setup, guard: guard };
 })();
