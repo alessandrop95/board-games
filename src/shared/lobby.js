@@ -17,7 +17,7 @@ var Lobby = (function () {
     if (!l.length) return '<p class="lead">Apri un tavolo e manda il link ai tuoi amici: si siedono dal loro telefono, senza registrarsi.</p>';
     return l.map(function (t) {
       var s = rstate[t.code], m = Math.round((Date.now() - t.t) / 60000), when = m < 60 ? m + ' min fa' : Math.round(m / 60) + ' ore fa';
-      var info = !s ? 'controllo…' : s.err ? when : (s.doc.phase === 'play' ? 'in partita' : s.doc.phase === 'over' ? 'partita finita' : 'in attesa') + ' · ' + s.doc.seats.length + ' giocatori' + (s.doc.host === Net.uid ? ' · tuo' : '');
+      var info = !s ? 'controllo…' : s.err ? when : s.missing ? 'non lo trovo ora · ' + when : (s.doc.phase === 'play' ? 'in partita' : s.doc.phase === 'over' ? 'partita finita' : 'in attesa') + ' · ' + s.doc.seats.length + ' giocatori' + (s.doc.host === Net.uid ? ' · tuo' : '');
       return '<div class="trow"><span class="code">' + e(t.code) + '</span><span class="grow muted" style="font-size:13px">' + info + '</span>' +
         '<button class="btn small ghost" data-act="jointable" data-code="' + e(t.code) + '">Rientra</button>' +
         '<button type="button" data-lobby="forget" data-code="' + e(t.code) + '" aria-label="Togli ' + e(t.code) + ' dalla lista" style="appearance:none;background:none;border:0;color:inherit;opacity:.6;font-size:22px;line-height:1;padding:4px 6px;cursor:pointer">×</button></div>';
@@ -29,10 +29,11 @@ var Lobby = (function () {
     if (checking) return; checking = true;
     try {
       await Promise.all(rget().map(function (t) {
-        var s = rstate[t.code]; if (s && !s.err && Date.now() - s.at < 60000) return null;
-        return Net.peek(t.code).then(function (doc) {
-          if (!doc) { forget(t.code); return; }
-          rstate[t.code] = { doc: doc, at: Date.now() }; paintRecent();
+        var s = rstate[t.code]; if (s && !s.err && !s.missing && Date.now() - s.at < 20000) return null;
+        return Net.peek(t.code).then(function (f) {
+          if (f && f.closed) { forget(t.code); return; }           // chiuso davvero: via dalla lista
+          if (!f || !f.doc) { rstate[t.code] = { missing: true, at: Date.now() }; paintRecent(); return; } // non trovato ora: resta, si può riprovare o togliere con ×
+          rstate[t.code] = { doc: f.doc, at: Date.now() }; paintRecent();
         }, function () { rstate[t.code] = { err: true, at: Date.now() }; paintRecent(); });
       }));
     } finally { checking = false; }

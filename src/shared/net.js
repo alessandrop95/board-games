@@ -132,7 +132,7 @@ MQ.prototype.onStatus = function (f) { this.statusHandlers.push(f); };
 /* ---------- tavolo condiviso ---------- */
 var Net = (function () {
   var qs = NETQ;
-  var BROKERS = qs.get('broker') ? [qs.get('broker')] : [
+  var BROKERS = qs.get('broker') ? qs.get('broker').split(',') : [
     'wss://broker.hivemq.com:8884/mqtt',
     'wss://broker.emqx.io:8084/mqtt',
     'wss://test.mosquitto.org:8081/mqtt'
@@ -144,8 +144,9 @@ var Net = (function () {
   var uid = lsGet('pp-uid');
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); lsSet('pp-uid', uid); }
   var clients = {}, reducer = null, beforePublish = null, onTakeover = null, lobbyInfo = null;
-  var LOBBY_BEAT = +(qs.get('lobbyBeat') || 25000);   // ogni quanto l'host conferma che il tavolo è vivo
-  var LOBBY_TTL = +(qs.get('lobbyTtl') || 75000);     // oltre questo silenzio il tavolo sparisce dalla lista
+  var LOBBY_BEAT = +(qs.get('lobbyBeat') || 20000);   // ogni quanto l'host conferma che il tavolo è vivo
+  var LOBBY_TTL = +(qs.get('lobbyTtl') || 150000);    // oltre questo silenzio il tavolo sparisce dalla lista
+  var FIND_MS = +(qs.get('findMs') || 4500);          // attesa massima della risposta quando si cerca un tavolo
   function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
   function rid() { return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6); }
   var T = null; // sessione del tavolo aperto
@@ -184,16 +185,25 @@ var Net = (function () {
     for (var i = 0; i < BROKERS.length; i++) { try { return { i: i, c: await client(i) }; } catch (e) {} }
     throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
   }
-  async function find(code) {
-    var reached = false;
-    for (var i = 0; i < BROKERS.length; i++) {
-      var c; try { c = await client(i); reached = true; } catch (e) { continue; }
-      var doc = await probeState(c, code, 2600);
-      if (doc && doc.code === code && !doc.closed) return { i: i, c: c, doc: doc };
-      c.unsubscribe(topic(code, 'state'));
-    }
-    if (!reached) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
-    return null;
+  // Cerca un tavolo su tutti i server in parallelo, con un'attesa generosa (reti lente, pagina appena riaperta).
+  // Risponde: {i, c, doc} se c'è; {closed:true} se è stato chiuso; {offline:true} se nessun server risponde; null se non c'è.
+  function find(code, ms) {
+    ms = ms || FIND_MS;
+    return new Promise(function (resolve) {
+      var pending = BROKERS.length, reached = false, closed = false, done = false;
+      function finish(v) { if (!done) { done = true; resolve(v); } }
+      BROKERS.forEach(function (_, i) {
+        client(i).then(function (c) {
+          reached = true;
+          if (done) return;
+          return probeState(c, code, ms).then(function (doc) {
+            if (doc && doc.code === code && !doc.closed) { finish({ i: i, c: c, doc: doc }); return; }
+            if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
+            if (doc && doc.closed) closed = true;
+          });
+        }).catch(function () {}).then(function () { if (--pending === 0) finish(!reached ? { offline: true } : closed ? { closed: true } : null); });
+      });
+    });
   }
 
   function newCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
@@ -217,7 +227,8 @@ var Net = (function () {
   async function open(code, onDoc, onStatus) {
     close();
     var f = await find(code);
-    if (!f) return false;
+    if (f && f.offline) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
+    if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     var c = f.c;
     T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], seenRev: 0, graceUntil: 0 };
     var me = T;
@@ -304,38 +315,45 @@ var Net = (function () {
   }
   // Controlla se un tavolo esiste ancora (senza entrarci). Risponde con lo stato o null; lancia un errore se nessun server è raggiungibile.
   async function peek(code) {
-    var reached = false;
-    for (var i = 0; i < BROKERS.length; i++) {
-      var c; try { c = await client(i); reached = true; } catch (e) { continue; }
-      var doc = await probeState(c, code, 2200);
-      if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
-      if (doc && doc.code === code && !doc.closed) return doc;
-    }
-    if (!reached) throw new Error('offline');
-    return null;
+    var f = await find(code);
+    if (f && f.offline) throw new Error('offline');
+    if (f && f.doc && !(T && T.code === code)) f.c.unsubscribe(topic(code, 'state'));
+    return f; // {doc} | {closed} | null
   }
   // Lista dal vivo dei tavoli di questo gioco. cb(lista) a ogni cambiamento; restituisce la funzione per smettere.
+  // Ascolta tutti i server raggiungibili e unisce le liste (un tavolo può stare su un server diverso dal mio).
   async function watchLobby(cb) {
-    var b = await firstBroker(), c = b.c, base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false;
+    var base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false, attached = [], reached = 0, failed = 0;
+    function alive(e) { var now = Date.now(); return (e.rx && now - e.rx < LOBBY_TTL) || now - e.t < LOBBY_TTL; }
     function emit() {
       if (stopped) return;
-      var now = Date.now();
-      cb(Object.keys(items).map(function (k) { return items[k]; }).filter(function (e) { return now - e.t < LOBBY_TTL && (e.phase === 'lobby' || e.phase === 'play'); })
+      cb(Object.keys(items).map(function (k) { return items[k]; }).filter(function (e) { return alive(e) && (e.phase === 'lobby' || e.phase === 'play'); })
         .sort(function (a, b) { return (a.phase === 'lobby' ? 0 : 1) - (b.phase === 'lobby' ? 0 : 1) || b.t - a.t; }));
     }
-    function h(t, p) {
-      if (t.indexOf(base) !== 0) return;
-      var id = t.slice(base.length);
-      if (!p) { delete items[id]; emit(); return; }
-      var e = safeParse(p);
-      if (!e || e.id !== id || typeof e.t !== 'number') return;
-      if (Date.now() - e.t > 3600e3) { c.publish(t, '', true); delete items[id]; emit(); return; } // pulizia dei tavoli abbandonati
-      e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
-      items[id] = e; emit();
+    function attach(c) {
+      function h(t, p, retained) {
+        if (t.indexOf(base) !== 0) return;
+        var id = t.slice(base.length);
+        if (!p) { delete items[id]; emit(); return; }
+        var e = safeParse(p);
+        if (!e || e.id !== id || typeof e.t !== 'number') return;
+        if (retained && Date.now() - e.t > 3600e3) { c.publish(t, '', true); return; } // pulizia dei tavoli abbandonati da tempo
+        e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
+        var old = items[id];
+        if (old && old.t > e.t) return;
+        e.rx = retained ? (old && old.rx) : Date.now(); // conferma arrivata adesso: vale anche se gli orologi dei telefoni non coincidono
+        items[id] = e; emit();
+      }
+      c.onMessage(h); c.subscribe(filt); attached.push({ c: c, h: h });
     }
-    c.onMessage(h); c.subscribe(filt);
+    await new Promise(function (resolve) {
+      BROKERS.forEach(function (_, i) {
+        client(i).then(function (c) { reached++; if (!stopped) attach(c); resolve(); }, function () { if (++failed === BROKERS.length) resolve(); });
+      });
+    });
+    if (!reached) throw new Error('offline');
     var iv = setInterval(emit, 10000);
-    return function () { stopped = true; clearInterval(iv); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(filt); };
+    return function () { stopped = true; clearInterval(iv); attached.forEach(function (a) { a.c.handlers = a.c.handlers.filter(function (x) { return x !== a.h; }); a.c.unsubscribe(filt); }); };
   }
   function publishState() {
     if (beforePublish) beforePublish(T.doc);

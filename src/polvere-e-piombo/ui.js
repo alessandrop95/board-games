@@ -152,28 +152,38 @@ function createTable() {
 }
 function joinTable(code) {
   code = (code || '').trim().toUpperCase();
+  if (App.code === code && App.doc) { toTable(); return; }
   if (!/^[A-Z]{4}$/.test(code)) { toast('Il codice del tavolo ha 4 lettere.'); return; }
   var nick = requireNick(); if (!nick) return;
   App.status = 'Cerco il tavolo ' + code + '…';
   run(function () { return enterTable(code, nick); });
 }
 async function enterTable(code, nick) {
+  if (App.code && App.code !== code && App.doc) {
+    var d0 = App.doc;
+    if (d0.phase === 'lobby' && d0.seats.some(function (s) { return s.uid === Net.uid; })) {
+      if (Net.isHost && !d0.seats.some(function (s) { return !s.bot && s.uid !== Net.uid; })) Net.clearTable(); else Net.send({ t: 'leave' }).catch(function () {});
+    }
+  }
   App.code = code; App.doc = null; App.flashInit = false; App.mode = 'idle'; App.sheet = null; App.botKey = null;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
-    if (!doc) { if (App.screen === 'table' && App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
+    if (!doc) { Lobby.forget(code); if (App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () {
     var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost;
     if (sig !== App.netSig) { App.netSig = sig; render(); }
   });
-  if (!ok) { App.screen = 'lobby'; App.code = null; lsSet('pp-table', null); Lobby.forget(code); render(); throw 'Il tavolo ' + code + ' non esiste più (è stato chiuso o è scaduto). L’ho tolto dai tuoi tavoli recenti.'; }
+  if (ok !== true) {
+    App.screen = 'lobby'; App.code = null; lsSet('pp-table', null); if (ok === 'closed') Lobby.forget(code); render();
+    throw ok === 'closed' ? 'Il tavolo ' + code + ' è stato chiuso. L’ho tolto dai tuoi tavoli recenti.' : 'Non riesco a raggiungere il tavolo ' + code + '. Se la connessione è lenta, riprova tra poco da «I tuoi tavoli recenti».';
+  }
   lsSet('pp-table', code); remember(code);
   if (nick) {
     var out = await Net.send({ t: 'join', nick: nick });
     if (out === 'spect' && myIdx() < 0) toast('La partita è già in corso: la guardi da spettatore.');
   }
-  history.replaceState(null, '', location.pathname + '?t=' + code);
+  Nav.guard(code);
 }
 function addBot() { run(function () { return Net.send({ t: 'addbot' }); }); }
 function removeSeat(uid) { run(function () { return Net.send({ t: 'kick', uid: uid }); }); }
@@ -211,6 +221,25 @@ function driveBots() {
 }
 
 /* ---------- navigazione ---------- */
+
+/* ---------- tavolo in corso e gesto indietro ---------- */
+function curTableHTML() {
+  if (!App.code || !App.doc) return '<div id="curtable"></div>';
+  var d = App.doc, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
+  var st = d.phase === 'play' ? 'partita in corso' : d.phase === 'over' ? 'partita finita' : 'in attesa · ' + d.seats.length + ' giocatori';
+  return '<div id="curtable" class="notice" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:180px">' + (seated ? 'Sei seduto al tavolo' : 'Stai guardando il tavolo') + ' <b>' + esc(d.code) + '</b>' + (host ? ' di ' + esc(host.nick) : '') + ' · ' + st + '</span><button class="btn small" data-act="totable">Torna al tavolo</button></div>';
+}
+function paintCur() { var el = document.getElementById('curtable'); if (el) el.outerHTML = curTableHTML(); }
+function toTable() { if (!App.code) return; App.screen = 'table'; Nav.guard(App.code); if (App.doc) onDoc(); else render(); window.scrollTo(0, 0); }
+function toHome() { if (history.state && history.state.ppTable) history.back(); else { App.screen = 'lobby'; render(); window.scrollTo(0, 0); } }
+Nav.setup(function (state) {
+  if (App.screen === 'table' && App.code) {
+    if (App.sheet || App.mode !== 'idle') { App.mode = 'idle'; App.sel = null; App.picks = []; closeSheet(); render(); Nav.guard(App.code); return; }
+    App.screen = 'lobby'; render(); window.scrollTo(0, 0); return;
+  }
+  if (App.screen === 'gallery') { App.screen = 'lobby'; render(); return; }
+  if (state && state.ppTable && state.ppTable === App.code && App.doc) { App.screen = 'table'; onDoc(); }
+});
 function leaveTable(silent) {
   var d = App.doc;
   if (!silent && d && d.phase === 'lobby' && d.seats.some(function (s) { return s.uid === Net.uid; })) {
@@ -235,6 +264,7 @@ function onDoc() {
   if (g && !App.flashInit) { App.lastFlash = g.flash ? g.flash.n : 0; App.flashInit = true; }
   if (!g) App.flashInit = false;
   // apri automaticamente il foglio di decisione quando tocca a me rispondere
+  if (App.screen !== 'table') { if (g && g.flash) App.lastFlash = Math.max(App.lastFlash, g.flash.n); driveBots(); Turns.watch(App.doc); paintCur(); return; }
   var me = myIdx();
   if (g && g.phase === 'play' && me >= 0) {
     var top = g.stack[g.stack.length - 1];
@@ -274,7 +304,7 @@ function lobbyHTML() {
   var fanItems = [ { h: backHTML() }, { h: charCardHTML('abner') }, { h: typeCardHTML('sparo') } ];
   fanItems.forEach(function (f, i) { fan += f.h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 22) + 'px)" class="card'); });
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b class="mono">' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
-  return '<div class="wrap lobby"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' +
+  return '<div class="wrap lobby"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' + curTableHTML() +
     '<section class="hero"><div><h1>Polvere <span class="amp">&amp;</span> Piombo</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p></div>' +
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
@@ -449,6 +479,7 @@ function sheetBody(s) {
       (d.host !== Net.uid ? '<button class="opt" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="opt" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
       (d.host === Net.uid ? '<button class="opt" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +
+      '<button class="opt" data-act="tohome">Vai alla home del gioco (resti seduto)</button>' +
       '<button class="opt" data-act="leave">Esci dal tavolo</button></div><button class="btn block ghost" data-act="close">Chiudi</button>';
   }
   if (s.kind === 'closeconfirm' && App.doc) return '<h2>Chiudere il tavolo ' + esc(App.doc.code) + '?</h2><p class="lead" style="margin:0">Il tavolo sparisce dalla lista' + (App.doc.game && App.doc.phase === 'play' ? ', la partita in corso finisce' : '') + ' e tutti tornano alla schermata iniziale. Non si può annullare.</p>' +
@@ -566,6 +597,8 @@ document.addEventListener('click', function (ev) {
     case 'log': App.sheet = { kind: 'log' }; renderSheet(); var ll = document.querySelector('.sheet'); if (ll) ll.scrollTop = ll.scrollHeight; break;
     case 'menu': App.sheet = { kind: 'menu' }; renderSheet(); break;
     case 'takehost': closeSheet(); takeHost(); break;
+    case 'totable': toTable(); break;
+    case 'tohome': closeSheet(); toHome(); break;
     case 'lobbyjoin': joinTable(el.getAttribute('data-code')); break;
     case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + (el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); break; }
     case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); break;

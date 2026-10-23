@@ -1709,7 +1709,7 @@ MQ.prototype.onStatus = function (f) { this.statusHandlers.push(f); };
 /* ---------- tavolo condiviso ---------- */
 var Net = (function () {
   var qs = NETQ;
-  var BROKERS = qs.get('broker') ? [qs.get('broker')] : [
+  var BROKERS = qs.get('broker') ? qs.get('broker').split(',') : [
     'wss://broker.hivemq.com:8884/mqtt',
     'wss://broker.emqx.io:8084/mqtt',
     'wss://test.mosquitto.org:8081/mqtt'
@@ -1721,8 +1721,9 @@ var Net = (function () {
   var uid = lsGet('pp-uid');
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); lsSet('pp-uid', uid); }
   var clients = {}, reducer = null, beforePublish = null, onTakeover = null, lobbyInfo = null;
-  var LOBBY_BEAT = +(qs.get('lobbyBeat') || 25000);   // ogni quanto l'host conferma che il tavolo è vivo
-  var LOBBY_TTL = +(qs.get('lobbyTtl') || 75000);     // oltre questo silenzio il tavolo sparisce dalla lista
+  var LOBBY_BEAT = +(qs.get('lobbyBeat') || 20000);   // ogni quanto l'host conferma che il tavolo è vivo
+  var LOBBY_TTL = +(qs.get('lobbyTtl') || 150000);    // oltre questo silenzio il tavolo sparisce dalla lista
+  var FIND_MS = +(qs.get('findMs') || 4500);          // attesa massima della risposta quando si cerca un tavolo
   function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
   function rid() { return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6); }
   var T = null; // sessione del tavolo aperto
@@ -1761,16 +1762,25 @@ var Net = (function () {
     for (var i = 0; i < BROKERS.length; i++) { try { return { i: i, c: await client(i) }; } catch (e) {} }
     throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
   }
-  async function find(code) {
-    var reached = false;
-    for (var i = 0; i < BROKERS.length; i++) {
-      var c; try { c = await client(i); reached = true; } catch (e) { continue; }
-      var doc = await probeState(c, code, 2600);
-      if (doc && doc.code === code && !doc.closed) return { i: i, c: c, doc: doc };
-      c.unsubscribe(topic(code, 'state'));
-    }
-    if (!reached) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
-    return null;
+  // Cerca un tavolo su tutti i server in parallelo, con un'attesa generosa (reti lente, pagina appena riaperta).
+  // Risponde: {i, c, doc} se c'è; {closed:true} se è stato chiuso; {offline:true} se nessun server risponde; null se non c'è.
+  function find(code, ms) {
+    ms = ms || FIND_MS;
+    return new Promise(function (resolve) {
+      var pending = BROKERS.length, reached = false, closed = false, done = false;
+      function finish(v) { if (!done) { done = true; resolve(v); } }
+      BROKERS.forEach(function (_, i) {
+        client(i).then(function (c) {
+          reached = true;
+          if (done) return;
+          return probeState(c, code, ms).then(function (doc) {
+            if (doc && doc.code === code && !doc.closed) { finish({ i: i, c: c, doc: doc }); return; }
+            if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
+            if (doc && doc.closed) closed = true;
+          });
+        }).catch(function () {}).then(function () { if (--pending === 0) finish(!reached ? { offline: true } : closed ? { closed: true } : null); });
+      });
+    });
   }
 
   function newCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
@@ -1794,7 +1804,8 @@ var Net = (function () {
   async function open(code, onDoc, onStatus) {
     close();
     var f = await find(code);
-    if (!f) return false;
+    if (f && f.offline) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
+    if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     var c = f.c;
     T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], seenRev: 0, graceUntil: 0 };
     var me = T;
@@ -1881,38 +1892,45 @@ var Net = (function () {
   }
   // Controlla se un tavolo esiste ancora (senza entrarci). Risponde con lo stato o null; lancia un errore se nessun server è raggiungibile.
   async function peek(code) {
-    var reached = false;
-    for (var i = 0; i < BROKERS.length; i++) {
-      var c; try { c = await client(i); reached = true; } catch (e) { continue; }
-      var doc = await probeState(c, code, 2200);
-      if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
-      if (doc && doc.code === code && !doc.closed) return doc;
-    }
-    if (!reached) throw new Error('offline');
-    return null;
+    var f = await find(code);
+    if (f && f.offline) throw new Error('offline');
+    if (f && f.doc && !(T && T.code === code)) f.c.unsubscribe(topic(code, 'state'));
+    return f; // {doc} | {closed} | null
   }
   // Lista dal vivo dei tavoli di questo gioco. cb(lista) a ogni cambiamento; restituisce la funzione per smettere.
+  // Ascolta tutti i server raggiungibili e unisce le liste (un tavolo può stare su un server diverso dal mio).
   async function watchLobby(cb) {
-    var b = await firstBroker(), c = b.c, base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false;
+    var base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false, attached = [], reached = 0, failed = 0;
+    function alive(e) { var now = Date.now(); return (e.rx && now - e.rx < LOBBY_TTL) || now - e.t < LOBBY_TTL; }
     function emit() {
       if (stopped) return;
-      var now = Date.now();
-      cb(Object.keys(items).map(function (k) { return items[k]; }).filter(function (e) { return now - e.t < LOBBY_TTL && (e.phase === 'lobby' || e.phase === 'play'); })
+      cb(Object.keys(items).map(function (k) { return items[k]; }).filter(function (e) { return alive(e) && (e.phase === 'lobby' || e.phase === 'play'); })
         .sort(function (a, b) { return (a.phase === 'lobby' ? 0 : 1) - (b.phase === 'lobby' ? 0 : 1) || b.t - a.t; }));
     }
-    function h(t, p) {
-      if (t.indexOf(base) !== 0) return;
-      var id = t.slice(base.length);
-      if (!p) { delete items[id]; emit(); return; }
-      var e = safeParse(p);
-      if (!e || e.id !== id || typeof e.t !== 'number') return;
-      if (Date.now() - e.t > 3600e3) { c.publish(t, '', true); delete items[id]; emit(); return; } // pulizia dei tavoli abbandonati
-      e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
-      items[id] = e; emit();
+    function attach(c) {
+      function h(t, p, retained) {
+        if (t.indexOf(base) !== 0) return;
+        var id = t.slice(base.length);
+        if (!p) { delete items[id]; emit(); return; }
+        var e = safeParse(p);
+        if (!e || e.id !== id || typeof e.t !== 'number') return;
+        if (retained && Date.now() - e.t > 3600e3) { c.publish(t, '', true); return; } // pulizia dei tavoli abbandonati da tempo
+        e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
+        var old = items[id];
+        if (old && old.t > e.t) return;
+        e.rx = retained ? (old && old.rx) : Date.now(); // conferma arrivata adesso: vale anche se gli orologi dei telefoni non coincidono
+        items[id] = e; emit();
+      }
+      c.onMessage(h); c.subscribe(filt); attached.push({ c: c, h: h });
     }
-    c.onMessage(h); c.subscribe(filt);
+    await new Promise(function (resolve) {
+      BROKERS.forEach(function (_, i) {
+        client(i).then(function (c) { reached++; if (!stopped) attach(c); resolve(); }, function () { if (++failed === BROKERS.length) resolve(); });
+      });
+    });
+    if (!reached) throw new Error('offline');
     var iv = setInterval(emit, 10000);
-    return function () { stopped = true; clearInterval(iv); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(filt); };
+    return function () { stopped = true; clearInterval(iv); attached.forEach(function (a) { a.c.handlers = a.c.handlers.filter(function (x) { return x !== a.h; }); a.c.unsubscribe(filt); }); };
   }
   function publishState() {
     if (beforePublish) beforePublish(T.doc);
@@ -2148,7 +2166,7 @@ var Lobby = (function () {
     if (!l.length) return '<p class="lead">Apri un tavolo e manda il link ai tuoi amici: si siedono dal loro telefono, senza registrarsi.</p>';
     return l.map(function (t) {
       var s = rstate[t.code], m = Math.round((Date.now() - t.t) / 60000), when = m < 60 ? m + ' min fa' : Math.round(m / 60) + ' ore fa';
-      var info = !s ? 'controllo…' : s.err ? when : (s.doc.phase === 'play' ? 'in partita' : s.doc.phase === 'over' ? 'partita finita' : 'in attesa') + ' · ' + s.doc.seats.length + ' giocatori' + (s.doc.host === Net.uid ? ' · tuo' : '');
+      var info = !s ? 'controllo…' : s.err ? when : s.missing ? 'non lo trovo ora · ' + when : (s.doc.phase === 'play' ? 'in partita' : s.doc.phase === 'over' ? 'partita finita' : 'in attesa') + ' · ' + s.doc.seats.length + ' giocatori' + (s.doc.host === Net.uid ? ' · tuo' : '');
       return '<div class="trow"><span class="code">' + e(t.code) + '</span><span class="grow muted" style="font-size:13px">' + info + '</span>' +
         '<button class="btn small ghost" data-act="jointable" data-code="' + e(t.code) + '">Rientra</button>' +
         '<button type="button" data-lobby="forget" data-code="' + e(t.code) + '" aria-label="Togli ' + e(t.code) + ' dalla lista" style="appearance:none;background:none;border:0;color:inherit;opacity:.6;font-size:22px;line-height:1;padding:4px 6px;cursor:pointer">×</button></div>';
@@ -2160,10 +2178,11 @@ var Lobby = (function () {
     if (checking) return; checking = true;
     try {
       await Promise.all(rget().map(function (t) {
-        var s = rstate[t.code]; if (s && !s.err && Date.now() - s.at < 60000) return null;
-        return Net.peek(t.code).then(function (doc) {
-          if (!doc) { forget(t.code); return; }
-          rstate[t.code] = { doc: doc, at: Date.now() }; paintRecent();
+        var s = rstate[t.code]; if (s && !s.err && !s.missing && Date.now() - s.at < 20000) return null;
+        return Net.peek(t.code).then(function (f) {
+          if (f && f.closed) { forget(t.code); return; }           // chiuso davvero: via dalla lista
+          if (!f || !f.doc) { rstate[t.code] = { missing: true, at: Date.now() }; paintRecent(); return; } // non trovato ora: resta, si può riprovare o togliere con ×
+          rstate[t.code] = { doc: f.doc, at: Date.now() }; paintRecent();
         }, function () { rstate[t.code] = { err: true, at: Date.now() }; paintRecent(); });
       }));
     } finally { checking = false; }
@@ -2218,6 +2237,21 @@ var Lobby = (function () {
   }
   return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
     setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget };
+})();
+
+/* ===== Gesto "indietro" (swipe o tasto) dentro il gioco =====
+   Quando si entra in un tavolo si aggiunge una voce alla cronologia: così "indietro" non chiude la pagina
+   ma viene gestito dal gioco (chiude una finestra aperta o porta alla home del gioco tenendo il posto). */
+var Nav = (function () {
+  var handler = null;
+  function setup(onBack) { handler = onBack; }
+  function guard(code) {
+    var url = location.pathname + '?t=' + code;
+    if (history.state && history.state.ppTable === code) history.replaceState({ ppTable: code }, '', url);
+    else history.pushState({ ppTable: code }, '', url);
+  }
+  window.addEventListener('popstate', function (ev) { if (handler) handler(ev.state || null); });
+  return { setup: setup, guard: guard };
 })();
 
 /* ===== Interfaccia ===== */
@@ -2374,28 +2408,38 @@ function createTable() {
 }
 function joinTable(code) {
   code = (code || '').trim().toUpperCase();
+  if (App.code === code && App.doc) { toTable(); return; }
   if (!/^[A-Z]{4}$/.test(code)) { toast('Il codice del tavolo ha 4 lettere.'); return; }
   var nick = requireNick(); if (!nick) return;
   App.status = 'Cerco il tavolo ' + code + '…';
   run(function () { return enterTable(code, nick); });
 }
 async function enterTable(code, nick) {
+  if (App.code && App.code !== code && App.doc) {
+    var d0 = App.doc;
+    if (d0.phase === 'lobby' && d0.seats.some(function (s) { return s.uid === Net.uid; })) {
+      if (Net.isHost && !d0.seats.some(function (s) { return !s.bot && s.uid !== Net.uid; })) Net.clearTable(); else Net.send({ t: 'leave' }).catch(function () {});
+    }
+  }
   App.code = code; App.doc = null; App.flashInit = false; App.mode = 'idle'; App.sheet = null; App.botKey = null;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
-    if (!doc) { if (App.screen === 'table' && App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
+    if (!doc) { Lobby.forget(code); if (App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () {
     var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost;
     if (sig !== App.netSig) { App.netSig = sig; render(); }
   });
-  if (!ok) { App.screen = 'lobby'; App.code = null; lsSet('pp-table', null); Lobby.forget(code); render(); throw 'Il tavolo ' + code + ' non esiste più (è stato chiuso o è scaduto). L’ho tolto dai tuoi tavoli recenti.'; }
+  if (ok !== true) {
+    App.screen = 'lobby'; App.code = null; lsSet('pp-table', null); if (ok === 'closed') Lobby.forget(code); render();
+    throw ok === 'closed' ? 'Il tavolo ' + code + ' è stato chiuso. L’ho tolto dai tuoi tavoli recenti.' : 'Non riesco a raggiungere il tavolo ' + code + '. Se la connessione è lenta, riprova tra poco da «I tuoi tavoli recenti».';
+  }
   lsSet('pp-table', code); remember(code);
   if (nick) {
     var out = await Net.send({ t: 'join', nick: nick });
     if (out === 'spect' && myIdx() < 0) toast('La partita è già in corso: la guardi da spettatore.');
   }
-  history.replaceState(null, '', location.pathname + '?t=' + code);
+  Nav.guard(code);
 }
 function addBot() { run(function () { return Net.send({ t: 'addbot' }); }); }
 function removeSeat(uid) { run(function () { return Net.send({ t: 'kick', uid: uid }); }); }
@@ -2433,6 +2477,25 @@ function driveBots() {
 }
 
 /* ---------- navigazione ---------- */
+
+/* ---------- tavolo in corso e gesto indietro ---------- */
+function curTableHTML() {
+  if (!App.code || !App.doc) return '<div id="curtable"></div>';
+  var d = App.doc, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
+  var st = d.phase === 'play' ? 'partita in corso' : d.phase === 'over' ? 'partita finita' : 'in attesa · ' + d.seats.length + ' giocatori';
+  return '<div id="curtable" class="notice" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:180px">' + (seated ? 'Sei seduto al tavolo' : 'Stai guardando il tavolo') + ' <b>' + esc(d.code) + '</b>' + (host ? ' di ' + esc(host.nick) : '') + ' · ' + st + '</span><button class="btn small" data-act="totable">Torna al tavolo</button></div>';
+}
+function paintCur() { var el = document.getElementById('curtable'); if (el) el.outerHTML = curTableHTML(); }
+function toTable() { if (!App.code) return; App.screen = 'table'; Nav.guard(App.code); if (App.doc) onDoc(); else render(); window.scrollTo(0, 0); }
+function toHome() { if (history.state && history.state.ppTable) history.back(); else { App.screen = 'lobby'; render(); window.scrollTo(0, 0); } }
+Nav.setup(function (state) {
+  if (App.screen === 'table' && App.code) {
+    if (App.sheet || App.mode !== 'idle') { App.mode = 'idle'; App.sel = null; App.picks = []; closeSheet(); render(); Nav.guard(App.code); return; }
+    App.screen = 'lobby'; render(); window.scrollTo(0, 0); return;
+  }
+  if (App.screen === 'gallery') { App.screen = 'lobby'; render(); return; }
+  if (state && state.ppTable && state.ppTable === App.code && App.doc) { App.screen = 'table'; onDoc(); }
+});
 function leaveTable(silent) {
   var d = App.doc;
   if (!silent && d && d.phase === 'lobby' && d.seats.some(function (s) { return s.uid === Net.uid; })) {
@@ -2457,6 +2520,7 @@ function onDoc() {
   if (g && !App.flashInit) { App.lastFlash = g.flash ? g.flash.n : 0; App.flashInit = true; }
   if (!g) App.flashInit = false;
   // apri automaticamente il foglio di decisione quando tocca a me rispondere
+  if (App.screen !== 'table') { if (g && g.flash) App.lastFlash = Math.max(App.lastFlash, g.flash.n); driveBots(); Turns.watch(App.doc); paintCur(); return; }
   var me = myIdx();
   if (g && g.phase === 'play' && me >= 0) {
     var top = g.stack[g.stack.length - 1];
@@ -2496,7 +2560,7 @@ function lobbyHTML() {
   var fanItems = [ { h: backHTML() }, { h: charCardHTML('abner') }, { h: typeCardHTML('sparo') } ];
   fanItems.forEach(function (f, i) { fan += f.h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 22) + 'px)" class="card'); });
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b class="mono">' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
-  return '<div class="wrap lobby"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' +
+  return '<div class="wrap lobby"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' + curTableHTML() +
     '<section class="hero"><div><h1>Polvere <span class="amp">&amp;</span> Piombo</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p></div>' +
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
@@ -2671,6 +2735,7 @@ function sheetBody(s) {
       (d.host !== Net.uid ? '<button class="opt" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="opt" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
       (d.host === Net.uid ? '<button class="opt" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +
+      '<button class="opt" data-act="tohome">Vai alla home del gioco (resti seduto)</button>' +
       '<button class="opt" data-act="leave">Esci dal tavolo</button></div><button class="btn block ghost" data-act="close">Chiudi</button>';
   }
   if (s.kind === 'closeconfirm' && App.doc) return '<h2>Chiudere il tavolo ' + esc(App.doc.code) + '?</h2><p class="lead" style="margin:0">Il tavolo sparisce dalla lista' + (App.doc.game && App.doc.phase === 'play' ? ', la partita in corso finisce' : '') + ' e tutti tornano alla schermata iniziale. Non si può annullare.</p>' +
@@ -2788,6 +2853,8 @@ document.addEventListener('click', function (ev) {
     case 'log': App.sheet = { kind: 'log' }; renderSheet(); var ll = document.querySelector('.sheet'); if (ll) ll.scrollTop = ll.scrollHeight; break;
     case 'menu': App.sheet = { kind: 'menu' }; renderSheet(); break;
     case 'takehost': closeSheet(); takeHost(); break;
+    case 'totable': toTable(); break;
+    case 'tohome': closeSheet(); toHome(); break;
     case 'lobbyjoin': joinTable(el.getAttribute('data-code')); break;
     case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + (el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); break; }
     case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); break;
