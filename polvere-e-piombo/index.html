@@ -3,19 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1d140e">
+<title>Polvere &amp; Piombo</title>
 <meta name="description" content="Gioco di carte western a ruoli segreti, da 4 a 7 giocatori, ognuno dal proprio telefono.">
+<meta name="theme-color" content="#1d140e">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Polvere &amp; Piombo</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Sancreek&display=swap">
 <style>
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}
-
 /* Layout: tavolo da saloon notturno in legno scuro; avversari in alto, mano e comandi in un pannello fisso in basso */
 :root {
   --wood: #1d140e; --wood-2: #2a1d14; --wood-3: #3a2819;
@@ -285,6 +283,7 @@ input.field.code { font-family: var(--f-mono); letter-spacing: .3em; text-transf
 <div id="app"></div>
 <div id="sheet"></div>
 <script>
+window.GAME_PREFIX = 'polvere-piombo/v1/';
 /* ===== Dati: carte, personaggi, ruoli (tutti originali di "Polvere & Piombo") ===== */
 var PPData = (function () {
   // kind: 'b' = carta immediata (bordo cuoio), 'e' = equipaggiamento (resta in gioco, bordo ferro)
@@ -1677,7 +1676,7 @@ var Net = (function () {
     'wss://test.mosquitto.org:8081/mqtt'
   ];
   var HOST_TIMEOUT = +(qs.get('hostTimeout') || 20000);
-  var PREFIX = 'polvere-piombo/v1/';
+  var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
   var uid = lsGet('pp-uid');
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); lsSet('pp-uid', uid); }
   var clients = {}, reducer = null;
