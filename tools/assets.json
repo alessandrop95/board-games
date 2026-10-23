@@ -1,0 +1,24 @@
+{
+  "dest": "presagio/img/src",
+  "maxWidth": 1600,
+  "files": {
+    "fiamme": "Gustove Dore, The Divine Comedy, Inferno, plate 14, The Tempest of Hell.jpg",
+    "maree": "Dore-I had done a hellish thing.jpg",
+    "foreste": "Gustave Dore Inferno1.jpg",
+    "sabbie": "015.Hagar and Ishmael in the Wilderness.jpg",
+    "arcimago": "Idylls of the King 10.jpg",
+    "giullare": "WillSommers engraving 300dpi.jpg",
+    "cielo": "Cellarius Harmonia Macrocosmica - Planisphaerium Braheum.jpg",
+    "flammarion": "FlammarionWoodcut.jpg"
+  },
+  "credits": {
+    "fiamme": "Gustave Doré, Inferno (Dante), 1861 — pubblico dominio",
+    "maree": "Gustave Doré, The Rime of the Ancient Mariner, 1876 — pubblico dominio",
+    "foreste": "Gustave Doré, Inferno (Dante), 1861 — pubblico dominio",
+    "sabbie": "Gustave Doré, La Sacra Bibbia, 1866 — pubblico dominio",
+    "arcimago": "Gustave Doré, Idylls of the King (Tennyson), 1868 — pubblico dominio",
+    "giullare": "Will Sommers, incisione antica — pubblico dominio",
+    "cielo": "Andreas Cellarius, Harmonia Macrocosmica, 1660 — pubblico dominio",
+    "flammarion": "Incisione Flammarion, 1888 — pubblico dominio"
+  }
+}
