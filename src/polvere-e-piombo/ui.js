@@ -407,7 +407,7 @@ function tableHTML() {
       '<div class="eqs">' + eqListHTML(P, false) + '</div></div></section>';
   }
   var alive = g.players.filter(function (P) { return P.alive; }).length;
-  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info"><b>' + connInfo(alive + ' pistoleri in vita') + '</b><span>Tavolo ' + esc(d.code) + '</span></span>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info"><b>' + connInfo(alive + ' in vita') + '</b><span>' + esc(d.code) + '</span></span>' +
     '<button class="iconbtn" data-act="log">Registro</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
     '<main class="wrap board">' + hostBanner() + Chat.dockHTML('position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:15;margin:0') +
     '<div class="sec-title">Al saloon, in ordine di turno</div><div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
