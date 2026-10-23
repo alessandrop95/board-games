@@ -1,5 +1,5 @@
 /* ===== Interfaccia ===== */
-var D = PPData, E = PPEngine, ART = PPArt, BOT = PPBot;
+var D = PPData, E = PPEngine, BOT = PPBot;
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -21,32 +21,28 @@ function toast(msg) {
 }
 function myNick() { return (lsGet('pp-nick') || '').trim().slice(0, 18); }
 
-/* ---------- carte in HTML ---------- */
-function cardHTML(id, extra) {
-  var C = D.CARDS[id], T = D.TYPES[C.t], red = C.s === 'H' || C.s === 'D';
-  return '<div class="card k-' + T.kind + ' ' + (extra || '') + '" data-card="' + id + '"><div class="cin">' +
-    '<div class="c-idx' + (red ? ' red' : '') + '"><span>' + C.r + '</span><span class="s">' + D.SUITSYM[C.s] + '</span></div>' +
-    (T.w ? '<div class="c-range" title="Portata">' + T.w + '</div>' : '') +
-    '<div class="c-title">' + T.n + '</div><div class="c-art">' + ART.card(C.t) + '</div>' +
-    '<div class="c-txt">' + T.txt + '</div><div class="c-foot">' + (T.kind === 'e' ? (T.w ? 'Arma' : 'Equipaggiamento') : 'Immediata') + '</div></div></div>';
+/* ---------- carte in HTML (vedi cards.js) ---------- */
+function cardHTML(id, extra) { return PPCards.card(id, extra); }
+function typeCardHTML(t) { return PPCards.type(t); }
+function charCardHTML(cid, hp, extra) { return PPCards.char(cid, hp, extra); }
+function roleCardHTML(r) { return PPCards.role(r); }
+function backHTML(extra) { return PPCards.back(extra); }
+function hpHTML(P) { var s = '<span class="hp" aria-label="' + Math.max(P.hp, 0) + ' punti vita su ' + P.max + '">'; for (var i = 0; i < P.max; i++) s += '<i' + (i < P.hp ? '' : ' class="lost"') + '></i>'; return s + '</span>'; }
+var TARGET_SVG = '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 3a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/></svg>';
+// abilità permanenti dei personaggi che valgono come carte in gioco
+function charChips(P) {
+  var ch = '';
+  if (P.char === 'wren') ch += PPCards.abilityChip('Cavallo (innato)', 'Gli altri lo vedono a +1');
+  if (P.char === 'maggie') ch += PPCards.abilityChip('Cannocchiale (innato)', 'Vede gli altri a −1');
+  if (P.char === 'padre') ch += PPCards.abilityChip('Riparo (innato)', 'Se gli sparano estrae: ♥ = schivato');
+  if (P.char === 'lark') ch += PPCards.abilityChip('Sparo! illimitati', 'Nel suo turno');
+  return ch;
 }
-function typeCardHTML(t) {
-  var T = D.TYPES[t];
-  return '<div class="card k-' + T.kind + '"><div class="cin">' + (T.w ? '<div class="c-range">' + T.w + '</div>' : '') +
-    '<div class="c-title">' + T.n + '</div><div class="c-art">' + ART.card(t) + '</div><div class="c-txt">' + T.txt + '</div><div class="c-foot">' + (T.kind === 'e' ? (T.w ? 'Arma' : 'Equipaggiamento') : 'Immediata') + '</div></div></div>';
+function eqListHTML(P, withPistol) {
+  var h = P.eq.map(function (c) { return PPCards.eqChip(c); }).join('') + charChips(P);
+  if (withPistol && !E.weapon(P) && P.alive) h = PPCards.abilityChip('Pistola', 'Arma di base · portata 1', 'pistol') + h;
+  return h;
 }
-function charCardHTML(cid, hp, extra) {
-  var C = D.CHAR[cid], n = hp == null ? C.hp : hp, b = '';
-  for (var i = 0; i < n; i++) b += '<i></i>';
-  return '<div class="card char ' + (extra || '') + '" data-char="' + cid + '"><div class="cin"><div class="c-title">' + C.n + '</div><div class="c-sub">' + C.title + '</div>' +
-    '<div class="c-art">' + ART.portrait(cid) + '</div><div class="c-hp">' + b + '</div><div class="c-txt">' + C.txt + '</div></div></div>';
-}
-function roleCardHTML(r) {
-  var R = D.ROLES[r];
-  return '<div class="card rolec"><div class="cin"><div class="c-title">' + R.n + '</div><div class="c-art">' + ART.role(r) + '</div><div class="c-txt">' + R.goal + '</div></div></div>';
-}
-function backHTML(extra) { return '<div class="card back ' + (extra || '') + '">' + ART.back() + '</div>'; }
-function hpHTML(P) { var s = '<span class="hp" aria-label="' + P.hp + ' punti vita su ' + P.max + '">'; for (var i = 0; i < P.max; i++) s += '<i' + (i < P.hp ? '' : ' class="lost"') + '></i>'; return s + '</span>'; }
 
 /* ---------- regole del tavolo: girano solo sul dispositivo host ---------- */
 function uniqueNick(seats, n) { var base = n, k = 2; while (seats.some(function (s) { return s.nick.toLowerCase() === n.toLowerCase(); })) n = base + ' ' + k++; return n; }
@@ -279,8 +275,7 @@ function onDoc() {
   if (App.sheet && App.sheet.kind === 'over' && (!g || g.phase !== 'over')) App.sheet = null;
   if (g && g.phase === 'over' && !App.sheet && !App.overShown) { App.overShown = g.seq; App.sheet = { kind: 'over' }; }
   if (!g || g.phase !== 'over') App.overShown = null;
-  render();
-  playFlash();
+  if (App.screen === 'table' && g && App.doc.phase !== 'lobby') { FX.before(); render(); FX.after(App.doc); } else { FX.reset(); render(); }
   driveBots();
   Turns.watch(App.doc);
 }
@@ -297,17 +292,18 @@ function render() {
     else root.innerHTML = tableHTML();
   }
   if ($('.hand')) $('.hand').scrollLeft = keepHand;
+  FX.reapply();
   if (App.screen === 'lobby') { renderLobbyList(); Lobby.start(); } else Lobby.end();
   renderSheet();
 }
 
 function lobbyHTML() {
   var fan = '';
-  var fanItems = [ { h: backHTML() }, { h: charCardHTML('abner') }, { h: typeCardHTML('sparo') } ];
+  var fanItems = [ { h: backHTML() }, { h: charCardHTML('maggie') }, { h: typeCardHTML('sparo') } ];
   fanItems.forEach(function (f, i) { fan += f.h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 22) + 'px)" class="card'); });
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b class="mono">' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<div class="wrap lobby"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' + curTableHTML() +
-    '<section class="hero"><div><h1>Polvere <span class="amp">&amp;</span> Piombo</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p></div>' +
+    '<section class="hero"><div style="display:grid;gap:10px"><h1>Polvere <span class="amp">&amp;</span> Piombo</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: disegni e dipinti di Frederic Remington e stampe western dell’Ottocento, di pubblico dominio</p></div>' +
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
     '<section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Rattlesnake Ale" value="' + esc(myNick()) + '">' +
@@ -353,20 +349,24 @@ function hostBanner() {
 function plateHTML(g, i, me, targets) {
   var P = g.players[i], C = D.CHAR[P.char], top = g.stack[g.stack.length - 1];
   var cls = ['plate'];
-  if (g.turn === i && g.phase === 'play') cls.push('turn');
-  if (top && top.who === i && top.who !== g.turn) cls.push('dec');
+  var isTurn = g.turn === i && g.phase === 'play', deciding = top && top.who === i && top.who !== g.turn;
+  if (isTurn) cls.push('turn');
   if (!P.alive) cls.push('dead');
   if (targets) cls.push(targets.indexOf(i) >= 0 ? 'target' : 'notarget');
-  var role = P.role === 'sceriffo' ? '<span class="badge star">★ Sceriffo</span>' : (!P.alive || g.phase === 'over' || i === me) ? '<span class="badge">' + D.ROLES[P.role].n + '</span>' : '';
-  var chips = P.eq.map(function (c) { var t = E.ty(c), T = D.TYPES[t]; return '<span class="chip' + (T.w ? ' w' : '') + (t === 'gattabuia' || t === 'candelotto' ? ' bad' : '') + '">' + T.n + (T.w ? ' ' + T.w : '') + '</span>'; }).join('');
-  if (!E.weapon(P) && P.alive) chips = '<span class="chip ab">Pistola 1</span>' + chips;
-  var dist = me >= 0 && me !== i && P.alive && g.players[me].alive ? '<span class="dist">dist ' + E.distance(g, me, i) + '</span>' : '';
-  return '<button class="' + cls.join(' ') + '" data-plate="' + i + '">' +
-    '<div class="pic">' + ART.portrait(P.char) + '</div>' +
-    '<div class="who"><div class="nick">' + esc(P.nick) + (P.bot ? ' <span class="muted" style="font-size:11px">(auto)</span>' : '') + '</div><div class="chr">' + C.n + '</div></div>' +
-    '<div class="stats" style="grid-column:2">' + hpHTML(P) + '<span class="handct"><b></b>' + P.hand.length + '</span>' + dist + '</div>' +
-    (role ? '<div class="chips">' + role + '</div>' : '') +
-    '<div class="chips">' + chips + '</div></button>';
+  var known = P.role === 'sceriffo' || !P.alive || g.phase === 'over' || i === me;
+  var role = known ? '<span class="rl' + (P.role === 'sceriffo' ? ' star' : '') + '">' + (P.role === 'sceriffo' ? '★ Sceriffo' : D.ROLES[P.role].n) + '</span>' : '';
+  var jail = E.hasEq ? E.hasEq(P, 'gattabuia') != null : P.eq.some(function (c) { return E.ty(c) === 'gattabuia'; });
+  var d = me >= 0 && me !== i && P.alive && g.players[me].alive ? E.distance(g, me, i) : null, inRange = d != null && d <= E.range(g.players[me]);
+  var dist = d != null ? '<span class="dist' + (inRange ? '' : ' out') + '" title="Distanza da te: ' + d + (inRange ? ', a portata' : ', fuori portata') + '">' + TARGET_SVG + d + '</span>' : '';
+  var ribbon = deciding ? '<span class="ribbon dec">deve rispondere</span>' : isTurn ? '<span class="ribbon">di turno</span>' : '';
+  return '<div class="' + cls.join(' ') + '" data-plate="' + i + '" role="button" tabindex="0" aria-label="' + esc(P.nick) + ', ' + C.n + '">' + ribbon + '<span class="nail"></span>' +
+    '<div class="ph" style="background-image:url(img/f-' + P.char + '.jpg)">' + (jail ? '<span class="bars" title="In gattabuia"></span>' : '') + role + '</div>' +
+    '<div class="hd"><span class="nick">' + esc(P.nick) + '</span>' + (P.bot ? '<span class="auto">auto</span>' : '') + '</div>' +
+    '<div class="chr">' + C.n + ' · ' + C.title + '</div>' +
+    '<div class="pow">' + C.s + '</div>' +
+    '<div class="stats">' + hpHTML(P) + '<span class="handct" title="Carte in mano"><b></b>' + P.hand.length + '</span>' + (P.alive ? '<span class="wpn" title="Portata della sua arma">arma <b>' + E.range(P) + '</b></span>' : '') + dist + '</div>' +
+    (P.eq.length || charChips(P) ? '<div class="eqs">' + eqListHTML(P, false) + '</div>' : '') +
+    (!P.alive ? '<span class="tomb"></span><span class="stamp-dead">Eliminato</span>' : '') + '</div>';
 }
 
 function statusText(g, me) {
@@ -390,26 +390,30 @@ function tableHTML() {
   var targets = App.mode === 'target' && App.sel ? App.sel.info.targets : App.mode === 'nate' ? g.players.map(function (P, i) { return P.alive && i !== me && P.hand.length ? i : -1; }).filter(function (i) { return i >= 0; }) : null;
   var st = statusText(g, me), top = g.stack[g.stack.length - 1];
   var disc = g.disc.length ? cardHTML(g.disc[g.disc.length - 1]) : '<div class="empty"></div>';
-  var feed = g.log.slice(-4).map(function (l) { return '<div class="k-' + l.k + '">' + esc(l.t) + '</div>'; }).join('');
-  var store = top && top.type === 'store' ? '<div class="panel" style="padding:10px"><span class="lead">Sul banco della Bottega</span><div class="row">' + top.cards.map(function (c) { return cardHTML(c).replace('class="card', 'style="--cw:70px" class="card'); }).join('') + '</div></div>' : '';
+  var lastN = App.feedN || 0;
+  var feed = g.log.slice(-4).map(function (l) { return '<div class="k-' + l.k + (l.n > lastN ? ' fresh' : '') + '">' + esc(l.t) + '</div>'; }).join('');
+  App.feedN = g.logN;
+  var store = top && top.type === 'store' ? '<div class="store"><span class="lead">Sul banco della Bottega' + (top.who === me ? ': scegli tu' : ': sceglie ' + esc(g.players[top.who].nick)) + '</span><div class="row">' + top.cards.map(function (c) { return cardHTML(c); }).join('') + '</div></div>' : '';
   var meHTML = '';
   if (me >= 0) {
-    var P = g.players[me];
+    var P = g.players[me], C = D.CHAR[P.char];
     var w = E.weapon(P), wr = E.range(P);
-    var bangs = (P.char === 'lark' || (w != null && E.ty(w) === 'ripetitore')) ? 'illimitati' : (g.turn === me ? (E.canPlayBang(g, me) ? '1 disponibile' : 'già usato') : '1 per turno');
-    meHTML = '<section class="me' + (g.turn === me ? ' turnme' : '') + '">' + charCardHTML(P.char, P.max).replace('class="card', 'data-zoomchar="' + P.char + '" class="card') +
-      '<div style="min-width:0"><h3>' + esc(P.nick) + '</h3><div class="muted" style="font-size:13px">' + D.CHAR[P.char].n + ' · ' + D.CHAR[P.char].title + '</div>' +
-      '<div class="row" style="margin-top:6px">' + hpHTML(P) + '<span class="muted mono" style="font-size:12px">' + Math.max(P.hp, 0) + '/' + P.max + '</span></div>' +
-      '<div class="muted" style="font-size:13px;margin-top:4px">Portata ' + wr + (w == null ? ' (Pistola)' : '') + ' · Sparo!: ' + bangs + '</div>' +
-      '<button class="btn ghost small rolebtn" data-act="myrole">' + (P.role === 'sceriffo' ? '★ Sceriffo' : 'Il tuo ruolo') + '</button>' +
-      (P.eq.length ? '<div class="eq">' + P.eq.map(function (c) { return cardHTML(c); }).join('') + '</div>' : '') + '</div></section>';
+    var bangs = (P.char === 'lark' || (w != null && E.ty(w) === 'ripetitore')) ? 'senza limite' : (g.turn === me ? (E.canPlayBang(g, me) ? '1 disponibile' : 'già usato') : '1 per turno');
+    meHTML = '<section class="me' + (g.turn === me && g.phase === 'play' ? ' turnme' : '') + '">' + charCardHTML(P.char, P.max).replace('class="card', 'data-zoomchar="' + P.char + '" class="card') +
+      '<div style="min-width:0"><h3>' + esc(P.nick) + '</h3><div class="chrline">' + C.n + ' · ' + C.title + '</div>' +
+      '<div class="stat">' + hpHTML(P) + '<span class="mono" style="font-size:14px;color:var(--paper-2)">' + Math.max(P.hp, 0) + '/' + P.max + ' punti vita</span></div>' +
+      '<div class="info">Portata ' + wr + (w == null ? ' (Pistola)' : '') + ' · Sparo!: ' + bangs + '</div>' +
+      '<button class="btn ghost small rolebtn" data-act="myrole">' + (P.role === 'sceriffo' ? '★ Sei lo Sceriffo' : 'Il tuo ruolo segreto') + '</button>' +
+      '<div class="eqs">' + eqListHTML(P, false) + '</div></div></section>';
   }
-  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code) + ' · ' + g.players.filter(function (P) { return P.alive; }).length + ' in vita') + '</span>' +
+  var alive = g.players.filter(function (P) { return P.alive; }).length;
+  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info"><b>' + connInfo(alive + ' pistoleri in vita') + '</b><span>Tavolo ' + esc(d.code) + '</span></span>' +
     '<button class="iconbtn" data-act="log">Registro</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
-    '<main class="wrap board">' + hostBanner() + Chat.dockHTML('position:sticky;top:calc(58px + env(safe-area-inset-top,0px));z-index:15;margin:0') + '<div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
-    '<section class="center"><div class="pile">' + backHTML() + '<span>' + g.deck.length + ' nel mazzo</span></div><div class="pile">' + disc + '<span>scarti</span></div>' +
-    '<div class="status"><div class="big">' + st.big + '</div><div class="small">' + st.small + '</div><div class="feed" style="margin-top:6px">' + feed + '</div></div></section>' +
-    store + meHTML + '</main>' + dockHTML(g, me);
+    '<main class="wrap board">' + hostBanner() + Chat.dockHTML('position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:15;margin:0') +
+    '<div class="sec-title">Al saloon, in ordine di turno</div><div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
+    '<section class="felt"><div class="pile deck">' + backHTML() + '<span>' + g.deck.length + ' nel mazzo</span></div><div class="pile disc">' + disc + '<span>scarti</span></div>' +
+    '<div class="status"><div class="big">' + st.big + '</div><div class="small">' + st.small + '</div></div>' + store + '<div class="feed">' + feed + '</div></section>' +
+    meHTML + '</main>' + dockHTML(g, me);
 }
 
 function dockHTML(g, me) {
@@ -418,11 +422,12 @@ function dockHTML(g, me) {
   var top = g.stack[g.stack.length - 1];
   if (!P) hint = 'Stai guardando la partita.';
   else {
-    var pickable = App.mode === 'pick';
+    var pickable = App.mode === 'pick', canPlayNow = g.phase === 'play' && g.turn === me && !top && g.step === 'play' && App.mode === 'idle';
     hand = P.hand.length ? P.hand.map(function (c) {
       var x = '';
       if (pickable) x = App.picks.indexOf(c) >= 0 ? 'pick' : '';
       else if (App.sel && App.sel.card === c) x = 'sel';
+      else if (canPlayNow && E.playInfo(g, me, c).ok) x = 'can';
       return cardHTML(c, x);
     }).join('') : '<span class="emptyhand">' + (P.alive ? 'Nessuna carta in mano.' : 'Sei fuori dalla partita. Puoi continuare a guardare.') + '</span>';
     var myTurnFree = g.phase === 'play' && g.turn === me && !top;
@@ -457,7 +462,8 @@ function galleryHTML() {
     D.ORDER.map(function (t) { return '<div class="gitem">' + typeCardHTML(t) + '<span class="cnt">× ' + D.TYPES[t].count + '</span></div>'; }).join('') +
     '<div class="gitem">' + backHTML() + '<span class="cnt">dorso</span></div></div>' +
     '<h2>I 16 pistoleri</h2><div class="ggrid">' + D.CHARS.map(function (c) { return '<div class="gitem">' + charCardHTML(c.id) + '</div>'; }).join('') + '</div>' +
-    '<h2>I ruoli segreti</h2><div class="ggrid">' + ['sceriffo', 'vice', 'bandito', 'traditore'].map(function (r) { return '<div class="gitem">' + roleCardHTML(r) + '</div>'; }).join('') + '</div></div>';
+    '<h2>I ruoli segreti</h2><div class="ggrid">' + ['sceriffo', 'vice', 'bandito', 'traditore'].map(function (r) { return '<div class="gitem">' + roleCardHTML(r) + '</div>'; }).join('') + '</div>' +
+    '<h2>Illustrazioni</h2><div class="credits">' + CREDITS.map(function (c) { return '<div>' + c + '</div>'; }).join('') + '</div></div>';
 }
 
 /* ---------- fogli modali ---------- */
@@ -497,8 +503,10 @@ function sheetBody(s) {
   }
   if (s.kind === 'player' && g) {
     var P = g.players[s.p], known = P.role === 'sceriffo' || !P.alive || g.phase === 'over' || s.p === me;
+    var eqh = eqListHTML(P, true);
     return '<h2>' + esc(P.nick) + '</h2><div class="cards">' + charCardHTML(P.char, P.max) + (known ? roleCardHTML(P.role) : '') + '</div>' +
-      (P.eq.length ? '<p class="lead" style="margin:0">In gioco davanti a lui</p><div class="cards">' + P.eq.map(function (c) { return cardHTML(c); }).join('') + '</div>' : '') +
+      '<p class="lead" style="margin:0;font-size:16px"><b style="font-family:var(--f-sc);font-weight:400;color:var(--brass)">Potere</b> · ' + D.CHAR[P.char].txt + '</p>' +
+      (eqh ? '<p class="lead" style="margin:0">In gioco davanti a ' + esc(P.nick) + ' (tocca per leggere la carta)</p><div class="pl-eq">' + eqh + '</div>' : '') +
       '<p class="muted" style="margin:0;text-align:center">' + P.hand.length + ' carte in mano' + (me >= 0 && me !== s.p && P.alive ? ' · distanza da te: ' + E.distance(g, me, s.p) : '') + '</p>' +
       (App.doc.host === Net.uid && s.p !== me && P.alive && g.phase === 'play' ? '<button class="btn ghost block" data-act="auto" data-p="' + s.p + '">' + (P.bot ? 'Ridai il controllo al giocatore' : 'Fallo giocare in automatico (se è assente)') + '</button>' : '') +
       '<button class="btn block" data-act="close">Chiudi</button>';
@@ -512,7 +520,7 @@ function sheetBody(s) {
   }
   if (s.kind === 'over' && g) {
     var W = g.winner, won = function (P) { return (W === 'legge' && (P.role === 'sceriffo' || P.role === 'vice')) || (W === 'banditi' && P.role === 'bandito') || (W === 'traditore' && P.role === 'traditore'); };
-    return '<div class="over"><div class="who-won">' + (W === 'legge' ? 'Vince la legge' : W === 'banditi' ? 'Vincono i Banditi' : 'Vince il Traditore') + '</div>' +
+    return '<div class="over"><div class="poster"><div class="kick">Avviso alla cittadinanza</div><div class="who-won">' + (W === 'legge' ? 'Vince la legge' : W === 'banditi' ? 'Vincono i Banditi' : 'Vince il Traditore') + '</div></div>' +
       (me >= 0 ? '<p style="margin:0">' + (won(g.players[me]) ? 'Hai vinto, pistolero.' : 'Stavolta è andata male.') + '</p>' : '') +
       '<table>' + g.players.map(function (P) { return '<tr><td>' + esc(P.nick) + '</td><td class="muted">' + D.CHAR[P.char].n + '</td><td>' + D.ROLES[P.role].n + '</td><td class="w">' + (won(P) ? 'vince' : '') + '</td></tr>'; }).join('') + '</table>' +
       (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="muted" style="margin:0">L’host può avviare una nuova partita.</p>') +
@@ -543,24 +551,10 @@ function decideBody(g, me) {
   return '';
 }
 
-/* ---------- effetti ---------- */
-function playFlash() {
-  var g = App.doc && App.doc.game; if (!g || !g.flash) return;
-  var f = g.flash; if (f.n <= App.lastFlash) return;
-  App.lastFlash = f.n;
-  var plate = function (i) { return document.querySelector('[data-plate="' + i + '"]'); };
-  function stamp(txt, red) { var s = document.createElement('div'); s.className = 'stamp' + (red ? ' red' : ''); s.textContent = txt; document.body.appendChild(s); setTimeout(function () { s.remove(); }, 1200); }
-  function reveal(id, cap) { var r = document.createElement('div'); r.className = 'reveal'; r.innerHTML = cardHTML(id) + '<span class="cap">' + esc(cap) + '</span>'; document.body.appendChild(r); setTimeout(function () { r.remove(); }, 1700); }
-  if (f.kind === 'bang') { stamp('Bang!'); var t = plate(f.t); if (t) t.classList.add('shake'); }
-  if (f.kind === 'hit') { var h = plate(f.p); if (h) h.classList.add('hitflash', 'shake'); else if (f.p === myIdx()) stamp('Colpito!', true); }
-  if (f.kind === 'death') stamp('Eliminato', true);
-  if (f.kind === 'check') reveal(f.card, 'Estrazione di ' + g.players[f.p].nick);
-  if (f.kind === 'card' && f.p !== myIdx()) reveal(f.card, g.players[f.p].nick + ' gioca');
-}
-
 /* ---------- eventi ---------- */
 document.addEventListener('click', function (ev) {
-  var el = ev.target.closest('[data-act],[data-plate],.hand .card,[data-zoomchar],.me .eq .card');
+  var el = ev.target.closest('[data-act],.eqs [data-card],.pl-eq [data-card],[data-plate],.hand .card,[data-zoomchar]');
+  if (el && el.matches('.eqs [data-card]') && el.closest('[data-plate]') && (App.mode === 'target' || App.mode === 'nate')) el = el.closest('[data-plate]');
   if (!el) return;
   var a = el.getAttribute('data-act');
   var g = App.doc && App.doc.game, me = myIdx();
@@ -656,11 +650,18 @@ var RULES = '<p>Ognuno riceve in segreto un <b>ruolo</b> e un <b>pistolero</b>. 
   '<h3>Distanza e armi</h3><p>La distanza è il numero di posti tra due giocatori vivi, nel verso più breve. Puoi sparare solo a chi è entro la portata della tua arma: senza armi hai la Pistola, portata 1. Il Cavallo ti allontana di 1 per gli altri, il Cannocchiale avvicina tutti di 1 per te. Si tiene una sola arma alla volta.</p>' +
   '<h3>Estrarre</h3><p>Riparo, Gattabuia e Candelotto chiedono di girare la prima carta del mazzo e guardarne il seme e il valore, nell’angolo in alto a sinistra.</p>' +
   '<h3>Taglie e penalità</h3><ul><li>Chi elimina un Bandito pesca 3 carte.</li><li>Se lo Sceriffo elimina un suo Vice, scarta tutte le carte.</li><li>Quando arrivi a zero puoi bere un Whisky per salvarti, ma non quando restate in due.</li></ul>' +
+  '<h3>Leggere il tavolo</h3><p>Su ogni avviso trovi il potere del personaggio, i punti vita, le carte in mano, la distanza da te (in rosso se è a portata della tua arma) e le carte che ha in gioco con il loro effetto. Tocca un avviso o una carta per leggerla per intero.</p>' +
   '<h3>Giocare online</h3><ul><li>Chi apre il tavolo è l’host: il suo telefono tiene la partita e muove i pistoleri automatici. Se chiude il gioco o mette il telefono in standby, dopo qualche secondo gli altri possono prendere il comando e continuare.</li><li>Se un amico si assenta, l’host può farlo giocare in automatico toccando la sua scheda. Appena torna e gioca una carta, riprende il controllo.</li><li>Le partite passano da un server pubblico gratuito: usa un soprannome e non scrivere dati personali.</li></ul>';
+
+var CREDITS = ['Frederic Remington (1861–1909): illustrazioni per Wolfville di A. H. Lewis (1897), Pony Tracks (1895), Stories of the West (1914), Harper’s Weekly e i dipinti Fired On, A Texas Pony, Coming and Going of the Pony Express, Downing the Nigh Leader, Holding Up the Pay Escort, Hands Up!, A Cracker Cowboy, The Cavalry Picket, An East-Side Politician, The Cow Boy.',
+  'Rufus F. Zogbaum, Painting the Town Red (Harper’s Weekly, 1886) · Cattle Raid on the Texas Border e Slaughtered for the Hide (Harper’s Weekly, 1874) · Mary L. Stone, Interior of a Country Store (1872).',
+  'Charles M. Russell, cowgirl su un cavallo imbizzarrito · Charles Dana Gibson (1902) · cartoline americane d’inizio Novecento (Take Care!, I’ll Catch You!, A Bunco Game) · fotografia di cowgirl, circa 1900.',
+  'Alhambra Saloon, Tombstone (1880) · pubblicità d’epoca: Elliot’s New Repeaters (1864), casseforti Julius Ochs (1870), Winchester (1898) · revolver Colt (1878) · fucile Sharps · Explosion au Mont-Valérien (1873).',
+  'Tutte di pubblico dominio, da Wikimedia Commons. Ritagliate e virate leggermente in seppia, senza alterarne il disegno.'];
 
 /* ---------- avvio ---------- */
 (function boot() {
-  document.body.insertAdjacentHTML('afterbegin', ART.DEFS);
+  PPCards.preload();
   var q = new URLSearchParams(location.search), t = (q.get('t') || '').toUpperCase(), last = lsGet('pp-table');
   if (/^[A-Z]{4}$/.test(t)) {
     if (t === last || (myNick() && q.get('auto') !== '0')) { App.status = 'Mi siedo al tavolo ' + t + '…'; run(function () { return enterTable(t, myNick() || null); }); }

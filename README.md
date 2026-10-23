@@ -13,7 +13,14 @@ Gioco di carte western a ruoli segreti, da 4 a 7 giocatori, ognuno dal proprio t
 - Chi apre il tavolo (l'host) tiene la partita sul suo telefono. Se esce, dopo qualche secondo un altro giocatore può prendere il comando.
 
 La sincronizzazione passa da broker MQTT pubblici e gratuiti (HiveMQ, EMQX, Mosquitto), senza server proprio né account.
-Tutte le carte, i personaggi e le illustrazioni sono originali e disegnati in SVG nella pagina stessa.
+Nomi, testi e grafica delle carte sono originali. Le illustrazioni sono disegni e dipinti western di pubblico dominio
+(soprattutto Frederic Remington, più stampe dell'Ottocento da Harper's Weekly e cartoline d'inizio Novecento), presi da
+Wikimedia Commons e appena virati in seppia da `tools/process_pp.py`; originali e crediti in `polvere-e-piombo/img/src/`.
+
+- Su ogni avviso dei giocatori si leggono il potere del personaggio, i punti vita, le carte in mano, l'arma, la distanza
+  e le carte in gioco con il loro effetto.
+- Animazioni: carte che volano tra mano, mazzo, scarti e tavolo; colpi di pistola, Mitraglia, Stampede, esplosioni del
+  Candelotto, sfide, eliminazioni, estrazioni, distribuzione iniziale e fine partita.
 
 ## Presagio
 
