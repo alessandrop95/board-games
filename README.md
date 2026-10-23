@@ -25,6 +25,11 @@ Gioco di carte a prese con previsione, da 3 a 6 giocatori.
 - A ogni mano le carte aumentano di una. Prima si prevede quante prese si faranno, poi si gioca.
 - Previsione esatta: 20 punti + 10 per presa. Sbagliata: −10 per ogni presa di differenza.
 - Opzione del tavolo: la somma delle previsioni non può essere uguale al numero di prese.
+- Tavolo animato: le carte volano dalla mano al centro, la presa va al vincitore, la distribuzione parte dal mazzo.
+
+Illustrazioni: incisioni antiche di pubblico dominio da Wikimedia Commons (Gustave Doré, l'incisione di Will Sommers,
+il planisfero di Cellarius e la xilografia Flammarion), ricolorate in stile fantasy da `tools/process_assets.py`.
+Originali e crediti in `presagio/img/src/` (scaricati dalla Action «assets»).
 
 ## Installare i giochi sul telefono
 

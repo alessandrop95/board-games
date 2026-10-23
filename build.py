@@ -48,8 +48,8 @@ open(os.path.join(ROOT, 'polvere-e-piombo', 'index.html'), 'w', encoding='utf-8'
     'family=Courier+Prime:wght@400;700&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Sancreek', pp_css, pp_js, 'Polvere&amp;Piombo'))
 
 pr = 'src/presagio/'
-pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, f) for f in ['engine.js', 'bot.js', 'art.js', 'ui.js'])
+pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'ui.js'])
 open(os.path.join(ROOT, 'presagio', 'index.html'), 'w', encoding='utf-8').write(page(
-    'Presagio', 'Gioco di carte a prese con previsione, da 3 a 6 giocatori, ognuno dal proprio telefono.', '#12142a',
-    'family=Cinzel:wght@400;700&family=EB+Garamond:wght@400;600;700&family=Uncial+Antiqua', r(pr, 'style.css'), pr_js, 'Presagio'))
+    'Presagio', 'Gioco di carte a prese con previsione, da 3 a 6 giocatori, ognuno dal proprio telefono.', '#06050d',
+    'family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:wght@500;600;700', r(pr, 'style.css'), pr_js, 'Presagio'))
 print('ok')

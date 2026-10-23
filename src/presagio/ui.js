@@ -1,5 +1,5 @@
 /* ===== Presagio: interfaccia ===== */
-var D = PRData, E = PREngine, ART = PRArt, BOT = PRBot, CARDS = PRData.CARDS;
+var D = PRData, E = PREngine, BOT = PRBot, CARDS = PRData.CARDS;
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
@@ -185,7 +185,7 @@ function driveBots() {
   var key = App.code + ':' + g.seq;
   if (App.botKey === key) return;
   App.botKey = key; clearTimeout(App.botTimer);
-  var wait = g.phase === 'roundEnd' ? 4200 : g.phase === 'bid' ? 800 : g.phase === 'trump' ? 1000 : (!g.trick.length && g.lastTrick ? 1800 : 950);
+  var wait = g.phase === 'roundEnd' ? 4200 : g.phase === 'bid' ? 800 : g.phase === 'trump' ? 1000 : (!g.trick.length && g.lastTrick ? 2300 : 1000);
   App.botTimer = setTimeout(function () {
     Net.hostApply(function (cur) {
       if (!cur || !cur.game || cur.phase !== 'play') return false;
@@ -211,7 +211,7 @@ function onDoc() {
     if (!key && App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
     if (App.sel != null && myIdx() >= 0 && g.players[myIdx()].hand.indexOf(App.sel) < 0) App.sel = null;
   } else if (App.sheet && (App.sheet.kind === 'round' || App.sheet.kind === 'over')) App.sheet = null;
-  render(); playFlash(); driveBots(); Turns.watch(App.doc);
+  render(); driveBots(); Turns.watch(App.doc);
 }
 function playFlash() {
   var g = App.doc && App.doc.game; if (!g || !g.flash || g.flash.n <= App.lastFlash) return;
@@ -223,8 +223,8 @@ function playFlash() {
 }
 
 /* ---------- render ---------- */
-function cardHTML(id, cls, attrs) { return '<div class="card ' + (cls || '') + '" ' + (attrs || '') + ' data-c="' + id + '">' + ART.card(id) + '</div>'; }
-function backHTML(style) { return '<div class="card back" ' + (style || '') + '>' + ART.back() + '</div>'; }
+function cardHTML(id, cls, attrs) { return PRCards.html(id, cls, attrs); }
+function backHTML(style) { return PRCards.back('', style); }
 function connInfo(txt) { return Net.connected ? txt : '<span style="color:var(--bad)">Riconnessione…</span> ' + txt; }
 function hostBanner() {
   var d = App.doc; if (!d || Net.isHost || Net.hostAlive()) return '';
@@ -232,29 +232,22 @@ function hostBanner() {
   return '<div class="notice red">' + esc(h ? h.nick : 'L’host') + ' non risponde: forse ha chiuso il gioco o ha il telefono in standby. Tra pochi secondi il comando passa da solo a un altro giocatore, oppure prendilo tu adesso.<div class="row" style="margin-top:8px"><button class="btn small" data-act="takehost">Prendi il comando</button></div></div>';
 }
 function render() {
-  var root = $('#app'), hand = $('.hand'), keep = hand ? hand.scrollLeft : 0;
+  var root = $('#app');
+  if (App.screen === 'table' && App.doc && App.doc.game && App.doc.phase !== 'lobby') { Lobby.end(); TV.update(App.doc); renderSheet(); return; }
+  TV.unmount();
   if (App.screen === 'lobby') root.innerHTML = lobbyHTML();
   else if (!App.doc) root.innerHTML = '<div class="wrap lobby"><p class="muted">' + esc(App.status || 'Mi siedo al tavolo…') + '</p></div>';
   else if (App.doc.phase === 'lobby' || !App.doc.game) root.innerHTML = roomHTML();
-  else root.innerHTML = tableHTML();
-  if ($('.hand')) { $('.hand').scrollLeft = keep; fitHand(); }
   if (App.screen === 'lobby') Lobby.start(); else Lobby.end();
   renderSheet();
 }
-function fitHand() {
-  var h = $('.hand'); if (!h) return;
-  var n = h.querySelectorAll('.card').length; if (n < 2) return;
-  var cw = 74, avail = h.clientWidth - 8, need = n * cw + (n - 1) * 6;
-  var ov = need > avail ? Math.max(-cw + 22, (avail - cw) / (n - 1) - cw) : 6;
-  h.style.setProperty('--ov', ov + 'px');
-}
-window.addEventListener('resize', fitHand);
+window.addEventListener('resize', function () { if (TV.mounted()) TV.update(App.doc); });
 
 function lobbyHTML() {
   var fan = [cardHTML(52), cardHTML(12), cardHTML(56)].map(function (h, i) { return h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 12) + 'deg) translateX(' + ((i - 1) * 20) + 'px)" class="card'); }).join('');
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<div class="wrap lobby"><a class="back-link" href="../">← Tutti i giochi</a>' + curTableHTML() +
-    '<section class="hero"><div><h1>Presagio</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
+    '<section class="hero"><div style="display:grid;gap:10px"><h1>Presagio</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: incisioni di Gustave Doré e di antichi atlanti celesti, di pubblico dominio</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
@@ -286,33 +279,10 @@ function roomHTML() {
     '</section></div>';
 }
 
-function tableHTML() {
-  var d = App.doc, g = d.game, me = myIdx(), k = g.players.length;
-  var order = []; var st = me >= 0 ? me : 0; for (var i = 0; i < k; i++) order.push((st + i) % k);
-  var sum = E.bidSum(g), allBid = g.players.every(function (P) { return P.bid != null; });
-  var pls = order.map(function (i) {
-    var P = g.players[i], cls = 'pl' + (g.turn === i && g.phase !== 'over' ? ' turn' : '') + (i === me ? ' me' : '');
-    var bt = P.bid == null ? '<span class="muted">prevede…</span>' : '<span class="t">' + P.tricks + '</span><span class="muted">/ ' + P.bid + ' prese</span>';
-    var btc = P.bid == null ? '' : P.tricks === P.bid ? ' hit' : P.tricks > P.bid ? ' over' : '';
-    return '<button class="' + cls + '" data-pl="' + i + '">' + (g.dealer === i ? '<span class="dealer" title="Mazziere">M</span>' : '') + '<span class="nk">' + esc(P.nick) + (i === me ? ' (tu)' : P.bot ? ' <span class="muted" style="font-weight:400;font-size:13px">auto</span>' : '') + '</span>' +
-      '<span class="bt' + btc + '">' + bt + '</span><span class="sc">' + P.score + ' punti</span></button>';
-  }).join('');
-  var trumpTxt = g.trump != null ? 'Briscola<br><b style="color:' + ART.SUITCOL[g.trump] + ';filter:brightness(1.5)">' + suitName(g.trump) + '</b>' : g.phase === 'trump' ? 'Briscola<br>da scegliere' : 'Niente<br>briscola';
-  var trumpCard = g.trumpCard != null ? cardHTML(g.trumpCard) : '<div class="none">ultima mano</div>';
-  var trick = '', show = g.trick.length ? g.trick : (g.lastTrick && (g.phase === 'play' || g.phase === 'roundEnd' || g.phase === 'over') ? g.lastTrick.cards : []);
-  var showing = show.length && !g.trick.length;
-  if (show.length) trick = show.map(function (t, j) { return '<div class="tc' + (showing && j === g.lastTrick.wi ? ' win' : '') + '">' + cardHTML(t.c) + '<span class="who">' + esc(t.p === me ? 'tu' : g.players[t.p].nick) + '</span></div>'; }).join('');
-  if (showing) trick += '<div class="msg">Presa a <b>' + esc(g.lastTrick.winner === me ? 'te' : g.players[g.lastTrick.winner].nick) + '</b></div>';
-  if (!show.length) trick = '<div class="msg">' + (g.phase === 'bid' ? 'Si fanno le previsioni.' : g.phase === 'trump' ? 'Si sceglie la briscola.' : 'Il tavolo è vuoto.') + '</div>';
-  var status = statusLine(g, me, sum, allBid);
-  var feed = g.log.slice(-3).map(function (l) { return '<div>' + esc(l.t) + '</div>'; }).join('');
-  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Mano ' + g.round + ' di ' + g.rounds + ' · ' + esc(d.code)) + '</span><button class="iconbtn" data-act="scores">Punti</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
-    '<main class="wrap board">' + hostBanner() + '<div class="players">' + pls + '</div>' +
-    '<section class="felt"><div class="trumpbox">' + trumpCard + '<span>' + trumpTxt + '</span></div><div class="trick">' + trick + '</div><div class="status">' + status + '<div class="feed" style="margin-top:6px">' + feed + '</div></div></section></main>' + dockHTML(g, me, sum);
-}
-function statusLine(g, me, sum, allBid) {
+function statusLine(g, me, sum, allBid, short) {
   var who = function (i) { return i === me ? 'tu' : esc(g.players[i].nick); };
   var pr = 'Previsioni: <b>' + sum + '</b> su ' + g.round + (g.round === 1 ? ' presa' : ' prese') + (allBid ? (sum > g.round ? ' · ne mancano per tutti' : sum < g.round ? ' · ne avanzano' : ' · somma pari') : '');
+  if (short && g.phase !== 'roundEnd') pr = '';
   if (g.phase === 'over') return 'Partita finita.';
   if (g.phase === 'roundEnd') return 'Fine della mano ' + g.round + '. ' + pr;
   if (g.phase === 'trump') return 'Il mazziere (' + who(g.dealer) + ') sceglie la briscola.';
@@ -328,39 +298,6 @@ function followNote(g, me) {
   if (firstNonJ && CARDS[firstNonJ.c].k === 'w') return (firstNonJ === g.trick[0] ? by + ' con un Arcimago' : 'È uscito un Arcimago prima di qualsiasi colore') + ': <b>carta libera</b>, nessun colore da seguire.';
   return 'Finora solo Giullari: il colore lo decide la prima carta numerata.';
 }
-function dockHTML(g, me, sum) {
-  if (me < 0) return '<div class="dock"><div class="wrap"><div class="hint">Stai guardando la partita.</div></div></div>';
-  var P = g.players[me], myTurn = g.turn === me && g.phase !== 'over', hint = '', extra = '';
-  var playable = g.phase === 'play' && myTurn ? E.playable(g, me) : null;
-  var hand = P.hand.length ? P.hand.map(function (c) {
-    var cls = playable ? (playable.indexOf(c) >= 0 ? 'ok' : 'no') : '';
-    if (App.sel === c) cls += ' sel';
-    return cardHTML(c, cls);
-  }).join('') : '<span class="empty">Nessuna carta in mano.</span>';
-  if (g.phase === 'bid' && myTurn) {
-    var f = E.forbiddenBid(g, me), b = '';
-    for (var i = 0; i <= g.round; i++) b += '<button data-act="bid" data-b="' + i + '"' + (i === f ? ' class="fb" disabled aria-label="' + i + ' non consentito"' : '') + '>' + i + '</button>';
-    hint = '<b>La tua previsione.</b> Quante prese farai? Finora ' + sum + ' su ' + g.round + '.' + (f != null ? ' Non puoi dire ' + f + '.' : '');
-    extra = '<div class="bids">' + b + '</div>';
-  } else if (g.phase === 'trump' && myTurn) {
-    hint = '<b>È uscito un Arcimago.</b> Scegli tu il colore di briscola.';
-    extra = '<div class="suits">' + D.SUITS.map(function (s) { return '<button data-act="trump" data-s="' + s.id + '">' + ART.emblem(s.id, 24) + s.n + '</button>'; }).join('') + '</div>';
-  } else if (g.phase === 'play' && myTurn) {
-    var need = P.bid - P.tricks;
-    var lsH = E.leadSuit(g), wiz = g.trick.length && lsH == null && g.trick.some(function (t) { return CARDS[t.c].k === 'w'; });
-    hint = '<b>Tocca a te.</b> ' + (need > 0 ? 'Ti servono ancora ' + need + (need === 1 ? ' presa.' : ' prese.') : need === 0 ? 'Hai le prese che volevi: ora evitale.' : 'Hai già ' + (-need) + (need === -1 ? ' presa' : ' prese') + ' di troppo.') +
-      (lsH != null ? ' Rispondi a ' + suitName(lsH) + ' se puoi.' : wiz ? ' Arcimago in apertura: carta libera.' : '') + (App.sel != null ? '' : ' Tocca una carta.');
-    if (App.sel != null) extra = '<button class="btn block" data-act="playsel">Gioca ' + esc(E.cardName(App.sel)) + '</button>';
-  } else if (g.phase === 'roundEnd') {
-    hint = myTurn || App.doc.host === Net.uid ? 'Mano finita. Quando siete pronti, avvia la prossima.' : 'Mano finita. Attendi che ' + esc(g.players[g.turn].nick) + ' avvii la prossima.';
-    if (myTurn || App.doc.host === Net.uid) extra = '<button class="btn block" data-act="next">Prossima mano</button>';
-  } else if (g.phase === 'over') { hint = 'Partita finita.'; extra = '<button class="btn block" data-act="showover">Classifica</button>'; }
-  else hint = P.bid == null ? 'Aspetta il tuo turno per la previsione.' : 'Hai previsto ' + P.bid + (P.bid === 1 ? ' presa' : ' prese') + ', ne hai fatte ' + P.tricks + '.';
-  if (myTurn && g.phase !== 'over') hint += '<span id="tt"></span>';
-  if (P.bot && g.phase !== 'over') { hint = '<b>Stai giocando in automatico</b> perché sei stato fermo troppo a lungo.'; extra = '<button class="btn block" data-act="resume">Riprendo io</button>'; }
-  return '<div class="dock"><div class="wrap"><div class="hint">' + hint + '</div><div class="hand" aria-label="La tua mano">' + hand + '</div>' + extra + '</div></div>';
-}
-
 /* ---------- fogli ---------- */
 function renderSheet() {
   var root = $('#sheet'), s = App.sheet;
@@ -369,7 +306,7 @@ function renderSheet() {
   root.innerHTML = '<div class="sheet-back" data-act="sheetback"><div class="sheet" role="dialog" aria-modal="true">' + h + '</div></div>';
 }
 function scoreTable(g, onlyRound) {
-  var head = '<tr><th>' + (onlyRound ? 'Giocatore' : 'Mano') + '</th>' + (onlyRound ? '<th>Previsione</th><th>Prese</th><th>Punti</th><th>Totale</th>' : g.players.map(function (P) { return '<th>' + esc(P.nick) + '</th>'; }).join('')) + '</tr>';
+  var head = '<tr><th>' + (onlyRound ? 'Giocatore' : 'Mano') + '</th>' + (onlyRound ? '<th>Previste</th><th>Prese</th><th>Mano</th><th>Tot.</th>' : g.players.map(function (P) { return '<th>' + esc(P.nick) + '</th>'; }).join('')) + '</tr>';
   var body = '';
   if (onlyRound) {
     var r = g.round - 1;
@@ -425,11 +362,12 @@ var RULES = '<p>Si gioca con 60 carte: quattro casate (Fiamme, Maree, Foreste, S
   '<h3>La previsione</h3><p>A turno, partendo da chi siede dopo il mazziere, ognuno dichiara quante prese farà. Con la regola <b>somma diversa</b>, il mazziere non può dichiarare il numero che renderebbe la somma uguale alle prese della mano.</p>' +
   '<h3>Le prese</h3><ul><li>Apre chi siede dopo il mazziere; poi apre chi ha vinto l’ultima presa.</li><li>Bisogna rispondere al colore di chi apre, se lo si ha. Arcimaghi e Giullari si possono giocare sempre.</li><li>Se si apre con un Arcimago, gli altri giocano quello che vogliono. Se si apre con un Giullare, il colore lo decide la prima carta numerata.</li><li>Vince il primo Arcimago; altrimenti la briscola più alta; altrimenti la carta più alta del colore di uscita. Se tutti giocano Giullari, vince il primo.</li></ul>' +
   '<h3>Punti</h3><ul><li>Previsione esatta: 20 punti più 10 per ogni presa.</li><li>Previsione sbagliata: −10 per ogni presa di differenza.</li></ul>' +
+  '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p>' +
   '<h3>Giocare online</h3><p>Chi apre il tavolo è l’host: il suo telefono tiene la partita e muove i giocatori automatici. Se si disconnette, gli altri possono prendere il comando dopo qualche secondo. Le partite passano da un server pubblico gratuito: usa un soprannome.</p>';
 
 /* ---------- eventi ---------- */
 document.addEventListener('click', function (ev) {
-  var el = ev.target.closest('[data-act],[data-pl],.hand .card');
+  var el = ev.target.closest('[data-act],[data-pl],.tv-hand .card');
   if (!el) return;
   var a = el.getAttribute('data-act'), g = App.doc && App.doc.game, me = myIdx();
   if (a === 'sheetback') { if (ev.target === el) { App.sheet = null; renderSheet(); } return; }
@@ -485,7 +423,7 @@ document.addEventListener('keydown', function (e) {
 
 /* ---------- avvio ---------- */
 (function boot() {
-  document.body.insertAdjacentHTML('afterbegin', ART.DEFS);
+  PRCards.preload();
   var q = new URLSearchParams(location.search), t = (q.get('t') || '').toUpperCase(), last = lsGet(KEY_TABLE);
   if (/^[A-Z]{4}$/.test(t)) {
     if (t === last || myNick()) { App.status = 'Mi siedo al tavolo ' + t + '…'; run(function () { return enterTable(t, myNick() || null); }); }
