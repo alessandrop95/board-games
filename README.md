@@ -84,3 +84,8 @@ Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori (regole equivalenti al 
 ## Modificare i giochi
 
 I sorgenti sono in `src/` (parte di rete condivisa in `src/shared/`). Dopo una modifica: `python3 build.py` rigenera le pagine.
+
+**Modifiche dal telefono (o da github.com).** Modifica i file in `src/` e conferma con *Commit changes* sul ramo `main`.
+L'azione *Ricostruisci i giochi* controlla che il codice non abbia errori di scrittura, rigenera le pagine con `build.py`
+e le pubblica: dopo 1–2 minuti il gioco aggiornato è online. Se qualcosa va storto, la scheda *Actions* mostra l'errore in rosso
+e il gioco online resta com'era. Non modificare a mano `*/index.html`: vengono riscritti a ogni ricostruzione.

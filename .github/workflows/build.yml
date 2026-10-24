@@ -1,0 +1,46 @@
+name: Ricostruisci i giochi
+# A ogni modifica dei sorgenti (anche fatta dal telefono su github.com) rigenera le pagine dei giochi
+# con build.py, le salva nel repository e fa ripartire la pubblicazione su GitHub Pages.
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'build.py', '.github/workflows/build.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: build-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Controlla che il codice non abbia errori di scrittura
+        run: |
+          fail=0
+          for f in $(find src -name '*.js'); do node --check "$f" || fail=1; done
+          if [ $fail = 1 ]; then echo "::error::C'è un errore di sintassi in un file JavaScript: le pagine NON sono state aggiornate."; exit 1; fi
+      - name: Genera le pagine
+        run: python3 build.py
+      - name: Salva le pagine aggiornate
+        id: save
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add polvere-e-piombo/index.html presagio/index.html gattomina/index.html
+          if git diff --cached --quiet; then echo "changed=no" >> "$GITHUB_OUTPUT"; echo "Pagine già aggiornate."; exit 0; fi
+          first=$(printf '%s' "${MSG:-avvio manuale}" | head -n 1)
+          git commit -m "Pagine dei giochi ricostruite ($first)"
+          git pull --rebase origin main
+          git push
+          echo "changed=yes" >> "$GITHUB_OUTPUT"
+      - name: Avvia la pubblicazione su GitHub Pages
+        if: steps.save.outputs.changed == 'yes'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
