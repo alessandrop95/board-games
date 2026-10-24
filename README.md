@@ -48,7 +48,7 @@ Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori (regole equivalenti al 
 
 - 56 carte: 4 Gattomine, 6 Scatolette (disinnesco), Agguato, Pisolino, Fusa, Gomitolo, Sfera, Soffio! e cinque tipi di Micio da giocare in coppia.
 - Ognuno riceve 7 carte e una Scatoletta; nel mazzo ci sono tante Gattomine quanti i giocatori meno uno.
-- Dopo ogni carta giocata ci sono alcuni secondi per rispondere con un Soffio! (anche a catena).
+- Dopo ogni carta giocata compare un annuncio con chi la gioca, su chi e che effetto avrà; ci sono 9 secondi (6–15 a scelta dell'host) per rispondere con un Soffio!, anche a catena. Se tutti toccano «Lascia passare» si prosegue subito.
 - Combinazioni: coppia (rubi a caso), tris (chiedi una carta precisa), cinque diverse (prendi dagli scarti).
 - Grafica: emoji 3D di [Noto Emoji](https://github.com/googlefonts/noto-emoji) di Google, licenza Apache 2.0 (copia in `gattomina/img/e/`), composte in carte cartoon.
 

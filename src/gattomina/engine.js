@@ -24,7 +24,8 @@ var GMData = (function () {
 
 var GMEngine = (function () {
   var D = GMData, C = D.CARDS, T = D.TYPES;
-  var NOPE_MS = 4200;   // tempo per rispondere con un Soffio!
+  var NOPE_MS = 9000;   // tempo predefinito per rispondere con un Soffio!
+  function nopeMs(s) { return (s.opts && s.opts.nopeMs) || NOPE_MS; }
   function ty(id) { return C[id].t; }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function nm(s, p) { return s.players[p].nick; }
@@ -34,14 +35,14 @@ var GMEngine = (function () {
   function removeFrom(a, id) { var i = a.indexOf(id); if (i >= 0) a.splice(i, 1); return i >= 0; }
   function bombsLeft(s) { return s.deck.filter(function (c) { return ty(c) === 'bomba'; }).length; }
 
-  function newGame(seats) {
+  function newGame(seats, opts) {
     var n = seats.length;
     if (n < 2 || n > 5) throw new Error('Servono da 2 a 5 giocatori.');
     var bombs = [], defuses = [], rest = [];
     C.forEach(function (c) { (c.t === 'bomba' ? bombs : c.t === 'scatoletta' ? defuses : rest).push(c.id); });
     shuffle(rest); shuffle(defuses);
     var s = {
-      v: 1, phase: 'play', seq: 0, logN: 0, log: [], fx: 0, flash: null, winner: null,
+      v: 1, opts: { nopeMs: opts && opts.nopeMs ? Math.max(4000, Math.min(20000, opts.nopeMs)) : NOPE_MS }, phase: 'play', seq: 0, logN: 0, log: [], fx: 0, flash: null, winner: null,
       players: seats.map(function (st) { return { uid: st.uid, nick: st.nick, bot: !!st.bot, hand: [], alive: true }; }),
       deck: [], disc: [], out: [], turn: Math.floor(Math.random() * n), turns: 1, pend: null, wait: null, peek: null, held: null
     };
@@ -112,7 +113,7 @@ var GMEngine = (function () {
     if (kind === 'trio' && !T[a.name]) return 'Scegli quale carta chiedere.';
     if (kind === 'five' && !s.disc.length) return 'La pila degli scarti è vuota.';
     cards.forEach(function (c) { removeFrom(P.hand, c); s.disc.push(c); });
-    s.pend = { id: s.logN + 1, by: p, cards: cards, kind: kind, target: tg, name: kind === 'trio' ? a.name : null, chain: [], until: Date.now() + NOPE_MS, dur: NOPE_MS };
+    s.pend = { id: s.logN + 1, by: p, cards: cards, kind: kind, target: tg, name: kind === 'trio' ? a.name : null, chain: [], passed: [], until: Date.now() + nopeMs(s), dur: nopeMs(s) };
     var what = kind === 'pair' ? 'una coppia di ' + T[ty(cards[0])].n : kind === 'trio' ? 'un tris di ' + T[ty(cards[0])].n : kind === 'five' ? 'cinque carte diverse' : T[kind].n;
     log(s, nm(s, p) + ' gioca ' + what + (tg != null ? ' contro ' + nm(s, tg) : '') + (kind === 'trio' ? ' e chiede ' + T[a.name].n : '') + '.', 'play');
     s.flash = { kind: 'play', p: p, cards: cards, target: tg, n: ++s.fx };
@@ -124,11 +125,22 @@ var GMEngine = (function () {
     var P = s.players[p], c = a.card != null ? a.card : P.hand.filter(function (x) { return ty(x) === 'soffio'; })[0];
     if (P.hand.indexOf(c) < 0 || ty(c) !== 'soffio') return 'Non hai un Soffio!.';
     removeFrom(P.hand, c); s.disc.push(c);
-    s.pend.chain.push(p); s.pend.until = Date.now() + NOPE_MS; s.pend.dur = NOPE_MS;
+    s.pend.chain.push(p); s.pend.passed = []; s.pend.until = Date.now() + nopeMs(s); s.pend.dur = nopeMs(s);
     var off = s.pend.chain.length % 2 === 1;
     log(s, nm(s, p) + ' soffia: ' + (off ? 'la carta di ' + nm(s, s.pend.by) + ' è annullata!' : 'il Soffio! è annullato, la carta torna valida!'), 'nope');
     s.flash = { kind: 'nope', p: p, card: c, off: off, n: ++s.fx };
     return null;
+  }
+  // "Lascia passare": chi potrebbe soffiare dice che non lo fa
+  function pass(s, p) {
+    if (!s.pend) return 'Non c’è niente in attesa.';
+    if (s.pend.passed.indexOf(p) < 0) s.pend.passed.push(p);
+    return null;
+  }
+  // tutti quelli che potrebbero soffiare hanno lasciato passare: si può risolvere subito
+  function allPassed(s) {
+    var f = s.pend; if (!f) return false;
+    return s.players.every(function (P, i) { return !canNope(s, i) || f.passed.indexOf(i) >= 0; });
   }
   function resolve(s) {
     var f = s.pend; if (!f) return 'Niente da risolvere.';
@@ -244,6 +256,7 @@ var GMEngine = (function () {
     switch (a.a) {
       case 'play': err = play(s, p, a); break;
       case 'nope': err = nope(s, p, a); break;
+      case 'pass': err = pass(s, p); break;
       case 'resolve': err = resolve(s); break;
       case 'draw': err = draw(s, p); break;
       case 'insert': err = insert(s, p, a); break;
@@ -251,9 +264,9 @@ var GMEngine = (function () {
       case 'take': err = take(s, p, a); break;
       default: err = 'Mossa sconosciuta.';
     }
-    if (!err) s.seq++;
+    if (!err && a.a !== 'pass') s.seq++;
     return err;
   }
-  return { newGame: newGame, act: act, decider: decider, canNope: canNope, comboKind: comboKind, needsTarget: needsTarget, targets: targets, bombsLeft: bombsLeft, ty: ty, nextAlive: nextAlive, NOPE_MS: NOPE_MS };
+  return { newGame: newGame, act: act, decider: decider, canNope: canNope, allPassed: allPassed, comboKind: comboKind, needsTarget: needsTarget, targets: targets, bombsLeft: bombsLeft, ty: ty, nextAlive: nextAlive, NOPE_MS: NOPE_MS };
 })();
 if (typeof module !== 'undefined') module.exports = { GMData: GMData, GMEngine: GMEngine };

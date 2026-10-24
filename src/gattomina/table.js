@@ -19,7 +19,7 @@ var TV = (function () {
       '<div class="tv-table" id="tv-table"><div class="tv-rug"></div><div id="tv-seats"></div>' +
       '<div class="tv-center"><div class="deck" id="tv-deck" data-act="drawtap"></div><div class="disc" id="tv-disc"></div></div>' +
       '<div class="playzone" id="tv-play"></div><div class="danger" id="tv-danger"></div></div>' +
-      '<div class="tv-status" id="tv-status" aria-live="polite"></div><div class="tv-hand" id="tv-hand" aria-label="La tua mano"></div><div class="tv-actions" id="tv-actions"></div></div>';
+      '<div class="tv-feed" id="tv-feed"></div><div class="tv-status" id="tv-status" aria-live="polite"></div><div class="tv-hand" id="tv-hand" aria-label="La tua mano"></div><div class="tv-actions" id="tv-actions"></div></div>';
     st = { code: App.code, prev: null, first: true, seatPos: {}, handRects: {}, pendKey: null, pendStart: 0, lastFx: 0 };
     st.timer = setInterval(tick, 200);
   }
@@ -120,13 +120,48 @@ var TV = (function () {
       else {
         var f = g.pend, off = f.chain.length % 2 === 1;
         pz.classList.add('on'); pz.classList.toggle('off', off);
-        pz.innerHTML = '<div class="pcards">' + f.cards.map(function (c, j) { return GMCards.html(c, '', 'style="--j:' + j + ';--n:' + f.cards.length + '"'); }).join('') + '</div>' +
-          '<div class="nopes">' + discNopes(g).map(function (c, j) { return GMCards.html(c, 'nopec', 'style="--j:' + j + '"'); }).join('') + '</div>' +
-          '<div class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"/><circle class="pr" cx="20" cy="20" r="17"/></svg><span></span></div>' +
-          '<div class="plabel">' + (off ? 'Annullata!' : 'Soffio! qualcuno?') + '</div>';
+        var t0 = E.ty(f.cards[0]), T0 = GMData.TYPES[t0];
+        pz.style.setProperty('--c1', GMCards.LOOK[t0].c1); pz.style.setProperty('--c2', GMCards.LOOK[t0].c2);
+        pz.innerHTML = '<div class="ann">' +
+          '<div class="pcards n' + f.cards.length + '">' + f.cards.map(function (c, j) { return GMCards.html(c, '', 'style="--j:' + j + ';--n:' + f.cards.length + '"'); }).join('') +
+          '<div class="nopes">' + discNopes(g).map(function (c, j) { return GMCards.html(c, 'nopec', 'style="--j:' + j + '"'); }).join('') + '</div></div>' +
+          '<div class="atext"><div class="who">' + annWho(g, f) + '</div><div class="cname">' + annName(f) + '</div><div class="eff">' + annEffect(g, f) + '</div>' +
+          '<div class="astate">' + annState(g, f) + '</div></div>' +
+          '<div class="bar"><i></i><span></span></div></div>';
         if (st.pendKey !== key) { st.pendKey = key; st.pendStart = Date.now(); st.pendDur = f.dur || E.NOPE_MS; }
       }
     }
+  }
+  /* ---------- annuncio della carta giocata: chi, cosa, su chi, che effetto avrà ---------- */
+  function nameOf(g, i) { if (!g.players[i]) return ''; return i === myIdx() ? '<b class="me">tu</b>' : '<b>' + esc(g.players[i].nick) + '</b>'; }
+  function annWho(g, f) { return (f.by === myIdx() ? '<b class="me">Hai giocato</b>' : nameOf(g, f.by) + ' gioca') + (f.target != null ? ' contro ' + (f.target === myIdx() ? '<b class="me">di te</b>' : nameOf(g, f.target)) : ''); }
+  function annName(f) {
+    var t = E.ty(f.cards[0]), T = GMData.TYPES;
+    return f.kind === 'pair' ? 'Coppia di ' + T[t].n : f.kind === 'trio' ? 'Tris di ' + T[t].n : f.kind === 'five' ? 'Cinque carte diverse' : T[f.kind].n;
+  }
+  function annEffect(g, f) {
+    var me = myIdx(), byMe = f.by === me, tgMe = f.target === me, by = nameOf(g, f.by), tg = f.target != null ? nameOf(g, f.target) : '';
+    var T = GMData.TYPES;
+    switch (f.kind) {
+      case 'agguato': {
+        var nx = E.nextAlive(g, f.by), n = (g.turns > 1 ? g.turns : 0) + 2;
+        return '⚔️ ' + (byMe ? 'Non peschi e passi la mano' : by + ' non pesca e passa la mano') + ': ' + (nx === me ? '<b class="me">dovrai</b>' : nameOf(g, nx) + ' dovrà') + ' fare <b class="big">' + n + ' turni</b> di fila!';
+      }
+      case 'pisolino': return '💤 ' + (byMe ? 'Finisci ' : by + ' finisce ') + (g.turns > 1 ? 'uno dei turni' : 'il turno') + ' <b>senza pescare</b>.';
+      case 'fusa': return '🎁 ' + (tgMe ? '<b class="me">Dovrai regalare</b> a ' + by + ' una carta a tua scelta.' : byMe ? tg + ' <b>dovrà regalarti</b> una carta a sua scelta.' : tg + ' dovrà <b>regalare una carta</b> a scelta a ' + by + '.');
+      case 'gomitolo': return '🧶 Il mazzo verrà <b>mescolato</b>: chi sapeva dov’è la Gattomina non lo saprà più.';
+      case 'sfera': return '🔮 ' + (byMe ? 'Guarderai' : by + ' guarderà') + ' di nascosto <b>le prime 3 carte</b> del mazzo.';
+      case 'pair': return '🐾 ' + (byMe ? '<b>Rubi una carta a caso</b> dalla mano di ' + tg : tgMe ? by + ' <b class="me">ti ruba una carta a caso</b> dalla mano' : by + ' <b>ruba una carta a caso</b> dalla mano di ' + tg) + '.';
+      case 'trio': return '🐾 ' + (byMe ? 'Chiedi a ' + tg + ' una <b>' + T[f.name].n + '</b>: se ce l’ha, deve dartela.' : tgMe ? by + ' <b class="me">ti chiede</b> una <b>' + T[f.name].n + '</b>: se ce l’hai, devi dargliela.' : by + ' chiede a ' + tg + ' una <b>' + T[f.name].n + '</b>: se ce l’ha, deve dargliela.');
+      case 'five': return '♻️ ' + (byMe ? '<b>Prendi la carta che vuoi</b>' : by + ' <b>prende la carta che vuole</b>') + ' dalla pila degli scarti.';
+    }
+    return '';
+  }
+  function annState(g, f) {
+    var k = f.chain.length;
+    if (!k) return '<span class="wait">Qualcuno risponde con un <b>Soffio!</b>?</span>';
+    var last = f.chain[k - 1], off = k % 2 === 1, who = last === myIdx() ? '<b class="me">Hai soffiato</b>' : nameOf(g, last) + ' ha soffiato';
+    return off ? '<span class="no">💨 ' + who + ': <b>la carta è annullata!</b></span>' : '<span class="yes">💨 ' + who + ' sul Soffio!: <b>la carta torna valida!</b></span>';
   }
   function discNopes(g) { if (!g.pend || !g.pend.chain.length) return []; return g.disc.filter(function (c) { return E.ty(c) === 'soffio'; }).slice(-g.pend.chain.length); }
 
@@ -136,11 +171,11 @@ var TV = (function () {
     var d = App.doc, g = d.game;
     var s = Turns.secs(d), el = document.querySelector('.tseat.deciding .av');
     if (el) { var p = s && d.turnSince ? Math.min(1, (Date.now() - d.turnSince) / (s * 1000)) : 0; el.style.setProperty('--p', (1 - p).toFixed(3)); }
-    var ring = document.querySelector('#tv-play .ring');
-    if (ring && g.pend) {
+    var bar = document.querySelector('#tv-play .bar');
+    if (bar && g.pend) {
       var left = Math.max(0, st.pendDur - (Date.now() - st.pendStart));
-      ring.style.setProperty('--q', (left / st.pendDur).toFixed(3));
-      var sp = ring.querySelector('span'); if (sp) sp.textContent = Math.ceil(left / 1000);
+      bar.style.setProperty('--q', (left / st.pendDur).toFixed(3));
+      var sp = bar.querySelector('span'); if (sp) sp.textContent = left > 0 ? Math.ceil(left / 1000) + ' s' : '…';
       var nb = document.querySelector('[data-act="nope"] em'); if (nb) nb.textContent = Math.ceil(left / 1000) + 's';
     }
   }
@@ -284,17 +319,22 @@ var TV = (function () {
   }
 
   /* ---------- aggiornamento ---------- */
+  // aggiorna solo se cambia: così un tocco a metà di un aggiornamento non va perso
+  function setHTML(id, h) { var el = $id(id); if (el && el.__h !== h) { el.__h = h; el.innerHTML = h; } }
   function update(doc) {
     if (!mounted()) mount();
     var g = doc.game, me = myIdx();
     var alive = g.players.filter(function (P) { return P.alive; }).length;
-    $id('tv-info').innerHTML = '<b>' + connInfo(alive + ' in gioco') + '</b><small>Tavolo ' + esc(doc.code) + '</small>';
-    $id('tv-banner').innerHTML = hostBanner();
-    $id('tv-seats').innerHTML = seatsHTML(g, me);
+    setHTML('tv-info', '<b>' + connInfo(alive + ' in gioco') + '</b><small>Tavolo ' + esc(doc.code) + '</small>');
+    setHTML('tv-banner', hostBanner());
+    setHTML('tv-seats', seatsHTML(g, me));
     renderCenter(g);
-    $id('tv-status').innerHTML = statusLine(g, me);
+    setHTML('tv-status', statusLine(g, me));
+    var lastN = st.feedN || 0;
+    setHTML('tv-feed', g.log.filter(function (l) { return l.k !== 'turn' && l.k !== 'draw'; }).slice(-2).map(function (l) { return '<div class="k-' + l.k + (l.n > lastN && !st.first ? ' fresh' : '') + '">' + esc(l.t) + '</div>'; }).join(''));
+    st.feedN = g.logN;
     renderHand(g, me);
-    $id('tv-actions').innerHTML = actionsHTML(g, me);
+    setHTML('tv-actions', actionsHTML(g, me));
     if (st.first) { st.lastFx = g.flash ? g.flash.n : 0; if (g.logN <= 2) later(300, dealFx); }
     else effects(g, me, st.prev);
     if (g.phase === 'over' && st.prev && st.prev.phase !== 'over') later(1900, function () { confetti(); Sound.play(g.winner === me ? 'win' : 'lose'); var w = seatPoint(g.winner); if (w) floatAt(w, '<img src="' + GMCards.src('1f451') + '" alt="" style="width:60px">', '', 2600); });
@@ -323,9 +363,12 @@ var TV = (function () {
     if (!P.alive) return '';
     if (P.bot) return '<button class="btn block" data-act="resume">Riprendo io</button>';
     var out = '';
-    if (g.pend && E.canNope(g, me)) {
-      var off = g.pend.chain.length % 2 === 1, mineAct = g.pend.by === me;
-      out += '<button class="btn block nope" data-act="nope">' + (off && mineAct ? 'Soffio! sul Soffio! (salva la tua carta)' : off ? 'Soffio! (rimetti in gioco la carta)' : 'Soffio! (annulla)') + ' <em></em></button>';
+    if (g.pend) {
+      var off = g.pend.chain.length % 2 === 1, mineAct = g.pend.by === me, pk = g.pend.id + ':' + g.pend.chain.length;
+      var passed = g.pend.passed.indexOf(me) >= 0 || App.passedKey === pk;
+      if (E.canNope(g, me) && !passed) out += '<div class="row2"><button class="btn nope" data-act="nope">💨 ' + (off ? 'Soffio! sul Soffio!' : 'Soffio!') + ' <em></em></button><button class="btn ghost" data-act="pass">Lascia passare</button></div>' +
+        '<div class="hint">' + (off && mineAct ? 'Ti hanno soffiato contro: rispondi per salvare la tua carta.' : off ? 'Se soffi, la carta torna valida.' : 'Se soffi, la carta non avrà effetto.') + '</div>';
+      else out += '<div class="hint">' + (passed ? 'Hai lasciato passare. ' : E.canNope(g, me) ? '' : (g.pend.chain.length ? g.pend.chain[g.pend.chain.length - 1] === me : g.pend.by === me) ? 'Ora tocca agli altri decidere. ' : 'Non hai un Soffio! in mano. ') + 'Si aspettano le risposte…</div>';
     }
     var w = g.wait;
     if (w && w.who === me) out += '<button class="btn block" data-act="decide">' + (w.type === 'favor' ? 'Scegli la carta da regalare' : w.type === 'insert' ? 'Rimetti la Gattomina nel mazzo' : 'Scegli una carta dagli scarti') + '</button>';

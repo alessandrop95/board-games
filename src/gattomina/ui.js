@@ -47,6 +47,7 @@ function tableReducer(doc, from, op) {
       if (doc.phase !== 'lobby') return { changed: false };
       doc.opts = doc.opts || {};
       if (op.timer != null) doc.opts.timer = Math.max(0, Math.min(600, +op.timer || 0));
+      if (op.nopeMs != null) doc.opts.nopeMs = Math.max(4000, Math.min(20000, +op.nopeMs || 9000));
       return {};
     }
     case 'back': {
@@ -63,7 +64,7 @@ function tableReducer(doc, from, op) {
       if (doc.seats.length < 2) return { err: 'Servono almeno 2 giocatori: aggiungi dei giocatori automatici.' };
       var seats = doc.seats.slice();
       for (var i = seats.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = seats[i]; seats[i] = seats[j]; seats[j] = t; }
-      doc.game = E.newGame(seats); doc.phase = 'play'; return {};
+      doc.game = E.newGame(seats, doc.opts); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
     case 'auto': if (!isHost) return hostOnly; if (!doc.game || !doc.game.players[op.p]) return { changed: false }; doc.game.players[op.p].bot = !!op.on; return {};
@@ -85,7 +86,7 @@ Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var g = cur.game; g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true; }
 });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}; return { max: 5, note: o.timer === 0 ? 'senza timer' : '' }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.timer === 0) notes.push('senza timer'); if (o.nopeMs && o.nopeMs !== E.NOPE_MS) notes.push('Soffio! ' + o.nopeMs / 1000 + 's'); return { max: 5, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i giocatori automatici.'); render(); });
 
 /* ---------- azioni ---------- */
@@ -190,12 +191,18 @@ function driveBots() {
       App.resolveTimer = setTimeout(function () {
         hostDo(function (gg) { return gg.pend && gg.pend.id + ':' + gg.pend.chain.length === pk.split(':').slice(1).join(':'); }, function () { return { a: 'resolve' }; }, function () { return 0; });
       }, Math.max(0, g.pend.until - Date.now()) + 120);
-      // ogni giocatore automatico decide se soffiare, con un po' di "riflessi"
+      // ogni giocatore automatico decide se soffiare o lasciar passare, con un po' di "riflessi"
+      var same = function (gg) { return gg.pend && gg.pend.id + ':' + gg.pend.chain.length === pk.split(':').slice(1).join(':'); };
       g.players.forEach(function (P, i) {
         if (!P.bot || !E.canNope(g, i)) return;
-        var a = BOT.decide(g, i); if (!a) return;
-        setTimeout(function () { hostDo(function (gg) { return gg.pend && gg.pend.id + ':' + gg.pend.chain.length === pk.split(':').slice(1).join(':') && gg.players[i].bot && E.canNope(gg, i); }, function () { return { a: 'nope' }; }, function () { return i; }); }, 700 + Math.random() * 1900);
+        var a = BOT.decide(g, i);
+        setTimeout(function () { hostDo(function (gg) { return same(gg) && gg.players[i].bot && E.canNope(gg, i); }, function () { return a ? { a: 'nope' } : { a: 'pass' }; }, function () { return i; }); }, (a ? 1500 : 1200) + Math.random() * 2200);
       });
+    }
+    // tutti hanno lasciato passare: si risolve subito, senza aspettare la fine del tempo
+    if (E.allPassed(g) && App.allKey !== pk) {
+      App.allKey = pk;
+      setTimeout(function () { hostDo(function (gg) { return gg.pend && gg.pend.id + ':' + gg.pend.chain.length === pk.split(':').slice(1).join(':') && E.allPassed(gg); }, function () { return { a: 'resolve' }; }, function () { return 0; }); }, g.pend.chain.length ? 1800 : 700);
     }
     return;
   }
@@ -277,10 +284,16 @@ function roomHTML() {
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 2 a 5 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
-    '<section class="panel"><h2>Al tavolo (' + n + '/5)</h2><div class="seats">' + seats + '</div>' + Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) +
+    '<section class="panel"><h2>Al tavolo (' + n + '/5)</h2><div class="seats">' + seats + '</div>' + Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) + nopeOptHTML(d, isHost) +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 5 ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 2 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 2 ? '<p class="lead">Manca almeno un altro giocatore.</p>' : '<p class="lead">Nel mazzo ci saranno ' + (n - 1) + (n - 1 === 1 ? ' Gattomina' : ' Gattomine') + '.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
     (isHost ? '<button class="btn ghost small" data-act="closetable" style="justify-self:start">Chiudi il tavolo</button>' : '') + '</section></div>';
+}
+function nopeOptHTML(d, isHost) {
+  var v = (d.opts && d.opts.nopeMs) || E.NOPE_MS;
+  return '<label class="tt-opt" style="display:grid;gap:6px"><b>Tempo per rispondere con un Soffio!</b><select id="opt-nope" class="field"' + (isHost ? '' : ' disabled') + '>' +
+    [6000, 9000, 12000, 15000].map(function (ms) { return '<option value="' + ms + '"' + (ms === v ? ' selected' : '') + '>' + (ms / 1000) + ' secondi' + (ms === 9000 ? ' (consigliato)' : '') + '</option>'; }).join('') +
+    '</select><span class="muted" style="font-size:14px">Dopo ogni carta giocata. Se tutti toccano «Lascia passare», si va avanti subito.</span></label>';
 }
 function galleryHTML() {
   return '<div class="topbar"><div class="wrap"><span class="brand">Gattomina</span><span class="info">Le 56 carte</span><button class="iconbtn" data-act="tolobby">Indietro</button></div></div><div class="wrap gallery"><div class="ggrid">' +
@@ -289,14 +302,13 @@ function galleryHTML() {
 }
 
 function statusLine(g, me) {
-  var who = function (i) { return i === me ? 'tu' : '<b>' + esc(g.players[i].nick) + '</b>'; };
+  var who = function (i) { return i === me ? 'tu' : g.players[i] ? '<b>' + esc(g.players[i].nick) + '</b>' : ''; };
   if (g.phase === 'over') return g.winner === me ? '<b>Hai vinto!</b> Sei l’ultimo rimasto intero.' : 'Vince ' + who(g.winner) + ', l’ultimo rimasto intero.';
   var sel = App.sel || [];
   if (sel.length === 1 && g.turn === me) { var T0 = D.TYPES[E.ty(sel[0])]; return '<b>' + T0.n + '</b>: ' + T0.txt; }
   if (g.pend) {
-    var f = g.pend, off = f.chain.length % 2 === 1;
-    var what = f.kind === 'pair' ? 'una coppia' : f.kind === 'trio' ? 'un tris' : f.kind === 'five' ? 'cinque carte diverse' : tn(f.kind);
-    return (f.by === me ? 'Hai giocato ' : who(f.by) + ' gioca ') + '<b>' + what + '</b>' + (f.target != null ? ' contro ' + who(f.target) : '') + (off ? ' — <b class="bad">annullata da un Soffio!</b>' : '') + '. ' + (E.canNope(g, me) ? 'Puoi rispondere con un Soffio!' : 'Qualcuno soffia?');
+    var canN = E.canNope(g, me), passed = g.pend.passed.indexOf(me) >= 0;
+    return canN && !passed ? '<b>Puoi rispondere:</b> soffia per ' + (g.pend.chain.length % 2 ? 'rimettere in gioco la carta' : 'annullarla') + ', oppure lascia passare.' : 'Si aspetta chi vuole rispondere con un Soffio!…';
   }
   if (g.wait) {
     var w = g.wait;
@@ -333,6 +345,7 @@ function sheetBody(s) {
   if (s.kind === 'closeconfirm' && App.doc) return '<h2>Chiudere il tavolo ' + esc(App.doc.code) + '?</h2><p class="lead">Il tavolo sparisce dalla lista' + (App.doc.game && App.doc.phase === 'play' ? ', la partita in corso finisce' : '') + ' e tutti tornano alla schermata iniziale. Non si può annullare.</p>' +
     '<button class="btn block red" data-act="closeyes">Chiudi per tutti</button><button class="btn block ghost" data-act="close">Annulla</button>';
   if (!g) return '';
+  if (['favor', 'insert', 'five'].indexOf(s.kind) >= 0 && !(g.wait && g.wait.who === me && g.wait.type === s.kind)) return '';
   if (s.kind === 'target') {
     var kind = E.comboKind(App.sel || []);
     return '<h2>' + (kind === 'fusa' ? 'A chi chiedi le fusa?' : kind === 'trio' ? 'A chi chiedi la carta?' : 'A chi rubi una carta?') + '</h2><div class="plist">' +
@@ -367,7 +380,7 @@ function sheetBody(s) {
 
 var RULES = '<p>Nel mazzo si nascondono le <b>Gattomine</b>: chi ne pesca una esplode ed esce dalla partita. Vince l’ultimo che resta intero.</p>' +
   '<h3>Il tuo turno</h3><ul><li>Gioca quante carte vuoi (anche nessuna).</li><li>Poi <b>pesca una carta</b>: è così che finisce il turno.</li><li>Se peschi una Gattomina e hai una <b>Scatoletta</b>, la calmi e la rimetti nel mazzo dove vuoi, di nascosto. Senza Scatoletta esplodi.</li></ul>' +
-  '<h3>Le carte</h3><ul><li><b>Agguato</b>: finisci senza pescare; il prossimo fa 2 turni (se era già sotto Agguato, i turni si sommano: 4, 6…).</li><li><b>Pisolino</b>: finisci un turno senza pescare.</li><li><b>Fusa</b>: un giocatore ti regala una carta a sua scelta.</li><li><b>Gomitolo</b>: mescola il mazzo.</li><li><b>Sfera</b>: guardi le prime 3 carte del mazzo.</li><li><b>Soffio!</b>: annulla una carta appena giocata da chiunque, anche fuori turno. Dopo ogni carta giocata hai qualche secondo per soffiare; si può soffiare anche su un Soffio!. Non ferma Gattomina e Scatoletta.</li></ul>' +
+  '<h3>Le carte</h3><ul><li><b>Agguato</b>: finisci senza pescare; il prossimo fa 2 turni (se era già sotto Agguato, i turni si sommano: 4, 6…).</li><li><b>Pisolino</b>: finisci un turno senza pescare.</li><li><b>Fusa</b>: un giocatore ti regala una carta a sua scelta.</li><li><b>Gomitolo</b>: mescola il mazzo.</li><li><b>Sfera</b>: guardi le prime 3 carte del mazzo.</li><li><b>Soffio!</b>: annulla una carta appena giocata da chiunque, anche fuori turno. Dopo ogni carta giocata compare al centro un riquadro che spiega chi la gioca, su chi e cosa succederà: hai 9 secondi (l’host può sceglierne da 6 a 15) per toccare «Soffio!» oppure «Lascia passare». Se tutti lasciano passare si va avanti subito. Si può soffiare anche su un Soffio!. Non ferma Gattomina e Scatoletta.</li></ul>' +
   '<h3>I mici</h3><ul><li>Da soli non fanno nulla.</li><li><b>Due uguali</b>: rubi una carta a caso a un giocatore.</li><li><b>Tre uguali</b>: chiedi una carta precisa; se ce l’ha, te la deve dare.</li><li><b>Cinque carte diverse</b>: prendi la carta che vuoi dagli scarti.</li></ul>' +
   '<h3>All’inizio</h3><p>Ognuno riceve 7 carte e 1 Scatoletta. Nel mazzo ci sono tante Gattomine quanti i giocatori meno uno, più le Scatolette avanzate (solo 2 se siete in 2 o 3).</p>' +
   '<h3>Giocare online</h3><p>Chi apre il tavolo è l’host: il suo telefono tiene la partita e muove i giocatori automatici. Se si disconnette, gli altri possono prendere il comando dopo qualche secondo.</p>' +
@@ -417,6 +430,7 @@ document.addEventListener('click', function (ev) {
     case 'resume': send({ t: 'back' }); break;
     case 'draw': case 'drawtap': if (g && g.turn === me && !g.pend && !g.wait && g.phase === 'play') act({ a: 'draw' }); break;
     case 'nope': act({ a: 'nope' }); break;
+    case 'pass': App.passedKey = g && g.pend ? g.pend.id + ':' + g.pend.chain.length : null; send({ t: 'act', a: { a: 'pass' } }); render(); break;
     case 'peek': App.sheet = { kind: 'future' }; renderSheet(); break;
     case 'decide': if (g && g.wait) { App.sheet = { kind: g.wait.type }; renderSheet(); } break;
     case 'playsel': {
@@ -446,6 +460,7 @@ document.addEventListener('input', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   if (ev.target.id === 'opt-timer') send({ t: 'opt', timer: +ev.target.value });
+  if (ev.target.id === 'opt-nope') send({ t: 'opt', nopeMs: +ev.target.value });
   if (ev.target.id === 'opt-vis') send({ t: 'vis', vis: ev.target.value });
 });
 document.addEventListener('keydown', function (e) {
