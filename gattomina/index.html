@@ -1353,14 +1353,14 @@ var Sound = (function () {
 var GMData = (function () {
   // t: tipo · n: nome · k: 'bomb' | 'defuse' | 'action' | 'nope' | 'cat'
   var TYPES = {
-    bomba:     { n: 'Gattomina',  k: 'bomb',   count: 4, s: 'Se la peschi esplodi!', txt: 'Se la peschi esplodi ed esci dalla partita, a meno che tu non abbia una Scatoletta.' },
-    scatoletta:{ n: 'Scatoletta', k: 'defuse', count: 6, s: 'Disinnesca la Gattomina', txt: 'Quando peschi una Gattomina, la Scatoletta la calma: poi rimetti la Gattomina nel mazzo dove vuoi, di nascosto.' },
-    agguato:   { n: 'Agguato',    k: 'action', count: 4, s: 'Il prossimo fa 2 turni', txt: 'Finisci il turno senza pescare. Il giocatore dopo di te deve fare 2 turni di fila (se era già sotto Agguato, i turni si sommano).' },
-    pisolino:  { n: 'Pisolino',   k: 'action', count: 4, s: 'Finisci il turno senza pescare', txt: 'Finisci un turno senza pescare. Se devi fare più turni per un Agguato, ne salti uno.' },
-    fusa:      { n: 'Fusa',       k: 'action', count: 4, s: 'Un giocatore ti regala una carta', txt: 'Scegli un giocatore: deve darti una carta della sua mano, a sua scelta.' },
-    gomitolo:  { n: 'Gomitolo',   k: 'action', count: 4, s: 'Mescola il mazzo', txt: 'Mescola il mazzo da pescare. Utile quando sai (o temi) che c’è una Gattomina in cima.' },
-    sfera:     { n: 'Sfera',      k: 'action', count: 5, s: 'Sbircia le prime 3 carte', txt: 'Guarda di nascosto le prime 3 carte del mazzo e rimettile come erano.' },
-    soffio:    { n: 'Soffio!',    k: 'nope',   count: 5, s: 'Annulla una carta giocata', txt: 'Annulla qualsiasi carta o coppia appena giocata, anche fuori dal tuo turno. Si può soffiare anche su un Soffio! (tranne Gattomina e Scatoletta).' },
+    bomba:     { n: 'Exploding Kitten',  k: 'bomb',   count: 4, s: 'Se la peschi esplodi!', txt: 'Se la peschi esplodi ed esci dalla partita, a meno che tu non abbia una Scatoletta.' },
+    scatoletta:{ n: 'Disinnesgatto', k: 'defuse', count: 6, s: 'Disinnesca la Gattomina', txt: 'Quando peschi una Gattomina, la Scatoletta la calma: poi rimetti la Gattomina nel mazzo dove vuoi, di nascosto.' },
+    agguato:   { n: 'Attacco',    k: 'action', count: 4, s: 'Il prossimo fa 2 turni', txt: 'Finisci il turno senza pescare. Il giocatore dopo di te deve fare 2 turni di fila (se era già sotto Agguato, i turni si sommano).' },
+    pisolino:  { n: 'Salta',   k: 'action', count: 4, s: 'Finisci il turno senza pescare', txt: 'Finisci un turno senza pescare. Se devi fare più turni per un Agguato, ne salti uno.' },
+    fusa:      { n: 'Favore',       k: 'action', count: 4, s: 'Un giocatore ti regala una carta', txt: 'Scegli un giocatore: deve darti una carta della sua mano, a sua scelta.' },
+    gomitolo:  { n: 'Mescola',   k: 'action', count: 4, s: 'Mescola il mazzo', txt: 'Mescola il mazzo da pescare. Utile quando sai (o temi) che c’è una Gattomina in cima.' },
+    sfera:     { n: 'Prevedi il futuro',      k: 'action', count: 5, s: 'Sbircia le prime 3 carte', txt: 'Guarda di nascosto le prime 3 carte del mazzo e rimettile come erano.' },
+    soffio:    { n: 'NO!',    k: 'nope',   count: 5, s: 'Annulla una carta giocata', txt: 'Annulla qualsiasi carta o coppia appena giocata, anche fuori dal tuo turno. Si può soffiare anche su un Soffio! (tranne Gattomina e Scatoletta).' },
     pirata:    { n: 'Micio Pirata',  k: 'cat', count: 4, s: 'Gioca 2 uguali e ruba', txt: 'Da sola non fa nulla. Due uguali: rubi una carta a caso. Tre uguali: chiedi una carta precisa.' },
     spaghetti: { n: 'Micio Spaghetti', k: 'cat', count: 4, s: 'Gioca 2 uguali e ruba', txt: 'Da sola non fa nulla. Due uguali: rubi una carta a caso. Tre uguali: chiedi una carta precisa.' },
     re:        { n: 'Micio Re',      k: 'cat', count: 4, s: 'Gioca 2 uguali e ruba', txt: 'Da sola non fa nulla. Due uguali: rubi una carta a caso. Tre uguali: chiedi una carta precisa.' },
