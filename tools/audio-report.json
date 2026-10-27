@@ -109,6 +109,16 @@
   "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Heismark&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Heismark (page does not exist)\">Heismark</a>",
   "file": "meow2.oga"
  },
+ "gattomina/purr": {
+  "title": "Purring cat bertie.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/69/Purring_cat_bertie.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 112983,
+  "duration": 8.724897959183673,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "jim_mowatt",
+  "file": "purr.ogg"
+ },
  "gattomina/explosion": {
   "title": "Explosion 10.ogg",
   "url": "https://upload.wikimedia.org/wikipedia/commons/3/37/Explosion_10.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
@@ -198,15 +208,5 @@
   "license": "CC BY 3.0",
   "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
   "file": "m3.ogg"
- },
- "binari-italia/bell": {
-  "title": "Taco Bell Bong.ogg",
-  "url": "https://upload.wikimedia.org/wikipedia/commons/a/af/Taco_Bell_Bong.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-  "size": 60422,
-  "duration": 1.8138333333333334,
-  "mediatype": "AUDIO",
-  "license": "Public domain",
-  "artist": "<a href=\"https://en.wikipedia.org/wiki/Taco_Bell\" class=\"extiw\" title=\"wikipedia:Taco Bell\">Taco Bell</a>",
-  "file": "bell.ogg"
  }
 }
