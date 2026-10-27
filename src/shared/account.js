@@ -36,12 +36,11 @@ var Account = (function () {
 
   /* ---------- sessione ---------- */
   function device() { var u = navigator.userAgent || ''; return (/Android/.test(u) ? 'Android' : /iPhone|iPad/.test(u) ? 'iPhone/iPad' : /Mac/.test(u) ? 'Mac' : /Windows/.test(u) ? 'Windows' : 'Browser') + (/Chrome/.test(u) ? ' Chrome' : /Safari/.test(u) ? ' Safari' : /Firefox/.test(u) ? ' Firefox' : ''); }
-  // Con l'account, l'identità al tavolo è la stessa su tutti i tuoi dispositivi.
-  function useIdentity(s) {
-    if (s) { if (!get('pp-uid-dev')) set('pp-uid-dev', get('pp-uid') || ''); set('pp-uid', 'p' + String(s.id).replace(/-/g, '').slice(0, 24)); if (!get('pp-nick')) set('pp-nick', s.username); }
-    else { var dev = get('pp-uid-dev'); if (dev) set('pp-uid', dev); set('pp-uid-dev', null); }
-  }
-  function setSession(s) { session = s; set('pp-session', s ? JSON.stringify(s) : null); useIdentity(s); }
+  // L'identità al tavolo resta quella di questo dispositivo (pp-uid), anche con l'account: lo stesso account aperto
+  // su due telefoni allo stesso tavolo non deve diventare «lo stesso giocatore due volte» (mosse doppie, partita sdoppiata),
+  // e accedere o uscire non deve far perdere il posto a un tavolo. Una versione precedente la cambiava: qui si ripristina.
+  (function () { var dev = get('pp-uid-dev'); if (dev && /^u[a-z0-9]+$/.test(dev)) set('pp-uid', dev); if (dev != null) set('pp-uid-dev', null); })();
+  function setSession(s) { session = s; set('pp-session', s ? JSON.stringify(s) : null); if (s && !get('pp-nick')) set('pp-nick', s.username); }
   function dropSession() { setSession(null); friendsData = null; repaint(); }
   function check() { if (session && configured()) rpc('me', { p_token: session.token }).then(function (m) { if (m && m.username !== session.username) { session.username = m.username; set('pp-session', JSON.stringify(session)); repaint(); } refreshFriends(true); }, function () {}); }
   function user() { return configured() && session ? session : null; }

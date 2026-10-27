@@ -10,7 +10,7 @@ var Alerts = (function () {
     { p: 'campi-acciaio/v1/', path: 'campi-acciaio/', n: 'Scythe' },
     { p: 'binari-italia/v1/', path: 'binari-italia/', n: 'Binari d’Italia' }
   ];
-  var KEY = 'pp-alerts', PREFS = 'pp-push-prefs', SUBK = 'pp-push', SEEN = 'pp-alerted', MINE = 'pp-mytables', TTL = 150000;
+  var KEY = 'pp-alerts', PREFS = 'pp-push-prefs', SUBK = 'pp-push', SEEN = 'pp-alerted', MINE = 'pp-mytables', SYNC = 'pp-push-sync', TTL = 150000;
   var here = GAMES.filter(function (g) { return location.pathname.indexOf('/' + g.path) >= 0; })[0] || null;
   var ROOT = here ? '../' : './';
   var started = false, tables = {}, homeEl = null;
@@ -99,7 +99,7 @@ var Alerts = (function () {
   function save(sub) {
     var j = sub.toJSON(), p = prefs();
     return Account.rpc('save_push', { p_token: Account.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_games: p.games, p_invites: p.invites, p_ua: ua.slice(0, 200) })
-      .then(function () { set(SUBK, j.endpoint); });
+      .then(function () { set(SUBK, j.endpoint); set(SYNC, String(Date.now())); });
   }
   var pushMsg = null;
   function enablePush() {
@@ -137,6 +137,27 @@ var Alerts = (function () {
     if (!ep || !window.Account || !Account.token) return Promise.resolve();
     return Account.rpc('delete_push', { p_token: Account.token, p_endpoint: ep }).catch(function () {});
   }
+  // A ogni apertura: se il browser ha rinnovato l'iscrizione (o il server l'ha scartata), la si salva di nuovo.
+  // Una volta al giorno la si ripete comunque, così il server la ritrova anche se nel frattempo l'aveva cancellata.
+  function heal() {
+    if (!window.Account || !Account.user() || !pushSupported() || Notification.permission !== 'granted' || !get(SUBK)) return Promise.resolve();
+    return registration().then(function (r) {
+      return r.pushManager.getSubscription().then(function (sub) {
+        var key = Account.config && Account.config.vapid;
+        if (!sub && key) return r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+        return sub;
+      });
+    }).then(function (sub) {
+      if (!sub) return;
+      var old = get(SUBK), stale = Date.now() - (+get(SYNC) || 0) > 864e5;
+      if (sub.endpoint === old && !stale) return;
+      return save(sub).then(function () {
+        set(SYNC, String(Date.now()));
+        if (old && old !== sub.endpoint) return Account.rpc('delete_push', { p_token: Account.token, p_endpoint: old }).catch(function () {});
+      });
+    }).catch(function () {});
+  }
+  setTimeout(function () { if (window.Account && Account.ready) Account.ready.then(heal); }, 1500);
   function setPrefs(p) { set(PREFS, JSON.stringify(p)); if (pushOn()) registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) { if (sub) return save(sub); }).catch(function (e) { pushMsg = String(e); repaintAll(); }); }
   function settingsHTML() {
     var p = prefs(), on = pushOn(), h = '';
@@ -149,6 +170,7 @@ var Alerts = (function () {
     }
     h += '<p class="pa-note">Avvisami quando qualcuno apre un tavolo di:</p><div class="pa-games">' + GAMES.map(function (g) { var id = g.path.replace(/\/$/, ''); return '<label class="pa-check"><input type="checkbox" data-pp="game" value="' + id + '"' + (p.games.indexOf(id) >= 0 ? ' checked' : '') + '> ' + esc(g.n) + '</label>'; }).join('') + '</div>' +
       '<label class="pa-check"><input type="checkbox" data-pp="inv"' + (p.invites ? ' checked' : '') + '> Inviti e richieste di amicizia</label>' +
+      '<label class="pa-check"><input type="checkbox" data-pp="inapp"' + (enabled() ? ' checked' : '') + '> Avvisi dei nuovi tavoli anche dentro l’app, mentre la usi</label>' +
       (pushMsg ? '<p class="pa-err">' + esc(pushMsg) + '</p>' : '') +
       '<p class="pa-note">Con l’app aperta gli avvisi compaiono in alto nella pagina; ad app chiusa arrivano come notifiche del telefono.</p>';
     return h;
@@ -159,11 +181,13 @@ var Alerts = (function () {
     if (k === 'master') { (t.checked ? enablePush() : disablePush()); return; }
     if (k === 'game') { p.games = Array.prototype.map.call(document.querySelectorAll('[data-pp="game"]:checked'), function (x) { return x.value; }); setPrefs(p); }
     if (k === 'inv') { p.invites = t.checked; setPrefs(p); }
+    if (k === 'inapp') { set(KEY, t.checked ? 'on' : 'off'); if (t.checked) start(); }
   });
   function repaintAll() { repaint(); if (window.Account && Account.render) Account.render(); }
   // notifica arrivata mentre l'app è aperta: il service worker la passa alla pagina
   if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
     var d = e.data; if (!d || d.type !== 'push' || !d.data) return;
+    if (d.data.kind === 'table' && (!enabled() || busy())) return;   // chi sta giocando (o ha spento gli avvisi) non viene disturbato
     banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' ? 'Apri' : 'Siediti');
   });
 
