@@ -45,7 +45,7 @@ with sync_playwright() as p:
     Bp.evaluate('Account.refreshFriends(true).then(()=>Lobby.paint())'); Bp.wait_for_timeout(1500)
     t('Bea vede il tavolo di Ale nella lista', 'Tavolo di Ale' in Bp.inner_text('#olist') and 'Solo amici' in Bp.inner_text('#olist'), Bp.inner_text('#olist'))
     Cp.evaluate('Lobby.paint()'); Cp.wait_for_timeout(500)
-    t('Ciro (non amico) non lo vede', 'Tavolo di Ale' not in Cp.inner_text('#olist'), Cp.inner_text('#olist'))
+    t('Ciro (non amico) non lo vede', 'Solo amici' not in Cp.inner_text('#olist'), Cp.inner_text('#olist'))
     Bp.locator('#olist [data-act=lobbyjoin]').first.click(); Bp.wait_for_function("App.doc && App.doc.code === '%s'" % code, timeout=10000)
     if Bp.locator('#nick').count() and Bp.locator('[data-act=join]').count(): Bp.fill('#nick', 'Bea'); Bp.click('[data-act=join]')
     Ap.wait_for_function('App.doc.seats.length === 2', timeout=10000); t('Bea si siede con un tocco', True)
