@@ -219,7 +219,7 @@ document.addEventListener('click', function (ev) {
     case 'log': App.sheet = { kind: 'log' }; renderSheet(); break;
     case 'showover': App.sheet = { kind: 'over' }; renderSheet(); break;
     case 'close': if (s && s.kind === 'help' && s.back) { App.sheet = s.back; } else App.sheet = null; renderSheet(); if (g) Game.render(); break;
-    case 'leave': App.sheet = null; leaveTable(); break;
+    case 'leave': App.sheet = null; if (Exit.ask()) renderSheet(); else leaveTable(); break;
     case 'invite': App.sheet = null; renderSheet(); invite(); break;
     case 'copylink': copyText(inviteLink(), 'Link d’invito copiato'); break;
     case 'addbot': send({ t: 'addbot' }); break;

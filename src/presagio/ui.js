@@ -403,7 +403,7 @@ document.addEventListener('click', function (ev) {
     case 'menu': App.sheet = { kind: 'menu' }; renderSheet(); break;
     case 'showover': App.sheet = { kind: 'over' }; renderSheet(); break;
     case 'close': App.sheet = null; renderSheet(); break;
-    case 'leave': App.sheet = null; leaveTable(); break;
+    case 'leave': App.sheet = null; if (Exit.ask()) renderSheet(); else leaveTable(); break;
     case 'invite': App.sheet = null; renderSheet(); invite(); break;
     case 'copylink': copyText(inviteLink(), 'Link d’invito copiato'); break;
     case 'addbot': send({ t: 'addbot' }); break;

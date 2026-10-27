@@ -587,7 +587,7 @@ document.addEventListener('click', function (ev) {
     case 'invite': closeSheet(); invite(); break;
     case 'copylink': copyText(inviteLink(), 'Link d’invito copiato'); break;
     case 'rules': App.sheet = { kind: 'rules' }; renderSheet(); break;
-    case 'leave': closeSheet(); leaveTable(); break;
+    case 'leave': closeSheet(); if (!Exit.ask()) leaveTable(); break;
     case 'addbot': addBot(); break;
     case 'kick': removeSeat(el.getAttribute('data-uid')); if (el.getAttribute('data-uid') === Net.uid) leaveTable(); break;
     case 'start': startGame(); break;

@@ -63,7 +63,7 @@ var GMEngine = (function () {
     return s.turn;
   }
   function canNope(s, p) {
-    var f = s.pend; if (!f || s.phase !== 'play' || !s.players[p].alive) return false;
+    var f = s.pend, P = s.players[p]; if (!f || s.phase !== 'play' || !P || !P.alive) return false; // p = -1: chi guarda soltanto
     var last = f.chain.length ? f.chain[f.chain.length - 1] : f.by;
     if (last === p) return false;
     return s.players[p].hand.some(function (c) { return ty(c) === 'soffio'; });

@@ -188,7 +188,7 @@ document.addEventListener('click', function (ev) {
     case 'introdone': lsSet('bi-intro-done', '1'); App.sheet = s.after || null; renderSheet(); break;
     case 'showover': App.sheet = { kind: 'over' }; App.focus = null; renderSheet(); Game.render(); break;
     case 'close': if (s && s.kind === 'help' && s.back) App.sheet = s.back; else { if (s && s.kind === 'keep') App.keepSel = s.sel; App.sheet = null; App.sel = null; if (s && s.kind === 'city') App.focus = null; } renderSheet(); if (g) Game.render(); break;
-    case 'leave': App.sheet = null; leaveTable(); break;
+    case 'leave': App.sheet = null; if (Exit.ask()) renderSheet(); else leaveTable(); break;
     case 'invite': App.sheet = null; renderSheet(); invite(); break;
     case 'copylink': copyText(inviteLink(), 'Link d’invito copiato'); break;
     case 'addbot': send({ t: 'addbot' }); break;

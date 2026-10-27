@@ -450,10 +450,36 @@ var Net = (function () {
   // Applica un'operazione allo stato (solo sull'host). Il reducer modifica il documento e restituisce {err, out}.
   function applyLocal(from, op) {
     var work = JSON.parse(JSON.stringify(T.doc));
-    var r = reducer(work, from, op) || {};
+    var r = op && op.t === 'quit' ? quit(work, from, op) : (reducer(work, from, op) || {});
     if (r.err) return r;
     if (r.changed !== false) { T.doc = work; publishState(); }
     return r;
+  }
+  // Un giocatore lascia il tavolo per sempre (scelta dal pulsante «Esci», vedi exit.js). Vale per tutti i giochi.
+  // In sala d'attesa libera il posto. In partita al suo posto gioca l'automatico, con una nuova identità «bot-»:
+  // così nessuno, neanche lui rientrando, può riprendersi quel posto per errore.
+  // Se era l'host, il comando passa al giocatore indicato (op.next) se è ancora seduto, altrimenti al primo collegato.
+  function quit(work, from, op) {
+    var seat = work.seats.filter(function (s) { return s.uid === from; })[0];
+    if (!seat) return { changed: false };
+    if (work.host === from) {
+      var hs = work.seats.filter(function (s) { return !s.bot && s.uid !== from; }).map(function (s) { return s.uid; });
+      var next = op.next && hs.indexOf(op.next) >= 0 ? op.next : (hs.filter(function (u) { return presence(u) === 'on'; })[0] || hs[0]);
+      if (!next) return { err: 'Al tavolo restano solo giocatori automatici: chiudi il tavolo.' };
+      work.host = next;
+    }
+    if (work.phase === 'lobby') { work.seats = work.seats.filter(function (s) { return s !== seat; }); return {}; }
+    var bot = 'bot-' + rid().slice(0, 8), g = work.game;
+    seat.uid = bot; seat.bot = true;
+    if (g && Array.isArray(g.players)) g.players.forEach(function (P) {
+      if (P.uid !== from) return;
+      P.uid = bot; P.bot = true; P.away = false;
+      if (Array.isArray(g.log) && typeof g.logN === 'number') {
+        g.log.push({ n: ++g.logN, t: P.nick + ' ha lasciato la partita: al suo posto gioca l’automatico.', k: 'sys' });
+        if (g.log.length > 70) g.log.splice(0, g.log.length - 70);
+      }
+    });
+    return {};
   }
   function send(op) {
     if (!T || !T.doc) return Promise.reject('Non sei collegato a nessun tavolo.');

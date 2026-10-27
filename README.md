@@ -94,6 +94,9 @@ Gioco di treni e tratte ferroviarie da 2 a 5 giocatori (regole equivalenti a un 
 - Nella schermata iniziale di ogni gioco c'è la lista dal vivo dei **Tavoli aperti**.
 - Chi apre un tavolo sceglie: **Aperto a tutti** (ci si siede con un tocco; in partita si può guardare) oppure **Solo su invito** (compare nella lista ma serve il codice o il link). L'host può cambiarlo dalla sala d'attesa.
 - L'host può **chiudere il tavolo** (sala d'attesa o Menu): tutti tornano alla home e il tavolo sparisce dalla lista. I tavoli abbandonati spariscono da soli dopo poco più di un minuto.
+- **Uscire (pulsante *Esci*):**
+  - **host**: sceglie tra *Esci e lascia il comando a…* (passa da solo al primo giocatore collegato; in partita al suo posto gioca l'automatico) e *Chiudi il tavolo per tutti*. Se al tavolo restano solo giocatori automatici, il tavolo si può solo chiudere e la partita finisce;
+  - **gli altri, a partita iniziata**: *Lascia la partita* (l'automatico prende il posto fino alla fine) oppure *Esci per ora* (il posto resta tuo e puoi rientrare). In sala d'attesa si esce e basta.
 
 ## Chat al tavolo
 
