@@ -97,6 +97,7 @@ Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il 
 async function run(p) { if (App.busy) return; App.busy = true; paintBusy(); try { await p(); } catch (e) { toast(esc(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'), 'bad'); Sound.play('error'); } finally { App.busy = false; paintBusy(); if (App.screen !== 'table' || !G()) render(); } }
 function paintBusy() { document.body.classList.toggle('busy', !!App.busy); }
 function requireNick() {
+  if (window.Account && !Account.allow()) return null; // con il server attivo serve l'account
   var n = ($('#nick') && $('#nick').value.trim()) || myNick();
   if (!n) { toast('Scrivi il tuo nome.'); if ($('#nick')) { $('#nick').focus(); $('#nick').scrollIntoView({ block: 'center' }); } return null; }
   lsSet('pp-nick', n.slice(0, 18)); return n.slice(0, 18);

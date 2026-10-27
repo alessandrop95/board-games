@@ -1,0 +1,4 @@
+// App Android di Board Games: una Trusted Web Activity che apre il sito a schermo intero.
+plugins {
+    id 'com.android.application' version '8.9.1' apply false
+}

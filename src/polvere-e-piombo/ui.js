@@ -131,6 +131,7 @@ Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il 
 /* ---------- azioni ---------- */
 async function run(p) { if (App.busy) return; App.busy = true; render(); try { await p(); } catch (e) { toast(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'); } finally { App.busy = false; render(); } }
 function requireNick() {
+  if (window.Account && !Account.allow()) return null; // con il server attivo serve l'account
   var n = ($('#nick') && $('#nick').value.trim()) || myNick();
   if (!n) { toast('Scrivi il tuo nome da pistolero.'); if ($('#nick')) { $('#nick').focus(); $('#nick').scrollIntoView({ block: 'center' }); } return null; }
   lsSet('pp-nick', n.slice(0, 18)); return n.slice(0, 18);
@@ -665,7 +666,7 @@ var CREDITS = ['Frederic Remington (1861–1909): illustrazioni per Wolfville di
   PPCards.preload();
   var q = new URLSearchParams(location.search), t = (q.get('t') || '').toUpperCase(), last = lsGet('pp-table');
   if (/^[A-Z]{4}$/.test(t)) {
-    if (t === last || (myNick() && q.get('auto') !== '0')) { App.status = 'Mi siedo al tavolo ' + t + '…'; run(function () { return enterTable(t, myNick() || null); }); }
+    if ((t === last || (myNick() && q.get('auto') !== '0')) && (!window.Account || Account.allowQuiet())) { App.status = 'Mi siedo al tavolo ' + t + '…'; run(function () { return enterTable(t, myNick() || null); }); }
     else App.inviteCode = t;
   } else if (last && /^[A-Z]{4}$/.test(last)) { App.status = 'Rientro al tavolo ' + last + '…'; run(function () { return enterTable(last, null); }); }
   render();

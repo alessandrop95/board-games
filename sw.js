@@ -1,7 +1,7 @@
 /* Service worker di Board Games: le pagine si caricano dalla rete (così gli aggiornamenti arrivano subito)
    e, se la rete manca, dalla copia salvata. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v11';
-var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js',
+var CACHE = 'board-games-v13';
+var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js', './src/shared/account.js',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',
   './presagio/', './presagio/manifest.webmanifest', './presagio/icon-192.png',
   './gattomina/', './gattomina/manifest.webmanifest', './gattomina/icon-192.png',
@@ -55,3 +55,20 @@ self.addEventListener('notificationclick', function (e) {
     return self.clients.openWindow(url);
   }));
 });
+
+// Notifica dal server (nuovo tavolo, invito, amicizia). Se l'app è aperta e in primo piano la mostra la pagina stessa.
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: 'Board Games', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+    var front = list.filter(function (c) { return c.visibilityState === 'visible' && c.focused; });
+    if (front.length) { front.forEach(function (c) { c.postMessage({ type: 'push', data: d }); }); return; }
+    var scope = self.registration.scope;
+    return self.registration.showNotification(d.title || 'Board Games', {
+      body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag, data: { url: d.url || scope },
+      icon: scope + 'icon-192.png', badge: scope + 'badge-96.png', lang: 'it', vibrate: [80, 40, 80]
+    });
+  }));
+});
+// Il browser ha rinnovato l'iscrizione: la pagina la salverà di nuovo alla prossima apertura.
+self.addEventListener('pushsubscriptionchange', function () {});

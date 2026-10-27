@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Collega l'app al sito (Digital Asset Links): serve per nascondere la barra dell'indirizzo. -->
+    <string name="assetStatements" translatable="false">
+        [{
+            \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+            \"target\": {\"namespace\": \"web\", \"site\": \"https://alessandrop95.github.io\"}
+        }]
+    </string>
+    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="orientation" translatable="false">portrait</string>
+    <integer name="splashScreenFadeOutDuration">300</integer>
+</resources>

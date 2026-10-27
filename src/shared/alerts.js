@@ -1,9 +1,7 @@
-/* ===== Avvisi: qualcuno ha aperto un tavolo in uno qualsiasi dei giochi =====
-   Funziona su tutte le pagine (home e giochi): ascolta le liste dei tavoli di tutti i giochi e,
-   quando compare un tavolo pubblico appena aperto, mostra un avviso nella pagina o, se l'app è in
-   sottofondo e il telefono lo permette, una notifica di sistema. Per ricevere gli avvisi anche ad app
-   chiusa serve un servizio di notifiche esterno: si usa ntfy (gratuito), a cui il telefono di chi apre
-   un tavolo pubblico manda un messaggio sul canale qui sotto. */
+/* ===== Avvisi: nuovi tavoli e inviti, in tutti i giochi =====
+   Con l'app aperta: ascolta le liste dei tavoli di tutti i giochi e mostra un avviso nella pagina.
+   Ad app chiusa: notifiche push vere (Web Push) mandate dal server Supabase (funzione «notify»);
+   ci si iscrive da qui, scegliendo per quali giochi ricevere gli avvisi dei nuovi tavoli. */
 var Alerts = (function () {
   var GAMES = [
     { p: 'polvere-piombo/v1/', path: 'polvere-e-piombo/', n: 'Bang!' },
@@ -12,14 +10,13 @@ var Alerts = (function () {
     { p: 'campi-acciaio/v1/', path: 'campi-acciaio/', n: 'Scythe' },
     { p: 'binari-italia/v1/', path: 'binari-italia/', n: 'Binari d’Italia' }
   ];
-  var NTFY = 'board-games-alessandrop95-tavoli';
-  var KEY = 'pp-alerts', SEEN = 'pp-alerted', MINE = 'pp-mytables', TTL = 150000;
+  var KEY = 'pp-alerts', PREFS = 'pp-push-prefs', SUBK = 'pp-push', SEEN = 'pp-alerted', MINE = 'pp-mytables', TTL = 150000;
   var here = GAMES.filter(function (g) { return location.pathname.indexOf('/' + g.path) >= 0; })[0] || null;
   var ROOT = here ? '../' : './';
   var started = false, tables = {}, homeEl = null;
 
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
   function obj(k) { try { return JSON.parse(get(k) || '{}') || {}; } catch (e) { return {}; } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function enabled() { return get(KEY) !== 'off'; }
@@ -64,6 +61,7 @@ var Alerts = (function () {
   function maybeAlert(k, t) {
     var e = t.e, g = t.g;
     if (!enabled() || e.phase !== 'lobby' || e.vis !== 'public' || !/^[A-Z]{4}$/.test(e.code || '')) return;
+    if (prefs().games.indexOf(g.path.replace(/\/$/, '')) < 0) return;            // gioco escluso nelle preferenze
     if (!e.c || e.t - e.c > 90000 || e.t < e.c - 5000) return;       // solo tavoli aperti adesso (orari dello stesso telefono)
     if (isMine(g, e.code) || (here && here.p === g.p && Net.tableCode === e.code) || busy()) return;
     var seen = obj(SEEN), now = Date.now();
@@ -72,7 +70,7 @@ var Alerts = (function () {
     seen[k] = now; set(SEEN, JSON.stringify(seen));
     var title = 'Nuovo tavolo: ' + nameOf(t), body = (e.host || 'Qualcuno') + ' ha aperto un tavolo ed è in attesa di giocatori.', url = urlFor(g, e.code);
     if (document.visibilityState === 'visible') banner(title, body, url);
-    else if (sysOn()) sysNotify(title, body + ' Tocca per sederti.', url, k);
+    else if (sysOn() && !pushOn()) sysNotify(title, body + ' Tocca per sederti.', url, k); // con le notifiche push ci pensa il server
   }
   function sysNotify(title, body, url, tag) {
     var o = { body: body, tag: tag, data: { url: url }, icon: new URL(ROOT + 'icon-192.png', location.href).href };
@@ -82,7 +80,94 @@ var Alerts = (function () {
     } else plain();
   }
 
-  /* --- grafica: avviso nella pagina, interruttore, finestra ntfy, lista in home --- */
+  /* --- notifiche push (ad app chiusa) --- */
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function standalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+  function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function allGames() { return GAMES.map(function (g) { return g.path.replace(/\/$/, ''); }); }
+  function prefs() { var p = obj(PREFS); return { games: Array.isArray(p.games) ? p.games : allGames(), invites: p.invites !== false }; }
+  function pushOn() { return !!get(SUBK) && pushSupported() && Notification.permission === 'granted'; }
+  function keyBytes(b) { b = b.replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; var s = atob(b), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
+  function registration() {
+    return new Promise(function (res, rej) {
+      if (!('serviceWorker' in navigator)) { rej('Notifiche non disponibili qui.'); return; }
+      var t = setTimeout(function () { rej('Il gioco non è ancora pronto per le notifiche: ricarica la pagina e riprova.'); }, 8000);
+      navigator.serviceWorker.ready.then(function (r) { clearTimeout(t); res(r); });
+    });
+  }
+  function save(sub) {
+    var j = sub.toJSON(), p = prefs();
+    return Account.rpc('save_push', { p_token: Account.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_games: p.games, p_invites: p.invites, p_ua: ua.slice(0, 200) })
+      .then(function () { set(SUBK, j.endpoint); });
+  }
+  var pushMsg = null;
+  function enablePush() {
+    if (!window.Account || !Account.configured()) return Promise.resolve();
+    if (!Account.user()) { Account.open('login', { why: 'Accedi per ricevere le notifiche: arrivano su tutti i dispositivi dove entri con il tuo account.' }); return Promise.resolve(); }
+    if (!pushSupported()) { pushMsg = isIOS && !standalone() ? 'Su iPhone e iPad prima aggiungi Board Games alla schermata Home e aprilo da lì.' : 'Questo browser non supporta le notifiche.'; repaintAll(); return Promise.resolve(); }
+    pushMsg = null;
+    return Promise.resolve(Notification.requestPermission()).then(function (perm) {
+      if (perm !== 'granted') { pushMsg = perm === 'denied' ? 'Le notifiche sono bloccate: riattivale nelle impostazioni del browser (o dell’app) per questo sito.' : 'Permesso non concesso.'; return; }
+      return registration().then(function (r) {
+        return r.pushManager.getSubscription().then(function (sub) {
+          var key = Account.config && Account.config.vapid;
+          if (!key) throw 'Notifiche non ancora configurate sul server.';
+          var same = sub && sub.options && sub.options.applicationServerKey && btoa(String.fromCharCode.apply(null, new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key;
+          if (sub && !same) return sub.unsubscribe().then(function () { return null; });
+          return sub;
+        }).then(function (sub) { return sub || r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(Account.config.vapid) }); });
+      }).then(save).then(function () { pushMsg = null; Account.toast('Notifiche attive su questo dispositivo.'); });
+    }).catch(function (e) { pushMsg = String(e && e.message || e); }).then(repaintAll);
+  }
+  function disablePush() {
+    return registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return;
+      return Account.rpc('delete_push', { p_token: Account.token, p_endpoint: sub.endpoint }).catch(function () {}).then(function () { return sub.unsubscribe(); });
+    }).catch(function () {}).then(function () { set(SUBK, null); repaintAll(); });
+  }
+  // dopo l'accesso: l'iscrizione già presente su questo dispositivo passa al nuovo account
+  function resync() {
+    if (!pushSupported() || Notification.permission !== 'granted' || !get(SUBK)) return Promise.resolve();
+    return registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) { if (sub) return save(sub); });
+  }
+  // prima di uscire dall'account: questo dispositivo non riceve più le notifiche di quell'account
+  function forget() {
+    var ep = get(SUBK); set(SUBK, null);
+    if (!ep || !window.Account || !Account.token) return Promise.resolve();
+    return Account.rpc('delete_push', { p_token: Account.token, p_endpoint: ep }).catch(function () {});
+  }
+  function setPrefs(p) { set(PREFS, JSON.stringify(p)); if (pushOn()) registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) { if (sub) return save(sub); }).catch(function (e) { pushMsg = String(e); repaintAll(); }); }
+  function settingsHTML() {
+    var p = prefs(), on = pushOn(), h = '';
+    if (!pushSupported()) {
+      h += '<p class="pa-note">' + (isIOS && !standalone() ? 'Su iPhone e iPad le notifiche arrivano quando il gioco è sulla schermata Home (iOS 16.4 o successivo): tocca Condividi → «Aggiungi alla schermata Home», poi apri Board Games da lì e torna qui.' : 'Questo browser non supporta le notifiche.') + '</p>';
+    } else if (Notification.permission === 'denied') {
+      h += '<p class="pa-err">Le notifiche per questo sito sono bloccate. Riattivale dalle impostazioni del browser (lucchetto accanto all’indirizzo → Notifiche) e poi torna qui.</p>';
+    } else {
+      h += '<label class="pa-check"><input type="checkbox" data-pp="master"' + (on ? ' checked' : '') + '> <b>Notifiche su questo dispositivo</b></label>';
+    }
+    h += '<p class="pa-note">Avvisami quando qualcuno apre un tavolo di:</p><div class="pa-games">' + GAMES.map(function (g) { var id = g.path.replace(/\/$/, ''); return '<label class="pa-check"><input type="checkbox" data-pp="game" value="' + id + '"' + (p.games.indexOf(id) >= 0 ? ' checked' : '') + '> ' + esc(g.n) + '</label>'; }).join('') + '</div>' +
+      '<label class="pa-check"><input type="checkbox" data-pp="inv"' + (p.invites ? ' checked' : '') + '> Inviti e richieste di amicizia</label>' +
+      (pushMsg ? '<p class="pa-err">' + esc(pushMsg) + '</p>' : '') +
+      '<p class="pa-note">Con l’app aperta gli avvisi compaiono in alto nella pagina; ad app chiusa arrivano come notifiche del telefono.</p>';
+    return h;
+  }
+  document.addEventListener('change', function (e) {
+    var t = e.target; if (!t.getAttribute || !t.getAttribute('data-pp')) return;
+    var k = t.getAttribute('data-pp'), p = prefs();
+    if (k === 'master') { (t.checked ? enablePush() : disablePush()); return; }
+    if (k === 'game') { p.games = Array.prototype.map.call(document.querySelectorAll('[data-pp="game"]:checked'), function (x) { return x.value; }); setPrefs(p); }
+    if (k === 'inv') { p.invites = t.checked; setPrefs(p); }
+  });
+  function repaintAll() { repaint(); if (window.Account && Account.render) Account.render(); }
+  // notifica arrivata mentre l'app è aperta: il service worker la passa alla pagina
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
+    var d = e.data; if (!d || d.type !== 'push' || !d.data) return;
+    banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' ? 'Apri' : 'Siediti');
+  });
+
+  /* --- grafica: avviso nella pagina, interruttore, lista in home --- */
   var DIE = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f2c14e"/><g fill="#2a1d10"><circle cx="8" cy="8" r="1.7"/><circle cx="16" cy="8" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="8" cy="16" r="1.7"/><circle cx="16" cy="16" r="1.7"/></g></svg>';
   var BELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
   function css() {
@@ -102,11 +187,11 @@ var Alerts = (function () {
       '.ppa-row a{flex:none;text-decoration:none;border-radius:999px;padding:8px 14px;border:1px solid #d9a441;color:inherit}.ppa-row a.sit{background:#d9a441;color:#1d140e;font-weight:700}';
     document.head.appendChild(s);
   }
-  function banner(title, body, url) {
+  function banner(title, body, url, go) {
     css();
     var old = document.querySelector('.ppa-banner'); if (old) old.remove();
     var b = document.createElement('div'); b.className = 'ppa-banner'; b.setAttribute('role', 'status');
-    b.innerHTML = DIE + '<div class="ppa-tx"><b>' + esc(title) + '</b><br><span>' + esc(body) + '</span></div><a class="ppa-go" href="' + esc(url) + '">Siediti</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">×</button>';
+    b.innerHTML = DIE + '<div class="ppa-tx"><b>' + esc(title) + '</b><br><span>' + esc(body) + '</span></div><a class="ppa-go" href="' + esc(url) + '">' + esc(go || 'Siediti') + '</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">×</button>';
     b.querySelector('.ppa-x').onclick = function () { b.remove(); };
     document.body.appendChild(b);
     requestAnimationFrame(function () { requestAnimationFrame(function () { b.classList.add('in'); }); });
@@ -114,37 +199,24 @@ var Alerts = (function () {
   }
   function controlHTML() {
     css();
-    var on = enabled(), perm = canSys() ? Notification.permission : 'none', st, btns;
-    if (!on) { st = 'Avvisi dei nuovi tavoli <b>spenti</b>'; btns = '<button type="button" data-alerts="on">Accendi</button>'; }
-    else if (perm === 'granted') { st = 'Ti avviso quando qualcuno apre un tavolo, anche con l’app in sottofondo'; btns = '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>'; }
+    if (window.Account && Account.configured()) {
+      var on = pushOn(), st = on ? 'Notifiche attive: nuovi tavoli e inviti arrivano anche ad app chiusa' : 'Ricevi una notifica quando qualcuno apre un tavolo o ti invita, anche ad app chiusa';
+      var btn = on ? '<button type="button" class="on" data-pa="open" data-v="account">Impostazioni</button>' : '<button type="button" data-alerts="push">Attiva le notifiche</button>';
+      return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st + '</span></span>' + btn + '</div>';
+    }
+    var en = enabled(), perm = canSys() ? Notification.permission : 'none', st2, btns;
+    if (!en) { st2 = 'Avvisi dei nuovi tavoli <b>spenti</b>'; btns = '<button type="button" data-alerts="on">Accendi</button>'; }
+    else if (perm === 'granted') { st2 = 'Ti avviso quando qualcuno apre un tavolo, anche con l’app in sottofondo'; btns = '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>'; }
     else {
-      st = 'Ti avviso quando qualcuno apre un tavolo, mentre l’app è aperta';
+      st2 = 'Ti avviso quando qualcuno apre un tavolo, mentre l’app è aperta';
       btns = (perm === 'default' ? '<button type="button" data-alerts="perm">Anche come notifica</button>' : '') + '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>';
     }
-    return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st + '</span></span>' + btns + '<button type="button" class="ppa-lnk" data-alerts="ntfy">Ad app chiusa?</button></div>';
+    return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st2 + '</span></span>' + btns + '</div>';
   }
   function repaint() { Array.prototype.forEach.call(document.querySelectorAll('.ppa-ctl'), function (el) { el.outerHTML = controlHTML(); }); }
   function askPerm() {
     if (!canSys() || Notification.permission !== 'default') { repaint(); return; }
     try { var r = Notification.requestPermission(function () { repaint(); }); if (r && r.then) r.then(repaint, repaint); } catch (e) { repaint(); }
-  }
-  function ntfySheet() {
-    css();
-    var web = 'https://ntfy.sh/' + NTFY;
-    var o = document.createElement('div'); o.className = 'ppa-sheet';
-    o.innerHTML = '<div class="ppa-card" role="dialog" aria-modal="true" aria-label="Avvisi ad app chiusa"><h3>Avvisi anche ad app chiusa</h3>' +
-      '<p style="margin:0">Il telefono non può svegliare questa app quando è chiusa, quindi gli avvisi passano da <b>ntfy</b>, un’app di notifiche gratuita e senza registrazione. Ogni volta che qualcuno apre un tavolo <b>aperto a tutti</b>, ti arriva una notifica: toccala e ti siedi.</p>' +
-      '<ol><li>Installa ntfy: <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a> · <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a></li>' +
-      '<li>Nell’app tocca <b>+</b> e iscriviti al canale <code>' + NTFY + '</code></li>' +
-      '<li>Su computer o Android puoi anche usare il browser: apri <a href="' + web + '" target="_blank" rel="noopener">ntfy.sh/' + NTFY + '</a> e attiva le notifiche.</li></ol>' +
-      '<p style="margin:0;font-size:13.5px;opacity:.75">Il canale è pubblico: contiene solo il nome di chi apre il tavolo, il gioco e il link per sedersi. I tavoli «solo su invito» non vengono mai annunciati.</p>' +
-      '<div class="row"><button type="button" class="main" data-ppa="copy">Copia il nome del canale</button><button type="button" data-ppa="close">Chiudi</button></div></div>';
-    o.addEventListener('click', function (ev) {
-      var a = ev.target.closest('[data-ppa]');
-      if (ev.target === o || (a && a.getAttribute('data-ppa') === 'close')) { o.remove(); return; }
-      if (a && a.getAttribute('data-ppa') === 'copy') { try { navigator.clipboard.writeText(NTFY).then(function () { a.textContent = 'Copiato'; }, function () {}); } catch (e) {} }
-    });
-    document.body.appendChild(o);
   }
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-alerts]'); if (!b) return;
@@ -152,7 +224,7 @@ var Alerts = (function () {
     if (k === 'on') { set(KEY, 'on'); start(); askPerm(); repaint(); }
     else if (k === 'off') { set(KEY, 'off'); repaint(); }
     else if (k === 'perm') askPerm();
-    else if (k === 'ntfy') ntfySheet();
+    else if (k === 'push') enablePush();
   });
 
   /* --- home: tutti i tavoli aperti adesso, di tutti i giochi --- */
@@ -169,18 +241,17 @@ var Alerts = (function () {
     }).join('') + '</div>';
   }
 
-  /* --- chi apre un tavolo pubblico lo annuncia anche su ntfy (per chi vuole gli avvisi ad app chiusa) --- */
+  /* --- chi apre un tavolo pubblico lo fa annunciare dal server a chi ha le notifiche attive --- */
   function created(prefix, code, nick, vis) {
     var m = obj(MINE), now = Date.now();
     Object.keys(m).forEach(function (x) { if (now - m[x] > 24 * 3600e3) delete m[x]; });
     m[prefix + code] = now; set(MINE, JSON.stringify(m));
-    if (vis === 'invite' || /[?&]broker=/.test(location.search)) return; // niente annunci dai tavoli su invito né dalle prove locali
+    if (vis === 'invite' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
     var g = GAMES.filter(function (x) { return x.p === prefix; })[0]; if (!g) return;
-    var name = document.title && document.title !== 'Board Games' ? document.title : g.n;
-    var msg = { topic: NTFY, title: 'Nuovo tavolo: ' + name, message: (nick || 'Qualcuno') + ' ha aperto un tavolo ed è in attesa di giocatori. Tocca per sederti.', click: urlFor(g, code), tags: ['game_die'] };
-    try { fetch('https://ntfy.sh/', { method: 'POST', mode: 'no-cors', keepalive: true, body: JSON.stringify(msg) }).catch(function () {}); } catch (e) {}
+    if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code }).catch(function (e) { console.warn('annuncio', e); });
   }
 
   if (enabled()) setTimeout(start, 1200);
-  return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables };
+  return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables,
+    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner };
 })();

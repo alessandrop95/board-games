@@ -84,8 +84,10 @@ Gioco di treni e tratte ferroviarie da 2 a 5 giocatori (regole equivalenti a un 
 
 ## Installare i giochi sul telefono
 
-- **Android (Chrome):** tocca *Installa app* nella pagina del gioco, oppure menu ⋮ → *Installa app* / *Aggiungi a schermata Home*.
-- **iPhone e iPad (Safari):** Condividi → *Aggiungi alla schermata Home* → *Aggiungi*.
+- **Android:** nella home tocca *Scarica l’app* e installa `board-games.apk` (la prima volta Android chiede di consentire l’installazione da Chrome).
+  È una vera app: icona, schermo intero e notifiche anche a telefono bloccato. Gli aggiornamenti si installano sopra la versione precedente.
+  In alternativa, dal browser: *Installa dal browser*, oppure menu ⋮ → *Installa app* / *Aggiungi a schermata Home*.
+- **iPhone e iPad (Safari):** Condividi → *Aggiungi alla schermata Home* → *Aggiungi*. Le notifiche su iPhone arrivano solo aprendo i giochi dall’icona sulla Home (iOS 16.4 o successivo).
 
 ## Tavoli aperti e chiusura
 
@@ -115,11 +117,58 @@ dei giochi i cui sorgenti sono cambiati (tutte, se cambia `src/shared/` o `build
 e il gioco online resta com'era. Conviene modificare `src/`: se cambi a mano una pagina `*/index.html`, l'azione se ne accorge e **non** la sovrascrive
 (compare un avviso giallo in *Actions*), ma quella pagina smette di ricevere gli aggiornamenti finché la stessa modifica non viene riportata in `src/`.
 
-## Presenza e avvisi dei nuovi tavoli
+## Presenza e notifiche
 
 - Accanto a ogni giocatore c'è un pallino: verde se è collegato, grigio con la scritta «offline» se ha chiuso l'app o perso la rete.
   Se tocca a un giocatore offline da più di 45 secondi, gioca l'automatico al suo posto (anche con «Nessun limite»); quando torna riprende lui.
-- Quando qualcuno apre un tavolo **aperto a tutti**, chi ha l'app aperta (home o un gioco, non seduto a un tavolo) vede un avviso con «Siediti»;
-  con le notifiche consentite arriva anche come notifica di sistema se l'app è in sottofondo. L'interruttore è nella home e nella lista dei tavoli di ogni gioco.
-- Ad app chiusa: gli avvisi passano dall'app gratuita [ntfy](https://ntfy.sh), canale `board-games-alessandrop95-tavoli` (istruzioni in «Ad app chiusa?»).
-  I tavoli «solo su invito» non vengono annunciati.
+- **Notifiche** (anche ad app chiusa, senza app esterne): *Nuovo tavolo* quando qualcuno apre un tavolo **aperto a tutti** nei giochi scelti,
+  e *Inviti degli amici*. Si attivano dal pulsante 👤 → *Notifiche*, dove si scelgono anche i giochi. Ogni telefono va attivato una volta.
+  Con l’app aperta l’avviso compare in alto nella pagina, con «Siediti». I tavoli «solo su invito» non vengono annunciati.
+
+## Account e amici
+
+- Per giocare serve un account: **nome utente e password**, nient’altro (niente email). Si crea dal pulsante 👤 *Accedi o registrati* nella home o in un gioco.
+- **Amici:** 👤 → *Amici* → scrivi il nome utente. L’altro riceve la richiesta (anche come notifica) e la accetta.
+- **Invitare:** nella sala d’attesa del tavolo tocca *Invita un amico* → *Invita*: all’amico arriva una notifica che lo porta direttamente al tavolo.
+- Dal pannello 👤 si cambia la password, si esce o si cancella l’account (con amici e notifiche).
+- Le password sono salvate cifrate (bcrypt); dopo troppi tentativi sbagliati l’accesso a quel nome si blocca per qualche minuto.
+
+## Configurare il server
+
+Account, amici e notifiche usano un progetto **Supabase** gratuito. Va creato una volta sola; il resto lo fa GitHub da solo
+(workflow *Server (Supabase)*: database, funzione `notify` che manda le notifiche Web Push, chiavi delle notifiche, `server.json` per il sito).
+Finché il server non è configurato i giochi funzionano come prima, senza account.
+
+1. Vai su [supabase.com](https://supabase.com), registrati (piano *Free*) e crea un **New project**: nome `board-games`,
+   regione *Central EU (Frankfurt)*. Come **Database Password** tocca *Generate a password* e **copiala** subito.
+2. **Project ref**: è il codice nell’indirizzo della dashboard, `supabase.com/dashboard/project/`**`abcdefghijklmnop`**
+   (si trova anche in *Project Settings → General → Project ID*).
+3. **Access token**: in alto a destra, avatar → *Account preferences* → *Access Tokens* → *Generate new token* (nome `github`), e copialo.
+4. Su GitHub: repository → *Settings* → *Secrets and variables* → *Actions* → *New repository secret*, tre volte:
+   | Nome | Valore |
+   |---|---|
+   | `SUPABASE_ACCESS_TOKEN` | il token del punto 3 |
+   | `SUPABASE_PROJECT_REF` | il project ref del punto 2 |
+   | `SUPABASE_DB_PASSWORD` | la password del punto 1 |
+5. *Actions* → **Server (Supabase)** → *Run workflow*. Dopo 2–3 minuti il workflow è verde, nel repository compare `server.json`
+   e poco dopo nel sito appare *Accedi o registrati*.
+
+Il workflow riparte da solo quando cambia `supabase/`, e ogni giorno fa una piccola richiesta al server perché il progetto gratuito
+non venga messo in pausa per inattività. Le chiavi delle notifiche vengono create la prima volta e restano solo su Supabase.
+
+## App Android
+
+L’app è una *Trusted Web Activity*: apre il sito nel motore di Chrome a schermo intero, quindi ogni aggiornamento dei giochi arriva subito anche nell’app.
+Sorgenti in `android/` (icone generate con `python3 tools/android/icone.py`). La costruisce il workflow **App Android**, che la pubblica
+nelle *Releases* del repository; il sito la offre da `app.json`.
+
+1. Aggiungi il segreto del repository **`ANDROID_KEYSTORE_PASSWORD`**: una password lunga (almeno 12 caratteri) che non userai altrove.
+   **Conservala** (per esempio nel gestore delle password): senza di lei non si possono più pubblicare aggiornamenti dell’app.
+2. *Actions* → **App Android** → *Run workflow*. La prima volta crea la chiave di firma `android/firma.p12` (protetta dalla password) e la salva nel repository;
+   dopo 3–5 minuti l’APK è nelle *Releases* e nella home compare *Scarica l’app*. Ogni modifica in `android/` pubblica una nuova versione.
+3. *Facoltativo, ma consigliato:* per togliere la barra con l’indirizzo in cima all’app, crea il repository pubblico **`alessandrop95.github.io`**
+   (*Add file → Create new file*) con due file:
+   - `.nojekyll` (vuoto);
+   - `.well-known/assetlinks.json` con il contenuto di `android/assetlinks.json` (creato dal workflow al punto 2).
+
+   Poi riapri l’app (se serve, cancellane i dati una volta): Android verifica il collegamento e la barra sparisce.

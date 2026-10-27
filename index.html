@@ -35,11 +35,12 @@ p { margin: 0; color: var(--muted); }
 <body>
 <main>
   <header><h1>Board Games</h1></header>
-  <p>Giochi da tavolo da fare online con gli amici, ognuno dal proprio telefono. Niente account: apri un tavolo e manda il link.</p>
+  <p>Giochi da tavolo da fare online con gli amici, ognuno dal proprio telefono. Crea un account gratuito, apri un tavolo e manda il link o invita gli amici.</p>
   <div id="install-slot"></div>
   <section style="display:grid;gap:10px">
     <h2 style="font:400 24px/1.1 'Sancreek',Georgia,serif;margin:0">Tavoli aperti adesso</h2>
     <div id="open-tables"><p>Cerco i tavoli aperti…</p></div>
+    <div id="account-slot"></div>
     <div id="alerts-slot"></div>
   </section>
   <a class="game" href="polvere-e-piombo/">
@@ -84,9 +85,13 @@ p { margin: 0; color: var(--muted); }
   </a>
 </main>
 <script src="src/shared/install.js"></script>
-<script>document.getElementById('install-slot').innerHTML = PWA.buttonHTML('install');</script>
+<script>function paintInstall() { document.getElementById('install-slot').innerHTML = PWA.buttonHTML('install'); } paintInstall(); PWA.onChange(paintInstall);</script>
 <script src="src/shared/net.js"></script>
 <script src="src/shared/alerts.js"></script>
-<script>document.getElementById('alerts-slot').innerHTML = Alerts.controlHTML(); Alerts.mountHome(document.getElementById('open-tables'));</script>
+<script src="src/shared/account.js"></script>
+<script>
+function paintSlots() { document.getElementById('account-slot').innerHTML = Account.chipHTML(); document.getElementById('alerts-slot').innerHTML = Alerts.controlHTML(); }
+paintSlots(); Account.ready.then(paintSlots); Alerts.mountHome(document.getElementById('open-tables'));
+</script>
 </body>
 </html>

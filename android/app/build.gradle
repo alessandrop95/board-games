@@ -1,0 +1,69 @@
+// Board Games per Android (Trusted Web Activity).
+// Versione e firma arrivano dal workflow «App Android» (.github/workflows/android.yml).
+plugins {
+    id 'com.android.application'
+}
+
+def site = [
+    host: 'alessandrop95.github.io',
+    path: '/board-games/',
+    name: 'Board Games',
+    color: '#1D140E'
+]
+def code = (project.findProperty('versionCode') ?: '1').toInteger()
+
+android {
+    namespace 'io.github.alessandrop95.boardgames'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'io.github.alessandrop95.boardgames'
+        minSdk 23
+        targetSdk 36
+        versionCode code
+        versionName '1.' + code
+
+        resValue 'string', 'appName', site.name
+        resValue 'string', 'launcherName', site.name
+        resValue 'string', 'hostName', site.host
+        resValue 'string', 'launchUrl', 'https://' + site.host + site.path + '?app=android'
+        resValue 'string', 'providerAuthority', 'io.github.alessandrop95.boardgames.fileprovider'
+        resValue 'color', 'colorPrimary', site.color
+        resValue 'color', 'colorPrimaryDark', site.color
+        resValue 'color', 'navigationColor', site.color
+        resValue 'color', 'navigationColorDark', site.color
+        resValue 'color', 'navigationDividerColor', '#00000000'
+        resValue 'color', 'backgroundColor', site.color
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv('BG_KEYSTORE')
+            if (ks) {
+                storeFile file(ks)
+                storeType 'pkcs12'
+                storePassword System.getenv('BG_KEYSTORE_PASSWORD')
+                keyAlias 'boardgames'
+                keyPassword System.getenv('BG_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv('BG_KEYSTORE')) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}

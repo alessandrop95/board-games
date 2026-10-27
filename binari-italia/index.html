@@ -2083,6 +2083,21 @@ var PWA = (function () {
   var iosNotSafari = isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
   function standalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
 
+  // dentro l'app Android (Trusted Web Activity) non serve proporre l'installazione
+  var inApp2 = false;
+  try {
+    if (/[?&]app=android/.test(location.search) || (document.referrer || '').indexOf('android-app://io.github.alessandrop95.boardgames') === 0) sessionStorage.setItem('pp-twa', '1');
+    inApp2 = sessionStorage.getItem('pp-twa') === '1';
+  } catch (e) {}
+  // app Android scaricabile: app.json viene scritto dal workflow «App Android» quando c'è una versione pubblicata
+  var apk = null;
+  var meta = document.querySelector('meta[name="pwa-sw"]');
+  var root = meta ? new URL(meta.getAttribute('data-scope') || './', location.href).href : './';
+  if (isAndroid && !inApp2 && window.fetch) {
+    fetch(root + 'app.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && /^https:\/\//.test(j.apk || '')) { apk = j; notify(); } }).catch(function () {});
+  }
+
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; notify(); });
   window.addEventListener('appinstalled', function () { deferred = null; close(); notify(); });
   function notify() { listeners.forEach(function (f) { try { f(); } catch (e) {} }); }
@@ -2093,25 +2108,39 @@ var PWA = (function () {
     if (swUrl) navigator.serviceWorker.register(swUrl.content, { scope: swUrl.getAttribute('data-scope') || './' }).catch(function () {});
   }
 
-  function available() { return !standalone(); }
-  function buttonHTML(cls) { return available() ? '<button type="button" class="' + (cls || 'btn ghost small') + '" data-pwa="install">Installa app</button>' : ''; }
+  function available() { return !standalone() && !inApp2; }
+  function buttonHTML(cls) { return available() ? '<button type="button" class="' + (cls || 'btn ghost small') + '" data-pwa="install">' + (isAndroid && apk ? 'Scarica l’app' : 'Installa app') + '</button>' : ''; }
 
   var css = '.pwa-back{position:fixed;inset:0;z-index:90;background:rgba(5,5,12,.6);display:flex;align-items:flex-end;justify-content:center}' +
     '.pwa-sheet{width:100%;max-width:520px;background:#1d1b2b;color:#f2ecdf;border-radius:18px 18px 0 0;padding:18px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:grid;gap:12px;font:16px/1.45 Georgia,serif;box-shadow:0 -10px 30px #000a}' +
     '.pwa-sheet h2{margin:0;font-size:21px}.pwa-sheet ol{margin:0;padding-left:22px;display:grid;gap:8px}.pwa-sheet .k{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:6px;background:#ffffff1a;font-weight:700;white-space:nowrap}' +
-    '.pwa-sheet .note{font-size:14px;color:#c9c2d8;margin:0}.pwa-sheet button{appearance:none;border:0;border-radius:999px;min-height:46px;font:700 16px Georgia,serif;background:#e2c27a;color:#231a08;cursor:pointer}';
+    '.pwa-sheet .note{font-size:14px;color:#c9c2d8;margin:0}.pwa-sheet .pwa-apk{display:flex;align-items:center;justify-content:center;min-height:50px;border-radius:999px;background:#e2c27a;color:#231a08;font:700 17px Georgia,serif;text-decoration:none}' +
+    '.pwa-sheet button.pwa-link{background:none;color:#e2c27a;min-height:0;padding:0;font:inherit;text-decoration:underline;border-radius:0}.pwa-sheet button.pwa-close{background:#ffffff1a;color:#f2ecdf}.pwa-sheet button{appearance:none;border:0;border-radius:999px;min-height:46px;font:700 16px Georgia,serif;background:#e2c27a;color:#231a08;cursor:pointer}';
   function close() { var m = document.querySelector('.pwa-back'); if (m) m.remove(); }
-  function sheet(html) {
+  function sheet(html, closeLabel) {
     close();
     if (!document.getElementById('pwa-css')) { var st = document.createElement('style'); st.id = 'pwa-css'; st.textContent = css; document.head.appendChild(st); }
     var d = document.createElement('div'); d.className = 'pwa-back';
-    d.innerHTML = '<div class="pwa-sheet" role="dialog" aria-modal="true">' + html + '<button type="button" data-pwa="close">Ho capito</button></div>';
+    d.innerHTML = '<div class="pwa-sheet" role="dialog" aria-modal="true">' + html + '<button type="button" data-pwa="close"' + (closeLabel ? ' class="pwa-close">' + closeLabel : '>Ho capito') + '</button></div>';
     d.addEventListener('click', function (e) { if (e.target === d) close(); });
     document.body.appendChild(d);
   }
   var SHARE = '<svg width="16" height="18" viewBox="0 0 16 18" aria-hidden="true"><path d="M8 1v10M4.5 4.5L8 1l3.5 3.5M3 8H1.5v9h13V8H13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function install() {
-    if (standalone()) { sheet('<h2>È già installata</h2><p class="note">Stai usando il gioco come app.</p>'); return; }
+    if (standalone() || inApp2) { sheet('<h2>È già installata</h2><p class="note">Stai usando il gioco come app.</p>'); return; }
+    if (isAndroid && apk && !inApp) {
+      sheet('<h2>Scarica l’app per Android</h2>' +
+        '<p class="note">Con l’app arrivano le notifiche dei nuovi tavoli e degli inviti degli amici anche a telefono bloccato, e i giochi si aprono a schermo intero.</p>' +
+        '<a class="pwa-apk" href="' + apk.apk.replace(/"/g, '%22') + '" download>Scarica l’app' + (apk.version ? ' (versione ' + String(apk.version).replace(/[^0-9.]/g, '') + ')' : '') + '</a>' +
+        '<ol><li>Apri il file scaricato <span class="k">board-games.apk</span> (dalla notifica del download o da <span class="k">File › Download</span>).</li>' +
+        '<li>Se Android lo chiede, tocca <span class="k">Impostazioni</span> e attiva <span class="k">Consenti da questa fonte</span>, poi torna indietro.</li>' +
+        '<li>Tocca <span class="k">Installa</span>, poi <span class="k">Apri</span>.</li></ol>' +
+        '<p class="note">Nell’app accedi con lo stesso nome utente e password. Preferisci senza scaricare nulla? <button type="button" class="pwa-link" data-pwa="browser">Installa dal browser</button></p>', 'Chiudi');
+      return;
+    }
+    browserInstall();
+  }
+  function browserInstall() {
     if (deferred) {
       var e = deferred; deferred = null;
       e.prompt();
@@ -2136,9 +2165,10 @@ var PWA = (function () {
   }
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-pwa]'); if (!b) return;
-    if (b.getAttribute('data-pwa') === 'install') install(); else close();
+    var a = b.getAttribute('data-pwa');
+    if (a === 'install') install(); else if (a === 'browser') { close(); browserInstall(); } else close();
   });
-  return { buttonHTML: buttonHTML, install: install, available: available, standalone: standalone, onChange: function (f) { listeners.push(f); } };
+  return { buttonHTML: buttonHTML, install: install, available: available, standalone: standalone, inApp: function () { return inApp2; }, apk: function () { return apk; }, onChange: function (f) { listeners.push(f); } };
 })();
 
 /* ===== Lista dei tavoli aperti (condivisa tra i giochi) ===== */
@@ -2210,7 +2240,7 @@ var Lobby = (function () {
         '<div class="muted" style="font-size:13px">' + t.n + (t.max ? '/' + t.max : '') + ' giocatori · ' + state + (t.note ? ' · ' + e(t.note) : '') + '</div></div>' + btn + '</div>';
     }).join('');
   }
-  function panelHTML() { ensureCss(); return (window.Alerts ? Alerts.controlHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
+  function panelHTML() { ensureCss(); return (window.Account ? Account.chipHTML() : '') + (window.Alerts ? Alerts.controlHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
   function pickHTML() {
     var v = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })() === 'invite' ? 'invite' : 'public';
     return '<div class="vis-pick" role="radiogroup" aria-label="Chi può sedersi">' +
@@ -2227,7 +2257,7 @@ var Lobby = (function () {
     var v = doc.vis === 'invite' ? 'invite' : 'public';
     return '<label style="display:grid;gap:6px"><span><b>Chi può sedersi</b><br><span class="muted" style="font-size:15px">' +
       (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
-      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option></select></label>';
+      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option></select></label>' + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
   }
   return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
     setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget };
@@ -2562,12 +2592,10 @@ var Sound = (function () {
   return api;
 })();
 
-/* ===== Avvisi: qualcuno ha aperto un tavolo in uno qualsiasi dei giochi =====
-   Funziona su tutte le pagine (home e giochi): ascolta le liste dei tavoli di tutti i giochi e,
-   quando compare un tavolo pubblico appena aperto, mostra un avviso nella pagina o, se l'app è in
-   sottofondo e il telefono lo permette, una notifica di sistema. Per ricevere gli avvisi anche ad app
-   chiusa serve un servizio di notifiche esterno: si usa ntfy (gratuito), a cui il telefono di chi apre
-   un tavolo pubblico manda un messaggio sul canale qui sotto. */
+/* ===== Avvisi: nuovi tavoli e inviti, in tutti i giochi =====
+   Con l'app aperta: ascolta le liste dei tavoli di tutti i giochi e mostra un avviso nella pagina.
+   Ad app chiusa: notifiche push vere (Web Push) mandate dal server Supabase (funzione «notify»);
+   ci si iscrive da qui, scegliendo per quali giochi ricevere gli avvisi dei nuovi tavoli. */
 var Alerts = (function () {
   var GAMES = [
     { p: 'polvere-piombo/v1/', path: 'polvere-e-piombo/', n: 'Bang!' },
@@ -2576,14 +2604,13 @@ var Alerts = (function () {
     { p: 'campi-acciaio/v1/', path: 'campi-acciaio/', n: 'Scythe' },
     { p: 'binari-italia/v1/', path: 'binari-italia/', n: 'Binari d’Italia' }
   ];
-  var NTFY = 'board-games-alessandrop95-tavoli';
-  var KEY = 'pp-alerts', SEEN = 'pp-alerted', MINE = 'pp-mytables', TTL = 150000;
+  var KEY = 'pp-alerts', PREFS = 'pp-push-prefs', SUBK = 'pp-push', SEEN = 'pp-alerted', MINE = 'pp-mytables', TTL = 150000;
   var here = GAMES.filter(function (g) { return location.pathname.indexOf('/' + g.path) >= 0; })[0] || null;
   var ROOT = here ? '../' : './';
   var started = false, tables = {}, homeEl = null;
 
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
   function obj(k) { try { return JSON.parse(get(k) || '{}') || {}; } catch (e) { return {}; } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function enabled() { return get(KEY) !== 'off'; }
@@ -2628,6 +2655,7 @@ var Alerts = (function () {
   function maybeAlert(k, t) {
     var e = t.e, g = t.g;
     if (!enabled() || e.phase !== 'lobby' || e.vis !== 'public' || !/^[A-Z]{4}$/.test(e.code || '')) return;
+    if (prefs().games.indexOf(g.path.replace(/\/$/, '')) < 0) return;            // gioco escluso nelle preferenze
     if (!e.c || e.t - e.c > 90000 || e.t < e.c - 5000) return;       // solo tavoli aperti adesso (orari dello stesso telefono)
     if (isMine(g, e.code) || (here && here.p === g.p && Net.tableCode === e.code) || busy()) return;
     var seen = obj(SEEN), now = Date.now();
@@ -2636,7 +2664,7 @@ var Alerts = (function () {
     seen[k] = now; set(SEEN, JSON.stringify(seen));
     var title = 'Nuovo tavolo: ' + nameOf(t), body = (e.host || 'Qualcuno') + ' ha aperto un tavolo ed è in attesa di giocatori.', url = urlFor(g, e.code);
     if (document.visibilityState === 'visible') banner(title, body, url);
-    else if (sysOn()) sysNotify(title, body + ' Tocca per sederti.', url, k);
+    else if (sysOn() && !pushOn()) sysNotify(title, body + ' Tocca per sederti.', url, k); // con le notifiche push ci pensa il server
   }
   function sysNotify(title, body, url, tag) {
     var o = { body: body, tag: tag, data: { url: url }, icon: new URL(ROOT + 'icon-192.png', location.href).href };
@@ -2646,7 +2674,94 @@ var Alerts = (function () {
     } else plain();
   }
 
-  /* --- grafica: avviso nella pagina, interruttore, finestra ntfy, lista in home --- */
+  /* --- notifiche push (ad app chiusa) --- */
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function standalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+  function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function allGames() { return GAMES.map(function (g) { return g.path.replace(/\/$/, ''); }); }
+  function prefs() { var p = obj(PREFS); return { games: Array.isArray(p.games) ? p.games : allGames(), invites: p.invites !== false }; }
+  function pushOn() { return !!get(SUBK) && pushSupported() && Notification.permission === 'granted'; }
+  function keyBytes(b) { b = b.replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; var s = atob(b), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
+  function registration() {
+    return new Promise(function (res, rej) {
+      if (!('serviceWorker' in navigator)) { rej('Notifiche non disponibili qui.'); return; }
+      var t = setTimeout(function () { rej('Il gioco non è ancora pronto per le notifiche: ricarica la pagina e riprova.'); }, 8000);
+      navigator.serviceWorker.ready.then(function (r) { clearTimeout(t); res(r); });
+    });
+  }
+  function save(sub) {
+    var j = sub.toJSON(), p = prefs();
+    return Account.rpc('save_push', { p_token: Account.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_games: p.games, p_invites: p.invites, p_ua: ua.slice(0, 200) })
+      .then(function () { set(SUBK, j.endpoint); });
+  }
+  var pushMsg = null;
+  function enablePush() {
+    if (!window.Account || !Account.configured()) return Promise.resolve();
+    if (!Account.user()) { Account.open('login', { why: 'Accedi per ricevere le notifiche: arrivano su tutti i dispositivi dove entri con il tuo account.' }); return Promise.resolve(); }
+    if (!pushSupported()) { pushMsg = isIOS && !standalone() ? 'Su iPhone e iPad prima aggiungi Board Games alla schermata Home e aprilo da lì.' : 'Questo browser non supporta le notifiche.'; repaintAll(); return Promise.resolve(); }
+    pushMsg = null;
+    return Promise.resolve(Notification.requestPermission()).then(function (perm) {
+      if (perm !== 'granted') { pushMsg = perm === 'denied' ? 'Le notifiche sono bloccate: riattivale nelle impostazioni del browser (o dell’app) per questo sito.' : 'Permesso non concesso.'; return; }
+      return registration().then(function (r) {
+        return r.pushManager.getSubscription().then(function (sub) {
+          var key = Account.config && Account.config.vapid;
+          if (!key) throw 'Notifiche non ancora configurate sul server.';
+          var same = sub && sub.options && sub.options.applicationServerKey && btoa(String.fromCharCode.apply(null, new Uint8Array(sub.options.applicationServerKey))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') === key;
+          if (sub && !same) return sub.unsubscribe().then(function () { return null; });
+          return sub;
+        }).then(function (sub) { return sub || r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(Account.config.vapid) }); });
+      }).then(save).then(function () { pushMsg = null; Account.toast('Notifiche attive su questo dispositivo.'); });
+    }).catch(function (e) { pushMsg = String(e && e.message || e); }).then(repaintAll);
+  }
+  function disablePush() {
+    return registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return;
+      return Account.rpc('delete_push', { p_token: Account.token, p_endpoint: sub.endpoint }).catch(function () {}).then(function () { return sub.unsubscribe(); });
+    }).catch(function () {}).then(function () { set(SUBK, null); repaintAll(); });
+  }
+  // dopo l'accesso: l'iscrizione già presente su questo dispositivo passa al nuovo account
+  function resync() {
+    if (!pushSupported() || Notification.permission !== 'granted' || !get(SUBK)) return Promise.resolve();
+    return registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) { if (sub) return save(sub); });
+  }
+  // prima di uscire dall'account: questo dispositivo non riceve più le notifiche di quell'account
+  function forget() {
+    var ep = get(SUBK); set(SUBK, null);
+    if (!ep || !window.Account || !Account.token) return Promise.resolve();
+    return Account.rpc('delete_push', { p_token: Account.token, p_endpoint: ep }).catch(function () {});
+  }
+  function setPrefs(p) { set(PREFS, JSON.stringify(p)); if (pushOn()) registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) { if (sub) return save(sub); }).catch(function (e) { pushMsg = String(e); repaintAll(); }); }
+  function settingsHTML() {
+    var p = prefs(), on = pushOn(), h = '';
+    if (!pushSupported()) {
+      h += '<p class="pa-note">' + (isIOS && !standalone() ? 'Su iPhone e iPad le notifiche arrivano quando il gioco è sulla schermata Home (iOS 16.4 o successivo): tocca Condividi → «Aggiungi alla schermata Home», poi apri Board Games da lì e torna qui.' : 'Questo browser non supporta le notifiche.') + '</p>';
+    } else if (Notification.permission === 'denied') {
+      h += '<p class="pa-err">Le notifiche per questo sito sono bloccate. Riattivale dalle impostazioni del browser (lucchetto accanto all’indirizzo → Notifiche) e poi torna qui.</p>';
+    } else {
+      h += '<label class="pa-check"><input type="checkbox" data-pp="master"' + (on ? ' checked' : '') + '> <b>Notifiche su questo dispositivo</b></label>';
+    }
+    h += '<p class="pa-note">Avvisami quando qualcuno apre un tavolo di:</p><div class="pa-games">' + GAMES.map(function (g) { var id = g.path.replace(/\/$/, ''); return '<label class="pa-check"><input type="checkbox" data-pp="game" value="' + id + '"' + (p.games.indexOf(id) >= 0 ? ' checked' : '') + '> ' + esc(g.n) + '</label>'; }).join('') + '</div>' +
+      '<label class="pa-check"><input type="checkbox" data-pp="inv"' + (p.invites ? ' checked' : '') + '> Inviti e richieste di amicizia</label>' +
+      (pushMsg ? '<p class="pa-err">' + esc(pushMsg) + '</p>' : '') +
+      '<p class="pa-note">Con l’app aperta gli avvisi compaiono in alto nella pagina; ad app chiusa arrivano come notifiche del telefono.</p>';
+    return h;
+  }
+  document.addEventListener('change', function (e) {
+    var t = e.target; if (!t.getAttribute || !t.getAttribute('data-pp')) return;
+    var k = t.getAttribute('data-pp'), p = prefs();
+    if (k === 'master') { (t.checked ? enablePush() : disablePush()); return; }
+    if (k === 'game') { p.games = Array.prototype.map.call(document.querySelectorAll('[data-pp="game"]:checked'), function (x) { return x.value; }); setPrefs(p); }
+    if (k === 'inv') { p.invites = t.checked; setPrefs(p); }
+  });
+  function repaintAll() { repaint(); if (window.Account && Account.render) Account.render(); }
+  // notifica arrivata mentre l'app è aperta: il service worker la passa alla pagina
+  if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
+    var d = e.data; if (!d || d.type !== 'push' || !d.data) return;
+    banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' ? 'Apri' : 'Siediti');
+  });
+
+  /* --- grafica: avviso nella pagina, interruttore, lista in home --- */
   var DIE = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f2c14e"/><g fill="#2a1d10"><circle cx="8" cy="8" r="1.7"/><circle cx="16" cy="8" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="8" cy="16" r="1.7"/><circle cx="16" cy="16" r="1.7"/></g></svg>';
   var BELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
   function css() {
@@ -2666,11 +2781,11 @@ var Alerts = (function () {
       '.ppa-row a{flex:none;text-decoration:none;border-radius:999px;padding:8px 14px;border:1px solid #d9a441;color:inherit}.ppa-row a.sit{background:#d9a441;color:#1d140e;font-weight:700}';
     document.head.appendChild(s);
   }
-  function banner(title, body, url) {
+  function banner(title, body, url, go) {
     css();
     var old = document.querySelector('.ppa-banner'); if (old) old.remove();
     var b = document.createElement('div'); b.className = 'ppa-banner'; b.setAttribute('role', 'status');
-    b.innerHTML = DIE + '<div class="ppa-tx"><b>' + esc(title) + '</b><br><span>' + esc(body) + '</span></div><a class="ppa-go" href="' + esc(url) + '">Siediti</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">×</button>';
+    b.innerHTML = DIE + '<div class="ppa-tx"><b>' + esc(title) + '</b><br><span>' + esc(body) + '</span></div><a class="ppa-go" href="' + esc(url) + '">' + esc(go || 'Siediti') + '</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">×</button>';
     b.querySelector('.ppa-x').onclick = function () { b.remove(); };
     document.body.appendChild(b);
     requestAnimationFrame(function () { requestAnimationFrame(function () { b.classList.add('in'); }); });
@@ -2678,37 +2793,24 @@ var Alerts = (function () {
   }
   function controlHTML() {
     css();
-    var on = enabled(), perm = canSys() ? Notification.permission : 'none', st, btns;
-    if (!on) { st = 'Avvisi dei nuovi tavoli <b>spenti</b>'; btns = '<button type="button" data-alerts="on">Accendi</button>'; }
-    else if (perm === 'granted') { st = 'Ti avviso quando qualcuno apre un tavolo, anche con l’app in sottofondo'; btns = '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>'; }
+    if (window.Account && Account.configured()) {
+      var on = pushOn(), st = on ? 'Notifiche attive: nuovi tavoli e inviti arrivano anche ad app chiusa' : 'Ricevi una notifica quando qualcuno apre un tavolo o ti invita, anche ad app chiusa';
+      var btn = on ? '<button type="button" class="on" data-pa="open" data-v="account">Impostazioni</button>' : '<button type="button" data-alerts="push">Attiva le notifiche</button>';
+      return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st + '</span></span>' + btn + '</div>';
+    }
+    var en = enabled(), perm = canSys() ? Notification.permission : 'none', st2, btns;
+    if (!en) { st2 = 'Avvisi dei nuovi tavoli <b>spenti</b>'; btns = '<button type="button" data-alerts="on">Accendi</button>'; }
+    else if (perm === 'granted') { st2 = 'Ti avviso quando qualcuno apre un tavolo, anche con l’app in sottofondo'; btns = '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>'; }
     else {
-      st = 'Ti avviso quando qualcuno apre un tavolo, mentre l’app è aperta';
+      st2 = 'Ti avviso quando qualcuno apre un tavolo, mentre l’app è aperta';
       btns = (perm === 'default' ? '<button type="button" data-alerts="perm">Anche come notifica</button>' : '') + '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>';
     }
-    return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st + '</span></span>' + btns + '<button type="button" class="ppa-lnk" data-alerts="ntfy">Ad app chiusa?</button></div>';
+    return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st2 + '</span></span>' + btns + '</div>';
   }
   function repaint() { Array.prototype.forEach.call(document.querySelectorAll('.ppa-ctl'), function (el) { el.outerHTML = controlHTML(); }); }
   function askPerm() {
     if (!canSys() || Notification.permission !== 'default') { repaint(); return; }
     try { var r = Notification.requestPermission(function () { repaint(); }); if (r && r.then) r.then(repaint, repaint); } catch (e) { repaint(); }
-  }
-  function ntfySheet() {
-    css();
-    var web = 'https://ntfy.sh/' + NTFY;
-    var o = document.createElement('div'); o.className = 'ppa-sheet';
-    o.innerHTML = '<div class="ppa-card" role="dialog" aria-modal="true" aria-label="Avvisi ad app chiusa"><h3>Avvisi anche ad app chiusa</h3>' +
-      '<p style="margin:0">Il telefono non può svegliare questa app quando è chiusa, quindi gli avvisi passano da <b>ntfy</b>, un’app di notifiche gratuita e senza registrazione. Ogni volta che qualcuno apre un tavolo <b>aperto a tutti</b>, ti arriva una notifica: toccala e ti siedi.</p>' +
-      '<ol><li>Installa ntfy: <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a> · <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a></li>' +
-      '<li>Nell’app tocca <b>+</b> e iscriviti al canale <code>' + NTFY + '</code></li>' +
-      '<li>Su computer o Android puoi anche usare il browser: apri <a href="' + web + '" target="_blank" rel="noopener">ntfy.sh/' + NTFY + '</a> e attiva le notifiche.</li></ol>' +
-      '<p style="margin:0;font-size:13.5px;opacity:.75">Il canale è pubblico: contiene solo il nome di chi apre il tavolo, il gioco e il link per sedersi. I tavoli «solo su invito» non vengono mai annunciati.</p>' +
-      '<div class="row"><button type="button" class="main" data-ppa="copy">Copia il nome del canale</button><button type="button" data-ppa="close">Chiudi</button></div></div>';
-    o.addEventListener('click', function (ev) {
-      var a = ev.target.closest('[data-ppa]');
-      if (ev.target === o || (a && a.getAttribute('data-ppa') === 'close')) { o.remove(); return; }
-      if (a && a.getAttribute('data-ppa') === 'copy') { try { navigator.clipboard.writeText(NTFY).then(function () { a.textContent = 'Copiato'; }, function () {}); } catch (e) {} }
-    });
-    document.body.appendChild(o);
   }
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-alerts]'); if (!b) return;
@@ -2716,7 +2818,7 @@ var Alerts = (function () {
     if (k === 'on') { set(KEY, 'on'); start(); askPerm(); repaint(); }
     else if (k === 'off') { set(KEY, 'off'); repaint(); }
     else if (k === 'perm') askPerm();
-    else if (k === 'ntfy') ntfySheet();
+    else if (k === 'push') enablePush();
   });
 
   /* --- home: tutti i tavoli aperti adesso, di tutti i giochi --- */
@@ -2733,20 +2835,240 @@ var Alerts = (function () {
     }).join('') + '</div>';
   }
 
-  /* --- chi apre un tavolo pubblico lo annuncia anche su ntfy (per chi vuole gli avvisi ad app chiusa) --- */
+  /* --- chi apre un tavolo pubblico lo fa annunciare dal server a chi ha le notifiche attive --- */
   function created(prefix, code, nick, vis) {
     var m = obj(MINE), now = Date.now();
     Object.keys(m).forEach(function (x) { if (now - m[x] > 24 * 3600e3) delete m[x]; });
     m[prefix + code] = now; set(MINE, JSON.stringify(m));
-    if (vis === 'invite' || /[?&]broker=/.test(location.search)) return; // niente annunci dai tavoli su invito né dalle prove locali
+    if (vis === 'invite' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
     var g = GAMES.filter(function (x) { return x.p === prefix; })[0]; if (!g) return;
-    var name = document.title && document.title !== 'Board Games' ? document.title : g.n;
-    var msg = { topic: NTFY, title: 'Nuovo tavolo: ' + name, message: (nick || 'Qualcuno') + ' ha aperto un tavolo ed è in attesa di giocatori. Tocca per sederti.', click: urlFor(g, code), tags: ['game_die'] };
-    try { fetch('https://ntfy.sh/', { method: 'POST', mode: 'no-cors', keepalive: true, body: JSON.stringify(msg) }).catch(function () {}); } catch (e) {}
+    if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code }).catch(function (e) { console.warn('annuncio', e); });
   }
 
   if (enabled()) setTimeout(start, 1200);
-  return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables };
+  return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables,
+    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner };
+})();
+
+/* ===== Account (nome utente e password), amici e inviti — server Supabase =====
+   L'indirizzo del server sta in server.json (scritto dall'azione «Server» su GitHub). Finché il server
+   non è configurato, i giochi funzionano come prima, senza account. */
+var Account = (function () {
+  var A = window.Alerts || {}, ROOT = A.ROOT || './';
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function jget(k) { try { return JSON.parse(get(k) || 'null'); } catch (e) { return null; } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
+  var readyRes; var ready = new Promise(function (r) { readyRes = r; });
+
+  /* ---------- server ---------- */
+  function load() {
+    fetch(ROOT + 'server.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : (r.status === 404 ? false : null); }).then(function (j) {
+      if (j && j.url && j.anon) { cfg = j; set('pp-server', JSON.stringify(j)); }
+      else if (j === false) { cfg = null; set('pp-server', null); }
+      readyRes(); repaint(); check();
+    }, function () { readyRes(); });
+  }
+  function configured() { return !!(cfg && cfg.url); }
+  function rpc(fn, args) {
+    if (!configured()) return Promise.reject('Il server non è ancora attivo.');
+    return fetch(cfg.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: cfg.anon, Authorization: 'Bearer ' + cfg.anon, 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) })
+      .then(function (r) { return r.text().then(function (t) { var d = null; try { d = t ? JSON.parse(t) : null; } catch (e) { d = t; } if (!r.ok) throw (d && d.message) || 'Errore del server.'; if (d && d.error) throw d.error; return d; }); },
+        function () { throw 'Nessuna connessione con il server: riprova tra poco.'; })
+      .catch(function (e) { if (/Sessione scaduta/.test(String(e))) dropSession(); throw e; });
+  }
+  function notify(body) {
+    if (!configured() || !session) return Promise.reject('Accedi per mandare avvisi.');
+    body.token = session.token;
+    return fetch(cfg.fn, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok || d.error) throw d.error || 'Errore del server.'; return d; }); }, function () { throw 'Nessuna connessione con il server.'; })
+      .catch(function (e) { if (/Sessione scaduta/.test(String(e))) dropSession(); throw e; });
+  }
+
+  /* ---------- sessione ---------- */
+  function device() { var u = navigator.userAgent || ''; return (/Android/.test(u) ? 'Android' : /iPhone|iPad/.test(u) ? 'iPhone/iPad' : /Mac/.test(u) ? 'Mac' : /Windows/.test(u) ? 'Windows' : 'Browser') + (/Chrome/.test(u) ? ' Chrome' : /Safari/.test(u) ? ' Safari' : /Firefox/.test(u) ? ' Firefox' : ''); }
+  // Con l'account, l'identità al tavolo è la stessa su tutti i tuoi dispositivi.
+  function useIdentity(s) {
+    if (s) { if (!get('pp-uid-dev')) set('pp-uid-dev', get('pp-uid') || ''); set('pp-uid', 'p' + String(s.id).replace(/-/g, '').slice(0, 24)); if (!get('pp-nick')) set('pp-nick', s.username); }
+    else { var dev = get('pp-uid-dev'); if (dev) set('pp-uid', dev); set('pp-uid-dev', null); }
+  }
+  function setSession(s) { session = s; set('pp-session', s ? JSON.stringify(s) : null); useIdentity(s); }
+  function dropSession() { setSession(null); friendsData = null; repaint(); }
+  function check() { if (session && configured()) rpc('me', { p_token: session.token }).then(function (m) { if (m && m.username !== session.username) { session.username = m.username; set('pp-session', JSON.stringify(session)); repaint(); } refreshFriends(true); }, function () {}); }
+  function user() { return configured() && session ? session : null; }
+  function reloadSoon() { setTimeout(function () { location.reload(); }, 350); }
+
+  function login(u, p, isNew) {
+    return rpc(isNew ? 'register' : 'login', { p_username: u, p_password: p, p_device: device() }).then(function (s) {
+      setSession(s); set('pp-nick', s.username);
+      return (window.Alerts && Alerts.resync ? Alerts.resync() : Promise.resolve()).catch(function () {}).then(function () { close(); toastMsg(isNew ? 'Benvenuto, ' + s.username + '! Account creato.' : 'Bentornato, ' + s.username + '!'); reloadSoon(); });
+    });
+  }
+  function logout() {
+    var s = session; if (!s) return;
+    var p = window.Alerts && Alerts.forget ? Alerts.forget() : Promise.resolve();
+    p.catch(function () {}).then(function () { return rpc('logout', { p_token: s.token }).catch(function () {}); }).then(function () { setSession(null); close(); reloadSoon(); });
+  }
+
+  /* ---------- amici ---------- */
+  function refreshFriends(quiet) {
+    if (!user()) return Promise.resolve(null);
+    return rpc('friends', { p_token: session.token }).then(function (d) { friendsData = d; repaint(); if (!quiet) render(); return d; });
+  }
+  function incoming() { return friendsData && friendsData.incoming ? friendsData.incoming.length : 0; }
+  function addFriend(name) {
+    return notify({ kind: 'friend', to: name }).then(function (r) {
+      var t = r.state === 'accepted' ? 'Tu e ' + r.to + ' ora siete amici.' : r.state === 'already' ? 'Tu e ' + r.to + ' siete già amici.' : r.state === 'pending' ? 'Hai già chiesto l’amicizia a ' + r.to + ': aspetta che accetti.' : 'Richiesta inviata a ' + r.to + '.';
+      msg = { ok: true, t: t }; return refreshFriends();
+    });
+  }
+
+  /* ---------- grafica ---------- */
+  var CSS = '.pa-back{position:fixed;inset:0;z-index:95;background:rgba(5,8,12,.62);display:flex;align-items:flex-end;justify-content:center;animation:pafade .2s}' +
+    '@keyframes pafade{from{opacity:0}}@keyframes paup{from{transform:translateY(24px);opacity:0}}' +
+    '.pa-sheet{width:100%;max-width:520px;max-height:calc(92vh - env(safe-area-inset-top,0px));overflow-y:auto;background:#1b2128;color:#f1ece2;border:1px solid rgba(255,255,255,.12);border-bottom:0;border-radius:18px 18px 0 0;padding:18px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:grid;gap:12px;font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 -10px 30px rgba(0,0,0,.5);animation:paup .25s cubic-bezier(.2,.8,.2,1)}' +
+    '@media(min-width:640px){.pa-back{align-items:center}.pa-sheet{border-radius:18px;border-bottom:1px solid rgba(255,255,255,.12)}}' +
+    '.pa-sheet h2{margin:0;font-size:22px}.pa-sheet h3{margin:6px 0 0;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#e6c56f}.pa-sheet p{margin:0}.pa-note{font-size:13.5px;color:#b9b3a6}' +
+    '.pa-tabs{display:flex;gap:6px;background:rgba(255,255,255,.06);padding:4px;border-radius:12px}.pa-tabs button{flex:1;appearance:none;border:0;background:none;color:inherit;font:600 15px inherit;padding:9px;border-radius:9px;cursor:pointer}.pa-tabs button.on{background:#e6c56f;color:#231a06}' +
+    '.pa-sheet form{display:grid;gap:10px}.pa-sheet label{display:grid;gap:4px;font-size:14px;color:#cfc8ba}.pa-sheet input[type=text],.pa-sheet input[type=password]{font:16px system-ui,sans-serif;padding:11px 13px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#f3ecdc;color:#1c1813;min-height:44px}' +
+    '.pa-btn{appearance:none;border:0;border-radius:10px;min-height:44px;padding:10px 16px;font:700 15.5px system-ui,sans-serif;background:linear-gradient(180deg,#f0d58f,#d9b45a);color:#231a06;cursor:pointer}.pa-btn:disabled{opacity:.5}' +
+    '.pa-btn.g{background:rgba(255,255,255,.08);color:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}.pa-btn.s{min-height:34px;padding:6px 11px;font-size:14px}.pa-btn.r{background:#b6402e;color:#fff}' +
+    '.pa-err{color:#ff9b86;font-size:14.5px}.pa-ok{color:#9fdc95;font-size:14.5px}' +
+    '.pa-list{display:grid;gap:6px}.pa-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}.pa-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
+    '.pa-dot{width:9px;height:9px;border-radius:50%;background:#8a9097;flex:none}.pa-dot.on{background:#43d17c}' +
+    '.pa-chip{appearance:none;display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(230,197,111,.45);background:rgba(230,197,111,.1);color:inherit;border-radius:999px;padding:6px 12px;font:600 14px system-ui,sans-serif;cursor:pointer;position:relative}' +
+    '.pa-chip .n{background:#c4301f;color:#fff;border-radius:999px;font-size:11px;padding:0 6px;font-weight:800}.pa-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
+    '.pa-check{display:flex!important;flex-direction:row!important;gap:10px!important;align-items:center;font-size:15px!important;color:inherit!important;padding:4px 0}.pa-check input{width:20px;height:20px;accent-color:#e6c56f;flex:none}' +
+    '.pa-games{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 10px}.pa-sep{border:0;border-top:1px solid rgba(255,255,255,.1);margin:4px 0}' +
+    '.pa-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:99;background:#1b2128;color:#f1ece2;border:1px solid rgba(230,197,111,.5);padding:10px 14px;border-radius:12px;font:15px system-ui,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.5);max-width:min(92vw,460px)}';
+  function css() { if (!document.getElementById('pa-css')) { var s = document.createElement('style'); s.id = 'pa-css'; s.textContent = CSS; document.head.appendChild(s); } }
+  function toastMsg(t) { css(); var d = document.createElement('div'); d.className = 'pa-toast'; d.textContent = t; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3200); }
+  function close() { var m = document.querySelector('.pa-back'); if (m) m.remove(); view = null; msg = null; }
+  function open(v, extra) {
+    css(); view = { v: v || (user() ? 'account' : 'login'), x: extra || {} }; msg = null;
+    if (view.v !== 'login' && view.v !== 'register' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
+    render();
+    if (user() && (view.v === 'account' || view.v === 'invite')) refreshFriends().catch(function () {});
+  }
+  function render() {
+    if (!view) return;
+    var html = body(), back = document.querySelector('.pa-back');
+    if (!back) { back = document.createElement('div'); back.className = 'pa-back'; back.addEventListener('click', function (e) { if (e.target === back) close(); }); document.body.appendChild(back); }
+    var focused = document.activeElement && document.activeElement.name, vals = {};
+    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { vals[i.name] = i.value; });
+    back.innerHTML = '<div class="pa-sheet" role="dialog" aria-modal="true">' + html + '</div>';
+    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (vals[i.name] != null) i.value = vals[i.name]; });
+    var f = focused && back.querySelector('[name="' + focused + '"]'); if (f) f.focus();
+  }
+  function msgHTML() { return msg ? '<p class="' + (msg.ok ? 'pa-ok' : 'pa-err') + '" role="status">' + esc(msg.t) + '</p>' : ''; }
+  function body() {
+    var v = view.v, u = user();
+    if (!configured()) return '<h2>Account</h2><p>Il server dei giocatori non è ancora attivo: puoi continuare a giocare come sempre.</p><button class="pa-btn g" data-pa="close">Chiudi</button>';
+    if (v === 'login' || v === 'register') {
+      var reg = v === 'register';
+      return '<h2>' + (reg ? 'Crea il tuo account' : 'Entra in Board Games') + '</h2>' + (view.x.why ? '<p>' + esc(view.x.why) + '</p>' : '') +
+        '<div class="pa-tabs" role="tablist"><button type="button" class="' + (!reg ? 'on' : '') + '" data-pa="tab" data-v="login">Accedi</button><button type="button" class="' + (reg ? 'on' : '') + '" data-pa="tab" data-v="register">Registrati</button></div>' +
+        '<form data-pa-form="' + v + '" autocomplete="on"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>' +
+        '<label>Password<input type="password" name="p" maxlength="72" autocomplete="' + (reg ? 'new-password' : 'current-password') + '" required></label>' +
+        (reg ? '<label>Ripeti la password<input type="password" name="p2" maxlength="72" autocomplete="new-password" required></label>' : '') + msgHTML() +
+        '<button class="pa-btn" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : reg ? 'Crea account' : 'Accedi') + '</button></form>' +
+        '<p class="pa-note">' + (reg ? 'Da 3 a 18 caratteri tra lettere, numeri, punto e trattini. Niente email: la password non si può recuperare, quindi scrivila in un posto sicuro (il browser può ricordarla per te).' : 'Con l’account ritrovi amici, inviti e notifiche su tutti i tuoi dispositivi.') + '</p>' +
+        '<button class="pa-btn g" data-pa="close" type="button">' + (view.x.why ? 'Non ora' : 'Chiudi') + '</button>';
+    }
+    if (!u) return '';
+    if (v === 'invite') {
+      var x = view.x, fr = friendsData ? friendsData.friends : null;
+      return '<h2>Invita un amico</h2><p class="pa-note">Gli arriva una notifica: toccandola si siede al tavolo <b>' + esc(x.code) + '</b>.</p>' + msgHTML() +
+        (fr == null ? '<p class="pa-note">Carico i tuoi amici…</p>' : fr.length ? '<div class="pa-list">' + fr.map(function (f) {
+          var k = x.code + ':' + f.username, sent = inviteSent[k];
+          return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '" title="' + (f.online ? 'In linea di recente' : 'Non in linea') + '"></span><b>' + esc(f.username) + '</b><button class="pa-btn s' + (sent ? ' g' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato ✓' : 'Invita') + '</button></div>';
+        }).join('') + '</div>' : '<p>Non hai ancora amici nella lista.</p>') +
+        '<button class="pa-btn g" data-pa="go" data-v="account">Aggiungi amici</button><button class="pa-btn g" data-pa="close">Chiudi</button>';
+    }
+    // account
+    var d = friendsData, fr2 = d ? d.friends : [], inc = d ? d.incoming : [], out = d ? d.outgoing : [];
+    var h = '<h2>Ciao, ' + esc(u.username) + '</h2>' + msgHTML();
+    h += '<h3>Notifiche</h3>' + (window.Alerts && Alerts.settingsHTML ? Alerts.settingsHTML() : '');
+    h += '<hr class="pa-sep"><h3>Amici</h3>';
+    if (inc.length) h += '<div class="pa-list">' + inc.map(function (n) { return '<div class="pa-row"><b>' + esc(n) + ' vuole essere tuo amico</b><button class="pa-btn s" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button class="pa-btn s g" data-pa="decline" data-u="' + esc(n) + '">No</button></div>'; }).join('') + '</div>';
+    h += d == null ? '<p class="pa-note">Carico…</p>' : fr2.length ? '<div class="pa-list">' + fr2.map(function (f) { return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '"></span><b>' + esc(f.username) + '</b><button class="pa-btn s g" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici">Togli</button></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun amico per ora. Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica.</p>';
+    if (out.length) h += '<p class="pa-note">In attesa di risposta: ' + out.map(esc).join(', ') + '</p>';
+    h += '<form data-pa-form="friend" class="pa-bar"><input type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" style="flex:1;min-width:170px" required><button class="pa-btn s" type="submit">Aggiungi</button></form>';
+    h += '<hr class="pa-sep"><h3>Account</h3>';
+    if (view.x.pw) h += '<form data-pa-form="password"><label>Password attuale<input type="password" name="o" autocomplete="current-password" required></label><label>Nuova password<input type="password" name="n" autocomplete="new-password" required></label><button class="pa-btn s" type="submit">Cambia password</button></form>';
+    if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p><label>Password<input type="password" name="d" autocomplete="current-password" required></label><button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
+    h += '<div class="pa-bar">' + (view.x.pw ? '' : '<button class="pa-btn s g" data-pa="pw">Cambia password</button>') + '<button class="pa-btn s g" data-pa="logout">Esci</button>' + (view.x.del ? '' : '<button class="pa-btn s g" data-pa="del">Cancella account</button>') + '</div>';
+    return h + '<button class="pa-btn g" data-pa="close">Chiudi</button>';
+  }
+  function repaint() {
+    document.querySelectorAll('[data-pa-chip]').forEach(function (e) { e.outerHTML = chipHTML(); });
+    if (window.Alerts && Alerts.controlHTML) document.querySelectorAll('.ppa-ctl').forEach(function (e) { e.outerHTML = Alerts.controlHTML(); });
+  }
+  function chipHTML() {
+    css(); if (!configured()) return '<span data-pa-chip hidden></span>';
+    var u = user();
+    if (!u) return '<span data-pa-chip class="pa-bar"><button type="button" class="pa-chip" data-pa="open" data-v="login">👤 Accedi o registrati</button></span>';
+    var n = incoming();
+    return '<span data-pa-chip class="pa-bar"><button type="button" class="pa-chip" data-pa="open" data-v="account">👤 ' + esc(u.username) + (n ? ' <span class="n" title="Richieste di amicizia">' + n + '</span>' : '') + '</button></span>';
+  }
+  function inviteHTML() {
+    if (!user()) return '';
+    return '<button type="button" class="pa-chip" data-pa="openinvite">✉ Invita un amico</button>';
+  }
+  // Prima di sedersi a un tavolo: con il server attivo serve l'account.
+  function allow() {
+    if (!configured() || user()) return true;
+    open('login', { why: 'Per giocare serve un account: è gratis, basta un nome utente e una password.' });
+    return false;
+  }
+  function allowQuiet() { return !configured() || !!user(); }
+  function gameId() { var h = A.here; return h ? h.path.replace(/\/$/, '') : null; }
+
+  /* ---------- eventi ---------- */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pa]'); if (!b || b.disabled) return;
+    var k = b.getAttribute('data-pa'), uname = b.getAttribute('data-u');
+    if (k === 'open') { e.preventDefault(); open(b.getAttribute('data-v')); }
+    else if (k === 'close') close();
+    else if (k === 'tab' || k === 'go') { view = { v: b.getAttribute('data-v'), x: {} }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); }
+    else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
+    else if (k === 'invite') {
+      b.disabled = true;
+      notify({ kind: 'invite', to: uname, game: view.x.game, code: view.x.code }).then(function (r) { inviteSent[view.x.code + ':' + uname] = 1; msg = { ok: true, t: r.sent ? 'Invito mandato a ' + uname + '.' : uname + ' non ha le notifiche attive: mandagli il codice ' + view.x.code + '.' }; render(); },
+        function (er) { msg = { t: String(er) }; render(); });
+    }
+    else if (k === 'accept') addFriend(uname).catch(function (er) { msg = { t: String(er) }; render(); });
+    else if (k === 'decline') rpc('friend_respond', { p_token: session.token, p_username: uname, p_accept: false }).then(function () { return refreshFriends(); }).catch(function (er) { msg = { t: String(er) }; render(); });
+    else if (k === 'unfriend') rpc('friend_remove', { p_token: session.token, p_username: uname }).then(function () { msg = { ok: true, t: uname + ' non è più nei tuoi amici.' }; return refreshFriends(); }).catch(function (er) { msg = { t: String(er) }; render(); });
+    else if (k === 'pw') { view.x.pw = true; render(); }
+    else if (k === 'del') { view.x.del = true; render(); }
+    else if (k === 'logout') logout();
+  });
+  document.addEventListener('submit', function (e) {
+    var f = e.target.closest('[data-pa-form]'); if (!f) return;
+    e.preventDefault(); var k = f.getAttribute('data-pa-form'), v = function (n) { var i = f.querySelector('[name="' + n + '"]'); return i ? i.value : ''; };
+    if (k === 'login' || k === 'register') {
+      if (k === 'register' && v('p') !== v('p2')) { msg = { t: 'Le due password non coincidono.' }; render(); return; }
+      busy = true; msg = null; render();
+      login(v('u').trim(), v('p'), k === 'register').catch(function (er) { msg = { t: String(er) }; }).then(function () { busy = false; render(); });
+    } else if (k === 'friend') {
+      addFriend(v('f').trim()).then(function () { var i = document.querySelector('[name="f"]'); if (i) i.value = ''; }, function (er) { msg = { t: String(er) }; render(); });
+    } else if (k === 'password') {
+      rpc('change_password', { p_token: session.token, p_old: v('o'), p_new: v('n') }).then(function () { view.x.pw = false; msg = { ok: true, t: 'Password cambiata. Gli altri dispositivi dovranno accedere di nuovo.' }; render(); }, function (er) { msg = { t: String(er) }; render(); });
+    } else if (k === 'delete') {
+      var s = session;
+      (window.Alerts && Alerts.forget ? Alerts.forget() : Promise.resolve()).catch(function () {}).then(function () { return rpc('delete_account', { p_token: s.token, p_password: v('d') }); })
+        .then(function () { setSession(null); close(); toastMsg('Account cancellato.'); reloadSoon(); }, function (er) { msg = { t: String(er) }; render(); });
+    }
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && view) close(); });
+  // link dalle notifiche: ?amici=1 apre la lista degli amici
+  if (/[?&]amici=1/.test(location.search)) ready.then(function () { if (user()) open('account'); });
+
+  load();
+  return { ready: ready, configured: configured, user: user, open: open, close: close, allow: allow, allowQuiet: allowQuiet, chipHTML: chipHTML, inviteHTML: inviteHTML,
+    rpc: rpc, notify: notify, refreshFriends: refreshFriends, toast: toastMsg, get config() { return cfg; }, get token() { return session && session.token; }, render: render };
 })();
 
 /* ===== Binari d'Italia: suoni (carte, binari, fischio, campanella) ===== */
@@ -2875,6 +3197,7 @@ Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il 
 async function run(p) { if (App.busy) return; App.busy = true; paintBusy(); try { await p(); } catch (e) { toast(esc(typeof e === 'string' ? e : (e && e.message) || 'Qualcosa è andato storto. Riprova.'), 'bad'); Sound.play('error'); } finally { App.busy = false; paintBusy(); if (App.screen !== 'table' || !G()) render(); } }
 function paintBusy() { document.body.classList.toggle('busy', !!App.busy); }
 function requireNick() {
+  if (window.Account && !Account.allow()) return null; // con il server attivo serve l'account
   var n = ($('#nick') && $('#nick').value.trim()) || myNick();
   if (!n) { toast('Scrivi il tuo nome.'); if ($('#nick')) { $('#nick').focus(); $('#nick').scrollIntoView({ block: 'center' }); } return null; }
   lsSet('pp-nick', n.slice(0, 18)); return n.slice(0, 18);
@@ -3463,7 +3786,7 @@ document.addEventListener('keydown', function (e) {
   App.showCan = lsGet('bi-can') !== '0';
   var q = new URLSearchParams(location.search), t = (q.get('t') || '').toUpperCase(), last = lsGet(KEY_TABLE);
   if (/^[A-Z]{4}$/.test(t)) {
-    if (t === last || myNick()) { App.status = 'Mi siedo al tavolo ' + t + '…'; run(function () { return enterTable(t, myNick() || null); }); }
+    if ((t === last || myNick()) && (!window.Account || Account.allowQuiet())) { App.status = 'Mi siedo al tavolo ' + t + '…'; run(function () { return enterTable(t, myNick() || null); }); }
     else App.inviteCode = t;
   } else if (last && /^[A-Z]{4}$/.test(last)) { App.status = 'Rientro al tavolo ' + last + '…'; run(function () { return enterTable(last, null); }); }
   render();

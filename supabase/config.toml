@@ -1,0 +1,5 @@
+# Configurazione minima per la CLI di Supabase (il progetto vero si collega con il codice nei segreti di GitHub).
+project_id = "board-games"
+
+[functions.notify]
+verify_jwt = false
