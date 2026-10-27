@@ -83,4 +83,4 @@ function handle(c, h, body) {
   else if (type === 14) c.sock.end();
 }
 server.listen(PORT, () => console.log('broker+static on', PORT));
-setInterval(() => fs.writeFileSync(path.join(__dirname, 'broker-stats.json'), JSON.stringify({ ...stats, retained: retained.size, clients: clients.size })), 1000);
+if (process.env.OUT) setInterval(() => fs.writeFileSync(path.join(process.env.OUT, 'broker-stats.json'), JSON.stringify({ ...stats, retained: retained.size, clients: clients.size })), 1000);
