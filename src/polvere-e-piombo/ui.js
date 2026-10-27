@@ -167,7 +167,7 @@ async function enterTable(code, nick) {
     if (!doc) { Lobby.forget(code); if (App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
     App.doc = doc; onDoc();
   }, function () {
-    var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost;
+    var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost + ':' + Net.presenceSig();
     if (sig !== App.netSig) { App.netSig = sig; render(); }
   });
   if (ok !== true) {
@@ -322,7 +322,7 @@ function roomHTML() {
   var seats = '';
   for (var i = 0; i < 7; i++) {
     var s = d.seats[i];
-    if (s) seats += '<div class="seat full"><div class="ava">' + esc(s.nick.charAt(0).toUpperCase()) + '</div><div><div class="nm">' + esc(s.nick) + '</div><div class="sub">' + (s.bot ? 'pistolero automatico' : s.uid === d.host ? 'host' : 'giocatore') + (s.uid === Net.uid ? ' · tu' : '') + '</div></div>' +
+    if (s) seats += '<div class="seat full"><div class="ava">' + esc(s.nick.charAt(0).toUpperCase()) + '</div><div><div class="nm">' + Net.dot(s.uid) + esc(s.nick) + Net.offTag(s.uid) + '</div><div class="sub">' + (s.bot ? 'pistolero automatico' : s.uid === d.host ? 'host' : 'giocatore') + (s.uid === Net.uid ? ' · tu' : '') + '</div></div>' +
       ((isHost && s.uid !== Net.uid) || (s.uid === Net.uid && !isHost) ? '<button class="x" data-act="kick" data-uid="' + esc(s.uid) + '" aria-label="Togli ' + esc(s.nick) + '">×</button>' : '') + '</div>';
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
@@ -361,7 +361,7 @@ function plateHTML(g, i, me, targets) {
   var ribbon = deciding ? '<span class="ribbon dec">deve rispondere</span>' : isTurn ? '<span class="ribbon">di turno</span>' : '';
   return '<div class="' + cls.join(' ') + '" data-plate="' + i + '" role="button" tabindex="0" aria-label="' + esc(P.nick) + ', ' + C.n + '">' + ribbon + '<span class="nail"></span>' +
     '<div class="ph" style="background-image:url(img/f-' + P.char + '.jpg)">' + (jail ? '<span class="bars" title="In gattabuia"></span>' : '') + role + '</div>' +
-    '<div class="hd"><span class="nick">' + esc(P.nick) + '</span>' + (P.bot ? '<span class="auto">auto</span>' : '') + '</div>' +
+    '<div class="hd"><span class="nick">' + Net.dot(P.uid) + esc(P.nick) + '</span>' + (P.bot ? '<span class="auto">auto</span>' : '') + '</div>' +
     '<div class="chr">' + C.n + ' · ' + C.title + '</div>' +
     '<div class="pow">' + C.s + '</div>' +
     '<div class="stats">' + hpHTML(P) + '<span class="handct" title="Carte in mano"><b></b>' + P.hand.length + '</span>' + (P.alive ? '<span class="wpn" title="Portata della sua arma">arma <b>' + E.range(P) + '</b></span>' : '') + dist + '</div>' +

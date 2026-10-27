@@ -1,8 +1,9 @@
 /* ===== Timer di turno (condiviso): se un giocatore non fa niente per troppo tempo,
    l'host lo fa giocare in automatico finché non torna. ===== */
 var Turns = (function () {
-  var cfg = null, lastKey = null, timer = null;
+  var cfg = null, lastKey = null, timer = null, offKey = null;
   var DEFAULT = 60;
+  var OFF_MS = +(new URLSearchParams(location.search).get('offMs') || 45000); // giocatore offline da così tanto al suo turno: gioca l'automatico
   function secs(doc) { var t = doc && doc.opts && doc.opts.timer; return t == null ? DEFAULT : +t; }
   // cfg: { decider(game) -> indice|null, onTimeout(doc, indice) -> true se ha cambiato qualcosa }
   function setup(c) {
@@ -33,10 +34,26 @@ var Turns = (function () {
       });
     }, wait);
   }
+  // Solo sull'host: tocca a un giocatore che ha chiuso l'app o perso la rete da un po'? Gioca l'automatico per lui,
+  // anche se il tavolo non ha limite di tempo (altrimenti la partita resterebbe ferma per sempre). Al suo ritorno riprende lui.
+  function offlineCheck(doc) {
+    if (!cfg || !Net.isHost || !Net.connected || !doc || !doc.game || doc.phase !== 'play' || !doc.turnKey || doc.turnKey === offKey) return;
+    var d = cfg.decider(doc.game), P = d == null ? null : doc.game.players[d];
+    if (!P || P.bot || !P.uid || P.uid === Net.uid || Net.presence(P.uid) !== 'off' || Net.offlineFor(P.uid) < OFF_MS) return;
+    if (Date.now() - (doc.turnSince || 0) < 15000) return;
+    var key = doc.turnKey; offKey = key;
+    Net.hostApply(function (cur) {
+      if (!cur.game || cur.phase !== 'play' || cur.turnKey !== key) return false;
+      var dd = cfg.decider(cur.game);
+      if (dd !== d || cur.game.players[dd].bot) return false;
+      return cfg.onTimeout(cur, dd);
+    });
+  }
   // Conto alla rovescia visibile a chi deve giocare (elemento #tt), solo negli ultimi 20 secondi.
   function tick() {
-    var el = document.getElementById('tt'); if (!el) return;
     var doc = App.doc, s = secs(doc);
+    offlineCheck(doc);
+    var el = document.getElementById('tt'); if (!el) return;
     if (!doc || !doc.turnSince || !s) { el.textContent = ''; return; }
     var rem = Math.ceil((doc.turnSince + s * 1000 - Date.now()) / 1000);
     el.textContent = rem > 0 && rem <= 20 ? ' Ancora ' + rem + ' s, poi gioca l’automatico.' : '';

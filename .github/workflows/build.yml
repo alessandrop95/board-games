@@ -1,8 +1,10 @@
 name: Ricostruisci i giochi
 # A ogni modifica dei sorgenti (anche fatta dal telefono su github.com) rigenera le pagine dei giochi
 # con build.py, le salva nel repository e fa ripartire la pubblicazione su GitHub Pages.
-# Si rigenerano SOLO i giochi i cui sorgenti (src/<gioco>/) sono cambiati: le pagine degli altri giochi
-# restano esattamente come sono, anche se sono state modificate a mano.
+# Si rigenerano solo i giochi i cui sorgenti sono cambiati (src/<gioco>/, o src/shared/ e build.py per tutti).
+# Protezione delle modifiche a mano: se una pagina è stata cambiata direttamente (non è identica a quella che
+# build.py produceva dai sorgenti di quel momento), NON viene sovrascritta e compare un avviso: riporta la modifica
+# anche in src/ e la pagina tornerà ad aggiornarsi da sola.
 on:
   push:
     branches: [main]
@@ -44,9 +46,20 @@ jobs:
             for g in polvere-e-piombo presagio gattomina campi-acciaio; do
               if echo "$changed" | grep -q "^src/$g/"; then games="$games $g"; fi
             done
-            # build.py o le parti condivise: si ricostruisce solo Campi d'Acciaio (gli altri giochi restano come sono)
-            if echo "$changed" | grep -q -e "^src/shared/" -e "^build.py$"; then case " $games " in *" campi-acciaio "*) ;; *) games="$games campi-acciaio";; esac; fi
+            # build.py o le parti condivise: si ricostruiscono tutti i giochi
+            if echo "$changed" | grep -q -e "^src/shared/" -e "^build.py$"; then games="polvere-e-piombo presagio gattomina campi-acciaio"; fi
           fi
+          safe=""
+          for g in $games; do
+            last=$(git log -1 --format=%H -- "$g/index.html")
+            if [ -z "$last" ]; then safe="$safe $g"; continue; fi
+            rm -rf /tmp/wt; git worktree add -q --detach /tmp/wt "$last"
+            (cd /tmp/wt && python3 build.py >/dev/null 2>&1 || true)
+            if cmp -s "/tmp/wt/$g/index.html" <(git show "$last:$g/index.html"); then safe="$safe $g"
+            else echo "::warning::La pagina $g/index.html è stata modificata a mano: non la ricostruisco per non perdere le tue modifiche. Riporta la modifica anche nei file in src/$g/ (o in build.py) e la pagina tornerà ad aggiornarsi da sola."; fi
+            git worktree remove --force /tmp/wt
+          done
+          games="$safe"
           echo "Giochi da ricostruire:$games"
           echo "games=$games" >> "$GITHUB_OUTPUT"
       - name: Genera le pagine

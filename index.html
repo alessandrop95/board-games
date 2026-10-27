@@ -37,6 +37,11 @@ p { margin: 0; color: var(--muted); }
   <header><h1>Board Games</h1></header>
   <p>Giochi da tavolo da fare online con gli amici, ognuno dal proprio telefono. Niente account: apri un tavolo e manda il link.</p>
   <div id="install-slot"></div>
+  <section style="display:grid;gap:10px">
+    <h2 style="font:400 24px/1.1 'Sancreek',Georgia,serif;margin:0">Tavoli aperti adesso</h2>
+    <div id="open-tables"><p>Cerco i tavoli aperti…</p></div>
+    <div id="alerts-slot"></div>
+  </section>
   <a class="game" href="polvere-e-piombo/">
     <img src="polvere-e-piombo/icon-180.png" alt="">
     <div>
@@ -72,5 +77,8 @@ p { margin: 0; color: var(--muted); }
 </main>
 <script src="src/shared/install.js"></script>
 <script>document.getElementById('install-slot').innerHTML = PWA.buttonHTML('install');</script>
+<script src="src/shared/net.js"></script>
+<script src="src/shared/alerts.js"></script>
+<script>document.getElementById('alerts-slot').innerHTML = Alerts.controlHTML(); Alerts.mountHome(document.getElementById('open-tables'));</script>
 </body>
 </html>

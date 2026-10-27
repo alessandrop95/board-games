@@ -142,13 +142,28 @@ var Net = (function () {
   var AUTO_TAKEOVER = +(qs.get('autoTakeover') || HOST_TIMEOUT * 1.5); // dopo quanto subentrare da soli
   var STAGGER = +(qs.get('stagger') || 6000);                     // attesa extra per ogni giocatore prima di me
   var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
-  var uid = lsGet('pp-uid');
-  if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); lsSet('pp-uid', uid); }
+  var uid = null; try { uid = localStorage.getItem('pp-uid'); } catch (e) {}
+  if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); try { localStorage.setItem('pp-uid', uid); } catch (e) {} }
   var clients = {}, reducer = null, beforePublish = null, onTakeover = null, lobbyInfo = null;
   var LOBBY_BEAT = +(qs.get('lobbyBeat') || 20000);   // ogni quanto l'host conferma che il tavolo è vivo
   var LOBBY_TTL = +(qs.get('lobbyTtl') || 150000);    // oltre questo silenzio il tavolo sparisce dalla lista
   var FIND_MS = +(qs.get('findMs') || 4500);          // attesa massima della risposta quando si cerca un tavolo
+  var PRES_MS = +(qs.get('presMs') || 35000);       // oltre questo silenzio un giocatore risulta offline
   function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
+  /* Stesso tavolo aperto in due schede dello stesso telefono/computer: resta attiva solo l'ultima aperta
+     (due schede con la stessa identità applicherebbero le mosse due volte e la partita si sdoppierebbe). */
+  var TAB = Math.random().toString(36).slice(2, 10), bc = null;
+  try { bc = new BroadcastChannel('pp-tables'); bc.onmessage = function (ev) { var m = ev.data || {}; if (m.k === 'open' && T && m.tab !== TAB && m.key === PREFIX + T.code) displaced(); }; } catch (e) { bc = null; }
+  function displaced() {
+    close({ quiet: true });
+    if (document.getElementById('pp-displaced')) return;
+    var o = document.createElement('div'); o.id = 'pp-displaced';
+    o.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:24px;background:rgba(8,8,12,.86);color:#fff;font:16px/1.45 system-ui,sans-serif;text-align:center');
+    o.innerHTML = '<div style="max-width:340px;display:grid;gap:14px"><b style="font-size:19px">Tavolo aperto in un’altra scheda</b><span>Hai aperto lo stesso tavolo in un’altra scheda o finestra: si gioca da lì. Qui il tavolo è in pausa.</span>' +
+      '<button type="button" style="font:inherit;font-weight:700;padding:12px 18px;border-radius:12px;border:0;background:#f2c14e;color:#111;cursor:pointer">Gioca da questa scheda</button></div>';
+    o.querySelector('button').onclick = function () { location.reload(); };
+    document.body.appendChild(o);
+  }
   function rid() { return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 6); }
   var T = null; // sessione del tavolo aperto
 
@@ -164,7 +179,7 @@ var Net = (function () {
   // Ritorno in primo piano o rete di nuovo disponibile: verifica subito la connessione.
   function wakeAll() {
     Object.keys(clients).forEach(function (k) { clients[k].wake(); });
-    if (T) { T.lastPing = Math.max(T.lastPing, Date.now() - 2000); T.graceUntil = Date.now() + 8000; }
+    if (T) { T.lastPing = Math.max(T.lastPing, Date.now() - 2000); T.graceUntil = Date.now() + 8000; heartbeat(T, true); }
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wakeAll(); });
   window.addEventListener('online', wakeAll);
@@ -219,6 +234,7 @@ var Net = (function () {
       var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
         vis: opts && opts.vis === 'invite' ? 'invite' : 'public', lobbyId: rid() };
       if (!b.c.publish(topic(code, 'state'), JSON.stringify(doc), true)) throw 'La connessione è caduta. Riprova.';
+      if (window.Alerts) Alerts.created(PREFIX, code, nick, doc.vis);
       return code;
     }
     throw 'Non sono riuscito a creare il tavolo. Riprova.';
@@ -231,16 +247,17 @@ var Net = (function () {
     if (f && f.offline) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     var c = f.c;
-    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], seenRev: 0, graceUntil: 0, chat: [], chatIds: {} };
+    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], graceUntil: 0, chat: [], chatIds: {},
+      seen: {}, upSince: Date.now(), lastHb: 0, resync: false, unpub: false, hostRev: 0 };
     var me = T;
-    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog');
+    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb');
     me.handler = function (t, p) {
       if (T !== me) return;
       if (t === tState) {
         if (!p) { me.doc = null; onDoc(null); return; }
         var d = safeParse(p); if (!d) return;
         if (d.closed) { if (!me.doc || (d.rev || 0) >= (me.doc.rev || 0)) { me.doc = null; me.closed = true; onDoc(null); } return; }
-        me.seenRev = Math.max(me.seenRev, d.rev || 0);
+        if (me.resync) { endResync(me, d); return; }
         if (me.doc) {
           var dr = d.rev || 0, mr = me.doc.rev || 0;
           // stessa versione ma host diverso (due subentri quasi simultanei): vince l'id più basso
@@ -249,18 +266,21 @@ var Net = (function () {
         }
         me.lastPing = Date.now();
         accept(d);
-      } else if (t === tPing) { me.lastPing = Date.now(); }
+      } else if (t === tPing) { me.lastPing = Date.now(); if (me.doc) me.seen[me.doc.host] = Date.now(); }
+      else if (t === tHb) { var hu = String(p || '').slice(0, 40); if (hu) me.seen[hu] = Date.now(); }
       else if (t === tRes) {
         var r = safeParse(p); if (!r || !me.pending[r.id]) return;
         var pd = me.pending[r.id]; delete me.pending[r.id]; clearInterval(pd.timer);
         if (r.err) pd.rej(r.err); else pd.res(r.out || null);
       } else if (t === tChat) {
-        if (addChat(me, safeParse(p), false) && me.isHost) saveChatLog(me);
+        var cm = safeParse(p); if (cm && cm.uid) me.seen[String(cm.uid).slice(0, 40)] = Date.now();
+        if (addChat(me, cm, false) && me.isHost) saveChatLog(me);
       } else if (t === tLog) {
         var arr = p ? safeParse(p) : null;
         if (Array.isArray(arr)) arr.forEach(function (m) { addChat(me, m, true); });
-      } else if (t === tAct && me.isHost) {
+      } else if (t === tAct && me.isHost && !me.resync) {
         var m = safeParse(p); if (!m || !m.id || !m.from) return;
+        me.seen[String(m.from).slice(0, 40)] = Date.now();
         hostHandle(m);
       }
     };
@@ -269,29 +289,76 @@ var Net = (function () {
       if (T !== me) return;
       me.up = up;
       if (up) {
-        me.lastPing = Date.now(); me.seenRev = 0; me.graceUntil = Date.now() + 8000;
-        // Host appena ricollegato: se nel frattempo nessuno ha pubblicato uno stato più nuovo, ripubblica il proprio.
-        setTimeout(function () {
-          if (T === me && me.isHost && me.up && me.doc && me.seenRev < (me.doc.rev || 0)) me.c.publish(tState, JSON.stringify(me.doc), true);
-        }, 1500);
+        me.lastPing = Date.now(); me.graceUntil = Date.now() + 8000; me.upSince = Date.now();
+        // Appena ricollegati si aspetta lo stato salvato sul server prima di pubblicare qualsiasi cosa:
+        // se intanto un altro giocatore ha preso il comando, vale il suo stato (vedi endResync).
+        me.resync = true; clearTimeout(me.resyncTimer);
+        me.resyncTimer = setTimeout(function () { if (T === me) endResync(me, null); }, 2500);
+        heartbeat(me, true);
       }
       if (onStatus) onStatus();
     };
     c.onStatus(me.statusFn);
-    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat);
+    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb);
     accept(f.doc);
+    heartbeat(me, true);
+    if (bc) { try { bc.postMessage({ k: 'open', key: PREFIX + code, tab: TAB }); } catch (e) {} }
     me.timers.push(setInterval(function () {
       if (T !== me) return;
+      heartbeat(me, false);
       if (me.isHost) { c.publish(tPing, String(Date.now()), false); if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true); }
       else maybeTakeOver(me);
       if (onStatus) onStatus();
     }, Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4))));
     return true;
   }
+  // Fine della risincronizzazione dopo una disconnessione. d = stato trovato sul server (o null se non è arrivato).
+  function endResync(me, d) {
+    if (!me.resync) return;
+    me.resync = false; clearTimeout(me.resyncTimer);
+    // Ero l'host ma sul server c'è uno stato pubblicato da un altro dopo che avevo preso il comando:
+    // mentre ero via qualcuno è subentrato. Vale il suo stato; le mie modifiche fatte offline si scartano.
+    if (d && me.isHost && d.host !== uid && (d.rev || 0) >= (me.hostRev || 0)) { me.unpub = false; me.lastPing = Date.now(); accept(d); return; }
+    if (d && (!me.doc || (d.rev || 0) > (me.doc.rev || 0))) { me.lastPing = Date.now(); accept(d); return; }
+    // Sono l'host e il server ha uno stato più vecchio del mio (o niente): pubblico il mio.
+    if (me.isHost && me.doc && (me.unpub || !d || (d.rev || 0) < (me.doc.rev || 0))) flush(me);
+  }
+  function flush(me) {
+    me.doc.updated = Date.now();
+    me.unpub = !(me.up && me.c.publish(topic(me.code, 'state'), JSON.stringify(me.doc), true));
+    if (!me.unpub) announce(true);
+  }
+  // Segnale di presenza: ogni giocatore lo manda ogni 10 secondi finché ha la pagina aperta e collegata.
+  function heartbeat(me, now) {
+    if (!me.up || (!now && Date.now() - me.lastHb < 10000)) return;
+    if (me.c.publish(topic(me.code, 'hb'), uid, false)) me.lastHb = Date.now();
+  }
+  // 'on' = collegato adesso, 'off' = non si sente da un po', null = non si sa ancora (appena entrati o offline noi).
+  function presence(u) {
+    if (!T || !u || /^bot-/.test(u)) return null;
+    if (u === uid) return T.up ? 'on' : 'off';
+    var s = T.seen[u], now = Date.now();
+    if (s && now - s < PRES_MS) return 'on';
+    if (!T.up || T.resync || now - T.upSince < PRES_MS) return null;
+    return 'off';
+  }
+  function offlineFor(u) { if (!T) return 0; return presence(u) === 'off' ? Date.now() - Math.max(T.seen[u] || 0, T.upSince) + PRES_MS : 0; }
+  var presCss = false;
+  function dot(u) {
+    var st = presence(u); if (!st) return '';
+    if (!presCss) {
+      presCss = true; var el = document.createElement('style');
+      el.textContent = '.pres{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 6px 1px 0;vertical-align:middle;flex:none}.pres-on{background:#3fd27a;box-shadow:0 0 0 2px rgba(63,210,122,.25)}.pres-off{background:#9aa0a8;box-shadow:0 0 0 2px rgba(154,160,168,.2)}.pres-t{font-size:.78em;opacity:.75;margin-left:6px;font-weight:400;white-space:nowrap}';
+      document.head.appendChild(el);
+    }
+    return '<i class="pres pres-' + st + '" title="' + (st === 'on' ? 'Collegato' : 'Offline') + '" aria-hidden="true"></i>';
+  }
+  function offTag(u) { return presence(u) === 'off' ? '<span class="pres-t">offline</span>' : ''; }
+  function presenceSig() { if (!T || !T.doc) return ''; return T.doc.seats.map(function (s) { return s.bot ? '' : presence(s.uid) || '-'; }).join(''); }
   // Subentro automatico: solo un giocatore seduto, collegato e con la pagina aperta.
   // Per evitare due subentri insieme, ognuno aspetta in più in base al suo posto.
   function maybeTakeOver(me) {
-    if (!me.doc || me.closed || !me.up || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
+    if (!me.doc || me.closed || !me.up || me.resync || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
     var humans = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== me.doc.host; }).map(function (s) { return s.uid; });
     var rank = humans.indexOf(uid);
     if (rank < 0) return;
@@ -302,19 +369,20 @@ var Net = (function () {
   function accept(d) {
     T.doc = d;
     var shouldHost = d.host === uid;
-    if (shouldHost && !T.isHost) { T.isHost = true; T.c.subscribe(topic(T.code, 'act')); T.c.publish(topic(T.code, 'ping'), String(Date.now()), false); }
+    if (shouldHost && !T.isHost) { T.isHost = true; T.hostRev = d.rev || 0; T.c.subscribe(topic(T.code, 'act')); T.c.publish(topic(T.code, 'ping'), String(Date.now()), false); }
     if (!shouldHost && T.isHost) { T.isHost = false; T.c.unsubscribe(topic(T.code, 'act')); }
     if (T.isHost && !d.lobbyId) { setTimeout(function () { hostApply(function (w) { if (w.lobbyId) return false; w.lobbyId = rid(); w.vis = w.vis || 'public'; return true; }); }, 0); }
-    else if (T.isHost) announce(false);
+    else if (T.isHost && !T.unpub && !T.resync) announce(false);
     T.onDoc(JSON.parse(JSON.stringify(d)));
   }
   // Annuncio del tavolo nella lista pubblica (messaggio "retained" per tavolo, aggiornato dall'host).
   // I tavoli "solo su invito" compaiono senza codice.
   function announce(force) {
-    if (!T || !T.isHost || !T.doc || !T.doc.lobbyId) return;
+    if (!T || !T.isHost || !T.doc || !T.doc.lobbyId || !T.up) return;
     var d = T.doc, info = lobbyInfo ? lobbyInfo(d) : {}, vis = d.vis === 'invite' ? 'invite' : 'public';
     var host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
-    var e = { v: 1, id: d.lobbyId, vis: vis, code: vis === 'public' ? d.code : null, host: host ? host.nick : '', n: d.seats.length, max: info.max || null, phase: d.phase, note: info.note || '', t: Date.now() };
+    var e = { v: 1, id: d.lobbyId, vis: vis, code: vis === 'public' ? d.code : null, host: host ? host.nick : '', n: d.seats.length, max: info.max || null, phase: d.phase, note: info.note || '', t: Date.now(),
+      c: d.created || null, g: String(document.title || '').slice(0, 30) };
     var sig = JSON.stringify([e.vis, e.code, e.host, e.n, e.phase, e.note]);
     if (!force && sig === T.lobbySig) return;
     if (T.c.publish(lobbyTopic(d.lobbyId), JSON.stringify(e), true)) { T.lobbySig = sig; T.lastAnn = Date.now(); }
@@ -345,6 +413,7 @@ var Net = (function () {
         if (!e || e.id !== id || typeof e.t !== 'number') return;
         if (retained && Date.now() - e.t > 3600e3) { c.publish(t, '', true); return; } // pulizia dei tavoli abbandonati da tempo
         e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
+        if (retained && e.t > Date.now()) e.t = Date.now(); // orologio dell'host avanti: il tavolo non resta in lista più del dovuto
         var old = items[id];
         if (old && old.t > e.t) return;
         e.rx = retained ? (old && old.rx) : Date.now(); // conferma arrivata adesso: vale anche se gli orologi dei telefoni non coincidono
@@ -361,10 +430,12 @@ var Net = (function () {
     var iv = setInterval(emit, 10000);
     return function () { stopped = true; clearInterval(iv); attached.forEach(function (a) { a.c.handlers = a.c.handlers.filter(function (x) { return x !== a.h; }); a.c.unsubscribe(filt); }); };
   }
+  // L'host applica sempre la modifica sul suo telefono; la pubblica solo se è collegato e sincronizzato.
+  // Se non può (offline o appena ricollegato), la tiene da parte: endResync decide poi se pubblicarla o scartarla.
   function publishState() {
     if (beforePublish) beforePublish(T.doc);
     T.doc.rev = (T.doc.rev || 0) + 1; T.doc.updated = Date.now();
-    T.c.publish(topic(T.code, 'state'), JSON.stringify(T.doc), true);
+    T.unpub = !(T.up && !T.resync && T.c.publish(topic(T.code, 'state'), JSON.stringify(T.doc), true));
     accept(T.doc);
   }
   function hostHandle(m) {
@@ -455,12 +526,23 @@ var Net = (function () {
     if (addChat(T, m, false) && T.isHost) saveChatLog(T);
     return true;
   }
-  function close() {
+  function close(opts) {
     if (!T) return;
-    var me = T; T = null;
+    var me = T;
+    // L'host esce durante la partita: passa subito il comando a un giocatore collegato invece di farlo aspettare.
+    if (!(opts && opts.quiet) && me.isHost && me.up && !me.resync && !me.closed && me.doc && me.doc.phase !== 'lobby') {
+      var next = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== uid && presence(s.uid) === 'on'; })[0];
+      if (next) {
+        var w = JSON.parse(JSON.stringify(me.doc)); w.host = next.uid;
+        if (beforePublish) beforePublish(w);
+        w.rev = (w.rev || 0) + 1; w.updated = Date.now();
+        me.c.publish(topic(me.code, 'state'), JSON.stringify(w), true);
+      }
+    }
+    T = null; clearTimeout(me.resyncTimer);
     me.timers.forEach(clearInterval);
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
-    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
     me.c.handlers = me.c.handlers.filter(function (h) { return h !== me.handler; });
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
@@ -475,6 +557,8 @@ var Net = (function () {
     get isHost() { return !!(T && T.isHost); },
     get connected() { return !!(T && T.up); },
     hostAlive: function () { return !T || T.isHost || Date.now() - T.lastPing < HOST_TIMEOUT; },
+    presence: presence, offlineFor: offlineFor, dot: dot, offTag: offTag, presenceSig: presenceSig,
+    _client: function (i) { return client(i); }, get brokers() { return BROKERS.length; },
     _debug: function () { return { clients: clients, T: T }; }
   };
 })();

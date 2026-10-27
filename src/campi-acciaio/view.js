@@ -137,7 +137,7 @@ var Game = (function () {
     return g.players.map(function (P, p) {
       var f = F[P.fac], on = g.ts && g.ts.p === p, dec = cur === p;
       return '<button class="pchip fc-b-' + P.fac + (on ? ' on' : '') + (dec && !on ? ' dec' : '') + (p === me ? ' me' : '') + '" data-act="player" data-p="' + p + '">' +
-        '<span class="pp">' + ART.portrait(P.fac, 30) + '</span><span class="pn"><b>' + esc(P.nick) + (p === me ? ' (tu)' : '') + '</b><span class="ps">' +
+        '<span class="pp">' + ART.portrait(P.fac, 30) + '</span><span class="pn"><b>' + Net.dot(P.uid) + esc(P.nick) + (p === me ? ' (tu)' : '') + '</b><span class="ps">' +
         '<i class="st">' + IC('star') + P.stars.length + '</i><i>' + IC('coin') + P.coins + '</i><i>' + IC('pop') + P.pop + '</i><i>' + IC('power') + P.power + '</i></span></span>' +
         (P.bot && !/^bot-/.test(P.uid) ? '<span class="away">auto</span>' : '') + '</button>';
     }).join('');

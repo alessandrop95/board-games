@@ -1,7 +1,7 @@
 /* Service worker di Board Games: le pagine si caricano dalla rete (così gli aggiornamenti arrivano subito)
    e, se la rete manca, dalla copia salvata. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v9';
-var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png',
+var CACHE = 'board-games-v10';
+var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',
   './presagio/', './presagio/manifest.webmanifest', './presagio/icon-192.png',
   './gattomina/', './gattomina/manifest.webmanifest', './gattomina/icon-192.png',
@@ -39,5 +39,18 @@ self.addEventListener('fetch', function (e) {
       return res;
     }).catch(function () { return hit; });
     return hit || net;
+  }));
+});
+
+// Tocco su una notifica «nuovo tavolo»: porta alla pagina del gioco con il codice, riusando una finestra già aperta se c'è.
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = (e.notification.data && e.notification.data.url) || self.registration.scope;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if (c.url.split('?')[0] === url.split('?')[0] && 'focus' in c) return c.focus().then(function (w) { return w && w.navigate ? w.navigate(url) : null; }).catch(function () { return self.clients.openWindow(url); });
+    }
+    return self.clients.openWindow(url);
   }));
 });

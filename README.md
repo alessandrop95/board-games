@@ -99,5 +99,15 @@ I sorgenti sono in `src/` (parte di rete condivisa in `src/shared/`). Dopo una m
 
 **Modifiche dal telefono (o da github.com).** Modifica i file in `src/` e conferma con *Commit changes* sul ramo `main`.
 L'azione *Ricostruisci i giochi* controlla che il codice non abbia errori di scrittura, rigenera con `build.py` solo le pagine
-dei giochi i cui sorgenti sono cambiati e le pubblica: dopo 1–2 minuti il gioco aggiornato è online. Se qualcosa va storto, la scheda *Actions* mostra l'errore in rosso
-e il gioco online resta com'era. Non modificare a mano `*/index.html`: vengono riscritti a ogni ricostruzione.
+dei giochi i cui sorgenti sono cambiati (tutte, se cambia `src/shared/` o `build.py`) e le pubblica: dopo 1–2 minuti il gioco aggiornato è online. Se qualcosa va storto, la scheda *Actions* mostra l'errore in rosso
+e il gioco online resta com'era. Conviene modificare `src/`: se cambi a mano una pagina `*/index.html`, l'azione se ne accorge e **non** la sovrascrive
+(compare un avviso giallo in *Actions*), ma quella pagina smette di ricevere gli aggiornamenti finché la stessa modifica non viene riportata in `src/`.
+
+## Presenza e avvisi dei nuovi tavoli
+
+- Accanto a ogni giocatore c'è un pallino: verde se è collegato, grigio con la scritta «offline» se ha chiuso l'app o perso la rete.
+  Se tocca a un giocatore offline da più di 45 secondi, gioca l'automatico al suo posto (anche con «Nessun limite»); quando torna riprende lui.
+- Quando qualcuno apre un tavolo **aperto a tutti**, chi ha l'app aperta (home o un gioco, non seduto a un tavolo) vede un avviso con «Siediti»;
+  con le notifiche consentite arriva anche come notifica di sistema se l'app è in sottofondo. L'interruttore è nella home e nella lista dei tavoli di ogni gioco.
+- Ad app chiusa: gli avvisi passano dall'app gratuita [ntfy](https://ntfy.sh), canale `board-games-alessandrop95-tavoli` (istruzioni in «Ad app chiusa?»).
+  I tavoli «solo su invito» non vengono annunciati.

@@ -44,7 +44,7 @@ var TV = (function () {
       var turn = g.turn === i && g.phase !== 'over';
       out += '<button class="tv-seat' + (turn ? ' turn' : '') + (P.bot ? ' bot' : '') + '" data-pl="' + i + '" style="left:' + p.x + '%;top:' + p.y + '%">' +
         '<span class="tv-ava">' + esc((P.nick || '?').charAt(0).toUpperCase()) + (g.dealer === i ? '<span class="dl" title="Mazziere">M</span>' : '') + '</span>' +
-        '<span class="nm">' + esc(P.nick) + '</span>' + gemsHTML(P, bidHidden(g, i, me)) + '<span class="sc">' + P.score + ' pt' + (P.bot ? ' · auto' : '') + '</span></button>';
+        '<span class="nm">' + Net.dot(P.uid) + esc(P.nick) + '</span>' + gemsHTML(P, bidHidden(g, i, me)) + '<span class="sc">' + P.score + ' pt' + (P.bot ? ' · auto' : '') + '</span></button>';
     });
     st.seatPos[me] = 0;
     return out;

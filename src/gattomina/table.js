@@ -42,7 +42,7 @@ var TV = (function () {
       var badge = !P.alive ? '<span class="sb out">esploso</span>' : g.wait && g.wait.who === i ? '<span class="sb dec">' + (g.wait.type === 'favor' ? 'regala…' : g.wait.type === 'insert' ? 'nasconde…' : 'fruga…') + '</span>' : turn && g.turns > 1 ? '<span class="sb x2">×' + g.turns + ' turni</span>' : '';
       out += '<button class="tseat' + (turn ? ' turn' : '') + (deciding ? ' deciding' : '') + (!P.alive ? ' dead' : '') + (g.phase === 'over' && g.winner === i ? ' winner' : '') + '" data-pl="' + i + '" style="left:' + p.x + '%;top:' + p.y + '%">' +
         '<span class="av">' + GMCards.avatar(i, !P.alive) + '</span>' +
-        '<span class="nm">' + esc(P.nick) + (P.bot && P.alive ? ' <i>auto</i>' : '') + '</span>' +
+        '<span class="nm">' + Net.dot(P.uid) + esc(P.nick) + (P.bot && P.alive ? ' <i>auto</i>' : '') + '</span>' +
         (P.alive ? '<span class="cnt"><b class="mini"></b>' + P.hand.length + '</span>' : '') + badge + '</button>';
     });
     return out;

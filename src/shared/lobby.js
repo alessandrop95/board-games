@@ -67,11 +67,11 @@ var Lobby = (function () {
         '<div class="muted" style="font-size:13px">' + t.n + (t.max ? '/' + t.max : '') + ' giocatori · ' + state + (t.note ? ' · ' + e(t.note) : '') + '</div></div>' + btn + '</div>';
     }).join('');
   }
-  function panelHTML() { ensureCss(); return '<div id="olist" class="olist">' + rows() + '</div>'; }
+  function panelHTML() { ensureCss(); return (window.Alerts ? Alerts.controlHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
   function pickHTML() {
     var v = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })() === 'invite' ? 'invite' : 'public';
     return '<div class="vis-pick" role="radiogroup" aria-label="Chi può sedersi">' +
-      '<label><input type="radio" name="vis" value="public"' + (v === 'public' ? ' checked' : '') + '><span><b>Aperto a tutti</b><br><span class="muted" style="font-size:13px">compare nella lista, ci si siede con un tocco</span></span></label>' +
+      '<label><input type="radio" name="vis" value="public"' + (v === 'public' ? ' checked' : '') + '><span><b>Aperto a tutti</b><br><span class="muted" style="font-size:13px">compare nella lista e chi ha gli avvisi accesi riceve una notifica</span></span></label>' +
       '<label><input type="radio" name="vis" value="invite"' + (v === 'invite' ? ' checked' : '') + '><span><b>Solo su invito</b><br><span class="muted" style="font-size:13px">compare nella lista, ma serve il codice</span></span></label></div>';
   }
   function pickedVis() {
