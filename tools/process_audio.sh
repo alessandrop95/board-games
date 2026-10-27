@@ -22,3 +22,8 @@ sfx $G/src/meow2.oga 10.15 0.95 $G/meow3.mp3
 sfx $G/src/purr.ogg 1.4 2.4 $G/purr.mp3
 sfx $G/src/hiss.wav 0.85 1.4 $G/hiss.mp3
 sfx $G/src/explosion.ogg 0 2.2 $G/explosion.mp3
+C=campi-acciaio/audio
+music $C/src/m1.mp3 $C/m1.mp3
+music $C/src/m2.mp3 $C/m2.mp3
+music $C/src/m3.mp3 $C/m3.mp3
+sfx $C/src/steam.ogg 0.7 3.2 $C/steam.mp3
