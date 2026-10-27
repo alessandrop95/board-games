@@ -138,5 +138,45 @@
   "license": "CC0",
   "artist": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.freesound.org/people/Zabuhailo/\">Zabuhailo</a>",
   "file": "hiss.wav"
+ },
+ "campi-acciaio/m1": {
+  "title": "Heroic Age (ISRC USUAN1100848).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/4/44/Heroic_Age_%28ISRC_USUAN1100848%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 3902611,
+  "duration": 97.462875,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "Kevin MacLeod",
+  "file": "m1.mp3"
+ },
+ "campi-acciaio/m2": {
+  "title": "Volatile Reaction (ISRC USUAN1400039).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/8/8c/Volatile_Reaction_%28ISRC_USUAN1400039%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 5293585,
+  "duration": 165.355125,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "Kevin MacLeod",
+  "file": "m2.mp3"
+ },
+ "campi-acciaio/m3": {
+  "title": "Crusade (ISRC USUAN1100884).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/55/Crusade_%28ISRC_USUAN1100884%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 7951802,
+  "duration": 198.7396,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "Kevin MacLeod",
+  "file": "m3.mp3"
+ },
+ "campi-acciaio/steam": {
+  "title": "WWS SteamWhistle.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/51/WWS_SteamWhistle.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 134484,
+  "duration": 11.019319727891157,
+  "mediatype": "AUDIO",
+  "license": "CC BY 4.0",
+  "artist": "<a href=\"//commons.wikimedia.org/wiki/Commons:Work_With_Sounds\" title=\"Commons:Work With Sounds\">Work With Sounds</a> / Konrad Gutkowski",
+  "file": "steam.ogg"
  }
 }
