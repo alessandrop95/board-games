@@ -1,0 +1,64 @@
+name: Prova app Android
+# Avvia l'app in un emulatore Android e riporta nelle annotazioni l'eventuale errore di avvio (logcat).
+on:
+  workflow_dispatch:
+    inputs:
+      api:
+        description: 'Versione di Android (livello API)'
+        default: '34'
+  push:
+    branches: [main]
+    paths: ['.github/workflows/android-test.yml']
+permissions:
+  contents: read
+jobs:
+  emulatore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Costruisci l'APK di prova
+        run: gradle -p android --no-daemon assembleDebug -q
+      - name: Abilita KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Script di prova
+        run: |
+          cat > prova.sh <<'EOF'
+          set -x
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r "$APK"
+          adb shell pm list packages | grep -E 'chrome|browser|webview' | sed 's/^/::notice::pacchetto /'
+          adb logcat -c
+          adb shell am start -W -n io.github.alessandrop95.boardgames/.LauncherActivity
+          sleep 20
+          adb logcat -d > logcat.txt
+          adb shell dumpsys activity activities | grep -E 'ResumedActivity' | head -3 | sed 's/^ */::notice::attività in primo piano: /'
+          if grep -q 'FATAL EXCEPTION' logcat.txt; then
+            grep -A40 'FATAL EXCEPTION' logcat.txt | sed -E 's/^.*AndroidRuntime: ?//' | grep -v '^\s*$' | head -40 > crash.txt
+            # un'unica annotazione su più righe (GitHub ne mostra al massimo 10 per passaggio)
+            msg=$(sed -e 's/%/%25/g' crash.txt | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::warning title=CRASH::$msg"
+          else
+            echo "::notice::Nessun crash all'avvio."
+            grep -iE 'LauncherActivity|TwaLauncher|androidbrowserhelper|boardgames' logcat.txt | tail -12 | sed 's/^/::notice::/'
+          fi
+          EOF
+          chmod +x prova.sh
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ github.event.inputs.api || '34' }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./prova.sh
