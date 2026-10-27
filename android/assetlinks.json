@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "io.github.alessandrop95.boardgames",
+    "sha256_cert_fingerprints": ["F6:0F:58:22:89:28:DE:26:C4:8E:C4:D6:26:21:EA:32:BA:4C:6D:D9:96:62:EA:CA:61:3B:6A:71:C1:67:BD:F6"]
+  }
+}]
