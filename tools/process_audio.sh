@@ -27,3 +27,7 @@ music $C/src/m1.mp3 $C/m1.mp3
 music $C/src/m2.mp3 $C/m2.mp3
 music $C/src/m3.mp3 $C/m3.mp3
 sfx $C/src/steam.ogg 0.7 3.2 $C/steam.mp3
+B=binari-italia/audio
+music $B/src/m1.ogg $B/m1.mp3
+music $B/src/m2.mp3 $B/m2.mp3
+music $B/src/m3.ogg $B/m3.mp3

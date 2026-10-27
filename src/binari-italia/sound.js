@@ -5,8 +5,8 @@
   function flick(at) { S.hiss({ ft: 'highpass', f: [2600, 5200], q: .7, a: .005, dur: .12, vol: .16, at: at || 0 }); }
   function paper(at) { S.hiss({ ft: 'bandpass', f: [1400, 3600], q: .9, a: .04, dur: .3, vol: .12, at: at || 0 }); }
   S.setup({
-    tracks: (window.BI_TRACKS || []), musicVol: .22,
-    credit: window.BI_CREDIT || 'Fischio a vapore: Work With Sounds / Konrad Gutkowski (CC BY 4.0, Wikimedia Commons); gli altri effetti sono sintetizzati nel browser.',
+    tracks: ['audio/m1.mp3', 'audio/m2.mp3', 'audio/m3.mp3'], musicVol: .2,
+    credit: 'Musica: «Carefree», «Easy Lemon» e «Fluffing a Duck» di Kevin MacLeod (incompetech.com, CC BY 3.0). Fischio a vapore: Work With Sounds / Konrad Gutkowski (CC BY 4.0, Wikimedia Commons); gli altri effetti sono sintetizzati nel browser.',
     samples: { whistle: { url: 'audio/whistle.mp3', vol: .32 } },
     synth: {
       draw: function () { flick(0); S.tone({ f: [N.E5, N.G5], type: 'triangle', dur: .12, vol: .05, at: .02 }); },
