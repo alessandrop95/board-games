@@ -9,9 +9,23 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/appName"
         android:supportsRtl="true"
+        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         android:theme="@android:style/Theme.Translucent.NoTitleBar">
 
         <meta-data android:name="asset_statements" android:resource="@string/assetStatements" />
+
+        <!-- Obbligatoria: all'avvio la libreria la attiva per la scorciatoia «Impostazioni del sito»
+             (senza questa dichiarazione l'app si chiude subito). -->
+        <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+            android:exported="false"
+            android:enabled="true"
+            android:excludeFromRecents="true">
+            <meta-data android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL" android:value="@string/launchUrl" />
+            <intent-filter>
+                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <activity android:name=".LauncherActivity"
             android:alwaysRetainTaskState="true"

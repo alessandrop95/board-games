@@ -8,7 +8,7 @@ on:
         default: '34'
   push:
     branches: [main]
-    paths: ['.github/workflows/android-test.yml']
+    paths: ['android/**', '.github/workflows/android-test.yml']
 permissions:
   contents: read
 jobs:
@@ -50,6 +50,7 @@ jobs:
             echo "::warning title=CRASH::$msg"
           else
             echo "::notice::Nessun crash all'avvio."
+            adb shell dumpsys activity activities | grep -q 'ResumedActivity.*com.android.chrome' && echo "::notice::OK: il sito è aperto in Chrome (Trusted Web Activity)." || echo "::warning::Chrome non è in primo piano."
             grep -iE 'LauncherActivity|TwaLauncher|androidbrowserhelper|boardgames' logcat.txt | tail -12 | sed 's/^/::notice::/'
           fi
           EOF
