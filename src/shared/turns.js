@@ -9,6 +9,7 @@ var Turns = (function () {
   function setup(c) {
     cfg = c;
     Net.setBeforePublish(function (doc) {
+      if (window.Score) Score.beforePublish(doc);   // serie di partite (vedi score.js)
       if (!doc.game || doc.phase !== 'play') { doc.turnKey = null; return; }
       var d = cfg.decider(doc.game), key = doc.game.seq + ':' + d;
       if (doc.turnKey !== key) { doc.turnKey = key; doc.turnSince = Date.now(); }

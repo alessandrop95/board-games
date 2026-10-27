@@ -197,7 +197,7 @@ function overBody(g, me) {
   return '<div class="over"><div class="crown">' + ART.portrait(W.fac, 100) + '</div><h2>' + (g.winner === me ? 'Hai vinto!' : 'Vince ' + esc(W.nick)) + '</h2><p class="lead">' + F[W.fac].n + ' chiude con ' + g.final[0].total + ' monete.</p>' +
     '<div class="tscroll"><table class="score"><tr><th></th><th>Giocatore</th><th>' + IC('coin') + '</th><th>' + IC('star') + '</th><th>Terr.</th><th>Risorse</th><th>Bonus</th><th>Totale</th></tr>' + rows + '</table></div>' +
     '<p class="muted">Stelle, territori e coppie di risorse valgono di più con più popolarità (0–6, 7–12, 13–18). Bonus delle strutture: «' + esc(B.n) + '» — ' + esc(B.d) + '.</p>' +
-    (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda la mappa') + '</div>';
+    Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda la mappa') + '</div>';
 }
 
 /* ---------- eventi ---------- */

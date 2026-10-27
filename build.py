@@ -38,7 +38,7 @@ def page(title, desc, theme, fonts, css, js, short):
 </html>
 '''
 
-net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'exit.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js') + '\n' + r('src', 'shared', 'audio.js') + '\n' + r('src', 'shared', 'alerts.js') + '\n' + r('src', 'shared', 'account.js')
+net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'exit.js') + '\n' + r('src', 'shared', 'score.js') + '\n' + r('src', 'shared', 'coach.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js') + '\n' + r('src', 'shared', 'react.js') + '\n' + r('src', 'shared', 'audio.js') + '\n' + r('src', 'shared', 'alerts.js') + '\n' + r('src', 'shared', 'account.js')
 
 def build_pp():
     pp = 'src/polvere-e-piombo/'

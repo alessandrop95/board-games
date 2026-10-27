@@ -14,7 +14,7 @@ var TV = (function () {
   function mount() {
     var root = $id('app');
     root.innerHTML = '<div class="tv" id="tv"><div class="tv-bg"></div>' +
-      '<div class="tv-top"><span class="brand">Gattomina</span><span class="info" id="tv-info"></span>' + Sound.buttonHTML() + '<button class="iconbtn" data-act="rules">Regole</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
+      '<div class="tv-top"><span class="brand">Exploding Kittens</span><span class="info" id="tv-info"></span>' + Sound.buttonHTML() + '<button class="iconbtn" data-act="rules">Regole</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
       '<div id="tv-banner"></div>' + Chat.dockHTML() +
       '<div class="tv-table" id="tv-table"><div class="tv-rug"></div><div id="tv-seats"></div>' +
       '<div class="tv-center"><div class="deck" id="tv-deck" data-act="drawtap"></div><div class="disc" id="tv-disc"></div></div>' +

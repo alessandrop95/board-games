@@ -1,6 +1,6 @@
 /* Service worker di Board Games: le pagine si caricano dalla rete (così gli aggiornamenti arrivano subito)
    e, se la rete manca, dalla copia salvata. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v15';
+var CACHE = 'board-games-v16';
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js', './src/shared/account.js',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',
   './presagio/', './presagio/manifest.webmanifest', './presagio/icon-192.png',

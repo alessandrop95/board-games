@@ -510,6 +510,23 @@ var Net = (function () {
     });
   }
 
+  // «Solo amici» serve l'account (gli amici sono quelli del server): senza, il tavolo resta aperto a tutti.
+  function visOf(v) { return v === 'invite' ? 'invite' : v === 'friends' && window.Account && Account.user() ? 'friends' : 'public'; }
+  function peekAt(prefix, code, ms) {
+    return new Promise(function (resolve) {
+      var st = prefix + code + '/state', pending = BROKERS.length, done = false, closed = false;
+      function fin(v) { if (!done) { done = true; resolve(v); } }
+      BROKERS.forEach(function (_, i) {
+        client(i).then(function (c) {
+          return new Promise(function (res) {
+            var t0 = setTimeout(function () { c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); res(); }, ms || 4000);
+            function h(t, p) { if (t !== st) return; var d = p ? safeParse(p) : null; if (d && d.closed) closed = true; else if (d && d.code === code) { clearTimeout(t0); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); fin({ doc: d }); } }
+            c.onMessage(h); c.subscribe(st);
+          });
+        }).catch(function () {}).then(function () { if (--pending === 0) fin(closed ? { closed: true } : null); });
+      });
+    });
+  }
   function newCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 
   async function create(nick, opts) {
@@ -520,9 +537,10 @@ var Net = (function () {
       b.c.unsubscribe(topic(code, 'state'));
       if (ex && ex.code && !ex.closed) continue;
       var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
-        vis: opts && opts.vis === 'invite' ? 'invite' : 'public', lobbyId: rid() };
+        vis: visOf(opts && opts.vis), lobbyId: rid() };
+      if (opts && opts.practice) { doc.practice = true; doc.vis = 'invite'; }
       if (!b.c.publish(topic(code, 'state'), JSON.stringify(doc), true)) throw 'La connessione è caduta. Riprova.';
-      if (window.Alerts) Alerts.created(PREFIX, code, nick, doc.vis);
+      if (window.Alerts && !doc.practice) Alerts.created(PREFIX, code, nick, doc.vis);
       return code;
     }
     throw 'Non sono riuscito a creare il tavolo. Riprova.';
@@ -538,7 +556,7 @@ var Net = (function () {
     T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], graceUntil: 0, chat: [], chatIds: {},
       seen: {}, upSince: Date.now(), lastHb: 0, resync: false, unpub: false, hostRev: 0 };
     var me = T;
-    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb');
+    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tReact = topic(code, 'react');
     me.handler = function (t, p) {
       if (T !== me) return;
       if (t === tState) {
@@ -563,6 +581,8 @@ var Net = (function () {
       } else if (t === tChat) {
         var cm = safeParse(p); if (cm && cm.uid) me.seen[String(cm.uid).slice(0, 40)] = Date.now();
         if (addChat(me, cm, false) && me.isHost) saveChatLog(me);
+      } else if (t === tReact) {
+        var rm = safeParse(p); if (rm && rm.uid && reactCb) { me.seen[String(rm.uid).slice(0, 40)] = Date.now(); reactCb(rm); }
       } else if (t === tLog) {
         var arr = p ? safeParse(p) : null;
         if (Array.isArray(arr)) arr.forEach(function (m) { addChat(me, m, true); });
@@ -587,7 +607,7 @@ var Net = (function () {
       if (onStatus) onStatus();
     };
     c.onStatus(me.statusFn);
-    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb);
+    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tReact);
     accept(f.doc);
     heartbeat(me, true);
     if (bc) { try { bc.postMessage({ k: 'open', key: PREFIX + code, tab: TAB }); } catch (e) {} }
@@ -667,10 +687,12 @@ var Net = (function () {
   // I tavoli "solo su invito" compaiono senza codice.
   function announce(force) {
     if (!T || !T.isHost || !T.doc || !T.doc.lobbyId || !T.up) return;
-    var d = T.doc, info = lobbyInfo ? lobbyInfo(d) : {}, vis = d.vis === 'invite' ? 'invite' : 'public';
+    if (T.doc.practice) return;   // partita di prova contro i bot: non compare nella lista
+    var d = T.doc, info = lobbyInfo ? lobbyInfo(d) : {}, vis = d.vis === 'invite' || d.vis === 'friends' ? d.vis : 'public';
+    var acct = window.Account && Account.user();
     var host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
     var e = { v: 1, id: d.lobbyId, vis: vis, code: vis === 'public' ? d.code : null, host: host ? host.nick : '', n: d.seats.length, max: info.max || null, phase: d.phase, note: info.note || '', t: Date.now(),
-      c: d.created || null, g: String(document.title || '').slice(0, 30) };
+      c: d.created || null, g: String(document.title || '').slice(0, 30), u: acct ? acct.username : null };
     var sig = JSON.stringify([e.vis, e.code, e.host, e.n, e.phase, e.note]);
     if (!force && sig === T.lobbySig) return;
     if (T.c.publish(lobbyTopic(d.lobbyId), JSON.stringify(e), true)) { T.lobbySig = sig; T.lastAnn = Date.now(); }
@@ -738,7 +760,7 @@ var Net = (function () {
   // Applica un'operazione allo stato (solo sull'host). Il reducer modifica il documento e restituisce {err, out}.
   function applyLocal(from, op) {
     var work = JSON.parse(JSON.stringify(T.doc));
-    var r = op && op.t === 'quit' ? quit(work, from, op) : (reducer(work, from, op) || {});
+    var r = op && op.t === 'quit' ? quit(work, from, op) : op && op.t === 'vis' ? setVis(work, from, op) : op && op.t === 'series' && window.Score ? Score.op(work, from, op) : (reducer(work, from, op) || {});
     if (r.err) return r;
     if (r.changed !== false) { T.doc = work; publishState(); }
     return r;
@@ -768,6 +790,13 @@ var Net = (function () {
       }
     });
     return {};
+  }
+  function setVis(work, from, op) {
+    if (work.host !== from) return { err: 'Solo l’host può farlo.' };
+    if (work.practice) return { changed: false };
+    var v = op.vis === 'invite' || op.vis === 'friends' ? op.vis : 'public';
+    if (v === 'friends' && !work.seats.some(function (s) { return s.uid === from; })) return { changed: false };
+    work.vis = v; return {};
   }
   function send(op) {
     if (!T || !T.doc) return Promise.reject('Non sei collegato a nessun tavolo.');
@@ -817,7 +846,11 @@ var Net = (function () {
 
   /* --- Chat del tavolo: i messaggi passano direttamente tra i giocatori (arrivano anche se l'host è assente);
      l'host conserva gli ultimi messaggi come cronologia per chi entra dopo. --- */
-  var chatCb = null;
+  var chatCb = null, reactCb = null;
+  function sendReact(e, nick) {
+    if (!T || !T.up) return false;
+    return T.c.publish(topic(T.code, 'react'), JSON.stringify({ uid: uid, nick: String(nick || '').slice(0, 18), e: String(e).slice(0, 8), ts: Date.now() }), false);
+  }
   function addChat(me, m, fromLog) {
     if (!m || typeof m.id !== 'string' || typeof m.text !== 'string' || me.chatIds[m.id]) return false;
     var clean = { id: m.id.slice(0, 40), uid: String(m.uid || '').slice(0, 40), nick: String(m.nick || '').trim().slice(0, 18) || 'Giocatore', text: m.text.trim().slice(0, 240), ts: +m.ts || Date.now() };
@@ -856,14 +889,14 @@ var Net = (function () {
     T = null; clearTimeout(me.resyncTimer);
     me.timers.forEach(clearInterval);
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
-    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'react'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
     me.c.handlers = me.c.handlers.filter(function (h) { return h !== me.handler; });
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
     create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
-    sendChat: sendChat, onChat: function (f) { chatCb = f; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
+    sendChat: sendChat, onChat: function (f) { chatCb = f; }, sendReact: sendReact, onReact: function (f) { reactCb = f; }, peekAt: peekAt, get prefix() { return PREFIX; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },
     setOnTakeover: function (f) { onTakeover = f; },
@@ -888,6 +921,7 @@ var Turns = (function () {
   function setup(c) {
     cfg = c;
     Net.setBeforePublish(function (doc) {
+      if (window.Score) Score.beforePublish(doc);   // serie di partite (vedi score.js)
       if (!doc.game || doc.phase !== 'play') { doc.turnKey = null; return; }
       var d = cfg.decider(doc.game), key = doc.game.seq + ':' + d;
       if (doc.turnKey !== key) { doc.turnKey = key; doc.turnSince = Date.now(); }
@@ -1045,6 +1079,180 @@ var Exit = (function () {
   return { ask: ask, close: close };
 })();
 
+/* ===== Serie di partite e risultati (condivisi da tutti i giochi) =====
+   Serie: con «Nuova partita con lo stesso tavolo» le vittorie si sommano; l'host può scegliere «al meglio di 3 / di 5».
+   La tiene l'host nello stato del tavolo (doc.series), aggiornata quando una partita finisce.
+   Risultati: a fine partita chi ha l'account registra il proprio sul server (statistiche e classifica tra amici).
+   Ogni gioco dice chi ha vinto con Score.setup({ game, result(g) -> [{ won, place, score }] per giocatore }). */
+var Score = (function () {
+  var cfg = null;
+  function setup(c) { cfg = c; }
+  function rid() { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function result(g) { if (!cfg || !g) return null; try { var r = cfg.result(g); return Array.isArray(r) && r.length === g.players.length ? r : null; } catch (e) { return null; } }
+  function need(s) { return s && s.target ? Math.floor(s.target / 2) + 1 : 0; }
+
+  // Solo sull'host, prima di ogni pubblicazione: ogni partita ha un numero (gid); a fine partita la serie si aggiorna una volta sola.
+  function beforePublish(doc) {
+    if (!doc) return;
+    if (doc.phase === 'lobby' || !doc.game) { doc.gid = null; return; }
+    if (!doc.gid) doc.gid = rid();
+    if (doc.phase !== 'over') return;
+    var s = doc.series || (doc.series = { target: 0, n: 0, wins: {}, names: {}, champ: null, last: null });
+    if (s.last === doc.gid) return;
+    var res = result(doc.game); if (!res) return;
+    if (s.champ) { s.n = 0; s.wins = {}; s.champ = null; }   // la serie di prima era già vinta: ne comincia una nuova
+    s.last = doc.gid; s.n++;
+    doc.game.players.forEach(function (P, i) {
+      s.names[P.uid] = P.nick;
+      if (!(P.uid in s.wins)) s.wins[P.uid] = 0;
+      if (res[i] && res[i].won) s.wins[P.uid]++;
+    });
+    var k = need(s);
+    if (k) s.champ = Object.keys(s.wins).filter(function (u) { return s.wins[u] >= k; }).sort(function (a, b) { return s.wins[b] - s.wins[a]; })[0] || null;
+  }
+  // Operazione dell'host: tipo di serie (0 = partite singole, 3 o 5 = al meglio di). Ricomincia da zero.
+  function op(work, from, o) {
+    if (work.host !== from) return { err: 'Solo l’host può farlo.' };
+    if (work.phase === 'play') return { err: 'Si cambia tra una partita e l’altra.' };
+    var t = o.target === 3 || o.target === 5 ? o.target : 0, last = work.series && work.series.last;
+    work.series = { target: t, n: 0, wins: {}, names: {}, champ: null, last: last || null };
+    return {};
+  }
+
+  function standings(doc) {
+    var s = doc && doc.series; if (!s || !s.n) return '';
+    var rows = Object.keys(s.wins).sort(function (a, b) { return s.wins[b] - s.wins[a]; });
+    var k = need(s), champ = s.champ && s.names[s.champ];
+    return '<div class="sc-box" role="status">' +
+      (champ ? '<div class="sc-champ">🏆 ' + esc(champ) + ' vince la serie!</div>' : '') +
+      '<div class="sc-head"><b>Serie</b> · ' + s.n + (s.n === 1 ? ' partita' : ' partite') + (k ? ' · al meglio di ' + s.target + (champ ? '' : ' (vince chi arriva a ' + k + ')') : '') + '</div>' +
+      '<div class="sc-rows">' + rows.map(function (u) { return '<span class="sc-p' + (u === s.champ ? ' on' : '') + (window.Net && u === Net.uid ? ' me' : '') + '">' + esc(s.names[u] || '…') + ' <b>' + s.wins[u] + '</b></span>'; }).join('') + '</div>' +
+      (champ ? '<div class="sc-note">Con una nuova partita comincia un’altra serie.</div>' : '') + '</div>';
+  }
+  var CSS = '.sc-box{display:grid;gap:6px;padding:10px 12px;border-radius:12px;border:1px solid rgba(230,197,111,.45);background:rgba(230,197,111,.08);font-size:15px;line-height:1.35;text-align:left}' +
+    '.sc-champ{font-weight:800;font-size:17px}.sc-rows{display:flex;flex-wrap:wrap;gap:6px}.sc-p{padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.08);white-space:nowrap}.sc-p.on{background:rgba(230,197,111,.35)}.sc-p.me{box-shadow:inset 0 0 0 1px currentColor}' +
+    '.sc-note,.sc-head{font-size:13.5px;opacity:.85}';
+  function css() { if (!document.getElementById('sc-css')) { var st = document.createElement('style'); st.id = 'sc-css'; st.textContent = CSS; document.head.appendChild(st); } }
+  // Sala d'attesa: scelta della serie (host) e classifica della serie in corso.
+  function roomHTML(doc, isHost) {
+    css();
+    var t = doc.series ? doc.series.target || 0 : 0;
+    return '<label style="display:grid;gap:6px"><span><b>Serie di partite</b><br><span class="muted" style="font-size:15px">Con «Nuova partita con lo stesso tavolo» le vittorie si sommano.</span></span>' +
+      '<select id="opt-series" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px">' +
+      [[0, 'Partite singole (conto le vittorie)'], [3, 'Al meglio di 3'], [5, 'Al meglio di 5']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === t ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+      '</select></label>' + standings(doc);
+  }
+  function endHTML(doc) { css(); return standings(doc); }
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'opt-series' && window.Net) Net.send({ t: 'series', target: +e.target.value }).catch(function (er) { console.warn(er); });
+  });
+
+  // Risultato personale sul server (una volta per partita, solo con l'account; le partite di prova non contano).
+  var RKEY = 'pp-reported', trying = {};
+  function reported() { try { return JSON.parse(localStorage.getItem(RKEY) || '[]'); } catch (e) { return []; } }
+  function report() {
+    var d = window.App && App.doc;
+    if (!cfg || !d || d.phase !== 'over' || !d.game || !d.gid || d.practice || !window.Account || !Account.user() || !window.Net) return;
+    var g = d.game, me = -1; g.players.forEach(function (P, i) { if (P.uid === Net.uid) me = i; });
+    if (me < 0) return;
+    var key = cfg.game + ':' + d.code + ':' + d.gid, done = reported();
+    if (done.indexOf(key) >= 0 || (trying[key] && Date.now() - trying[key] < 30000)) return;
+    var r = result(g); if (!r || !r[me]) return;
+    trying[key] = Date.now();
+    Account.rpc('report_result', { p_token: Account.token, p_game: cfg.game, p_match: key, p_won: !!r[me].won, p_place: r[me].place || null, p_players: g.players.length,
+      p_score: r[me].score == null ? null : Math.round(r[me].score), p_rivals: g.players.filter(function (P, i) { return i !== me; }).map(function (P) { return String(P.nick || '').slice(0, 18); }) })
+      .then(function () { var l = reported(); l.push(key); try { localStorage.setItem(RKEY, JSON.stringify(l.slice(-60))); } catch (e) {} }, function () {});
+  }
+  setInterval(report, 2500);
+  return { setup: setup, beforePublish: beforePublish, op: op, roomHTML: roomHTML, endHTML: endHTML, standings: standings, result: result };
+})();
+
+/* ===== Partita guidata contro i bot (condivisa) =====
+   Dalla lista dei tavoli: «Partita di prova guidata». Si apre un tavolo che non compare nella lista, con dei bot,
+   senza limite di tempo. Durante la partita una barra in alto spiega cosa fare adesso e propone la mossa consigliata
+   (quella che sceglierebbe il giocatore automatico). Ogni gioco dà i suoi consigli con Coach.setup({ bots, tip(g, me) }).
+   Usa le funzioni globali dei giochi: App, E, BOT, act, myIdx, requireNick, run, enterTable. */
+var Coach = (function () {
+  var cfg = null, hidden = false, lastHTML = '';
+  function setup(c) { cfg = c; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var CSS = '.cx-start{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px dashed rgba(255,255,255,.22);border-radius:12px;font-size:14.5px;line-height:1.35}.cx-start span{flex:1;min-width:180px;opacity:.9}' +
+    '.cx-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(58px + env(safe-area-inset-top,0px));z-index:9980;width:min(540px,calc(100vw - 16px));display:flex;gap:10px;align-items:flex-start;padding:10px 10px 10px 12px;border-radius:14px;background:rgba(18,30,44,.94);color:#eef4fb;border:1px solid rgba(140,200,255,.45);box-shadow:0 10px 26px rgba(0,0,0,.45);font:14.5px/1.4 system-ui,-apple-system,sans-serif}' +
+    '.cx-bar .cx-t{flex:1;min-width:0}.cx-bar b{color:#9fd3ff}.cx-bar .cx-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}' +
+    '.cx-bar button{appearance:none;font:600 13.5px system-ui,sans-serif;border-radius:999px;padding:7px 12px;border:1px solid #9fd3ff;background:transparent;color:inherit;cursor:pointer}.cx-bar button.main{background:#9fd3ff;color:#0e1a26;border-color:#9fd3ff}' +
+    '.cx-bar .cx-x{border:0;padding:2px 6px;font-size:20px;line-height:1;opacity:.7}.cx-pill{position:fixed;right:max(10px,env(safe-area-inset-right,0px));top:calc(60px + env(safe-area-inset-top,0px));z-index:9980;appearance:none;border:1px solid rgba(140,200,255,.6);background:rgba(18,30,44,.94);color:#eef4fb;border-radius:999px;padding:7px 12px;font:600 13.5px system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4)}';
+  function css() { if (!document.getElementById('cx-css')) { var s = document.createElement('style'); s.id = 'cx-css'; s.textContent = CSS; document.head.appendChild(s); } }
+  function buttonHTML() {
+    if (!cfg || (window.App && App.code)) return '';
+    css();
+    return '<div class="cx-start"><span>Non conosci ancora il gioco? Prova una partita contro i bot: ti spiego ogni mossa.</span><button type="button" class="btn small" data-coach="start">🎓 Partita guidata</button></div>';
+  }
+  function wait(fn, ms) { return new Promise(function (res, rej) { var t0 = Date.now(), iv = setInterval(function () { if (fn()) { clearInterval(iv); res(); } else if (Date.now() - t0 > ms) { clearInterval(iv); rej('Il tavolo di prova non risponde: riprova.'); } }, 150); }); }
+  function start() {
+    var nick = requireNick(); if (!nick) return;
+    hidden = false;
+    run(async function () {
+      var code = await Net.create(nick, { practice: true });
+      await enterTable(code, nick);
+      await wait(function () { return App.doc && App.doc.code === code && Net.isHost; }, 15000);
+      for (var i = 0; i < (cfg.bots || 2); i++) await Net.send({ t: 'addbot' });
+      await Net.send({ t: 'opt', timer: 0 });
+      await Net.send({ t: 'start' });
+    });
+  }
+
+  function myTurn(g, me) {
+    if (me < 0 || !g || g.phase === 'over') return false;
+    if (cfg.myTurn) return cfg.myTurn(g, me);
+    return E.decider(g) === me;
+  }
+  function suggest() {
+    var g = App.doc && App.doc.game, me = myIdx();
+    if (!myTurn(g, me)) return;
+    var a = null; try { a = BOT.decide(JSON.parse(JSON.stringify(g)), me); } catch (e) { a = null; }
+    if (!a) { flash('Qui non saprei cosa consigliarti: scegli tu.'); return; }
+    act(a); flash('Ho giocato per te la mossa consigliata: guarda cosa è successo sul tavolo e nel registro.');
+  }
+  var flashTxt = null, flashT = null;
+  function flash(t) { flashTxt = t; clearTimeout(flashT); flashT = setTimeout(function () { flashTxt = null; paint(); }, 5000); paint(); }
+  function paint() {
+    // nascosta mentre è aperta una finestra del gioco (benvenuto, scelte, regole): quella spiega già cosa fare
+    var d = window.App && App.doc, on = d && d.practice && App.screen === 'table' && d.game && cfg && !App.sheet && !document.querySelector('.pa-back,.px-back');
+    var bar = document.querySelector('.cx-bar'), pill = document.querySelector('.cx-pill');
+    if (!on) { if (bar) bar.remove(); if (pill) pill.remove(); lastHTML = ''; return; }
+    css();
+    if (hidden) {
+      if (bar) bar.remove();
+      if (!pill) { pill = document.createElement('button'); pill.type = 'button'; pill.className = 'cx-pill'; pill.setAttribute('data-coach', 'show'); pill.textContent = '🎓 Guida'; document.body.appendChild(pill); }
+      return;
+    }
+    if (pill) pill.remove();
+    var g = d.game, me = myIdx(), mine = myTurn(g, me), txt;
+    if (g.phase === 'over' || d.phase === 'over') txt = '<b>Partita finita!</b> Dalla schermata finale puoi giocarne un’altra con lo stesso tavolo, oppure esci e apri un tavolo vero con i tuoi amici.';
+    else {
+      var t = null; try { t = cfg.tip(g, me, mine); } catch (e) { t = null; }
+      if (!t && !mine) { var dd = E.decider(g); t = dd != null && g.players[dd] ? 'Tocca a <b>' + esc(g.players[dd].nick) + '</b> (bot): guarda cosa fa, poi tocca a te.' : 'Aspetta un attimo: gli altri stanno giocando.'; }
+      txt = t || 'Tocca a te.';
+    }
+    if (flashTxt) txt = flashTxt + '<br>' + txt;
+    var html = '<span aria-hidden="true">🎓</span><div class="cx-t">' + txt + (mine && g.phase !== 'over' ? '<div class="cx-row"><button type="button" class="main" data-coach="suggest">Fai la mossa consigliata</button><button type="button" data-coach="rules">Regole</button></div>' : '') + '</div><button type="button" class="cx-x" data-coach="hide" aria-label="Nascondi la guida">×</button>';
+    if (!bar) { bar = document.createElement('div'); bar.className = 'cx-bar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
+    if (html !== lastHTML) { bar.innerHTML = html; lastHTML = html; }
+  }
+  setInterval(paint, 700);
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-coach]'); if (!b) return;
+    var k = b.getAttribute('data-coach');
+    if (k === 'start') start();
+    else if (k === 'hide') { hidden = true; paint(); }
+    else if (k === 'show') { hidden = false; lastHTML = ''; paint(); }
+    else if (k === 'suggest') suggest();
+    else if (k === 'rules') { var r = document.querySelector('[data-act="rules"]'); if (r) r.click(); }
+  });
+  return { setup: setup, buttonHTML: buttonHTML, start: start, paint: paint };
+})();
+
 /* ===== Installazione come app (PWA): Android usa il prompt del browser, iOS mostra le istruzioni ===== */
 var PWA = (function () {
   var deferred = null, listeners = [];
@@ -1200,36 +1408,47 @@ var Lobby = (function () {
     if (failed) return '<p class="lead">Non riesco a caricare la lista dei tavoli. Controlla la connessione; puoi sempre entrare con il codice.</p>';
     if (!list) return '<p class="lead">Cerco i tavoli aperti…</p>';
     if (!list.length) return '<p class="lead">Nessun tavolo aperto in questo momento. Aprine uno tu: comparirà qui per tutti.</p>';
-    return list.map(function (t) {
+    var A = window.Account, shown = list.filter(function (t) { return t.vis !== 'friends' || (A && A.friend && A.friend(t.u)); });
+    if (!shown.length) return '<p class="lead">Nessun tavolo aperto in questo momento. Aprine uno tu: comparirà qui per tutti.</p>';
+    return shown.map(function (t) {
       var full = t.max && t.n >= t.max, pub = t.vis === 'public';
+      if (t.vis === 'friends') {   // tavolo di un amico: il codice arriva dal server (dove si trova l'amico adesso)
+        var f = A.friend(t.u), here = window.Alerts && Alerts.here, code = f && f.table && here && f.game === here.path.replace(/\/$/, '') ? f.table : null;
+        if (!code && A.refreshFriendsSoon) A.refreshFriendsSoon();
+        t = Object.assign({}, t, { code: code }); pub = !!code;
+      }
       var state = t.phase === 'play' ? 'in partita' : full ? 'completo' : 'in attesa';
       var btn;
-      if (!pub) btn = '<button class="btn small ghost" data-act="lobbycode" data-host="' + e(t.host) + '">Ho il codice</button>';
+      if (!pub && t.vis === 'friends') btn = '<button class="btn small ghost" disabled>Un attimo…</button>';
+      else if (!pub) btn = '<button class="btn small ghost" data-act="lobbycode" data-host="' + e(t.host) + '">Ho il codice</button>';
       else if (t.phase === 'play') btn = '<button class="btn small ghost" data-act="lobbyjoin" data-code="' + e(t.code) + '">Guarda</button>';
       else if (full) btn = '<button class="btn small ghost" disabled>Completo</button>';
       else btn = '<button class="btn small" data-act="lobbyjoin" data-code="' + e(t.code) + '">Siediti</button>';
-      return '<div class="trow"><div class="grow" style="min-width:0"><div style="overflow-wrap:anywhere"><b>Tavolo di ' + e(t.host || '…') + '</b><span class="vis-b">' + (pub ? 'Aperto a tutti' : 'Solo su invito') + '</span></div>' +
+      return '<div class="trow"><div class="grow" style="min-width:0"><div style="overflow-wrap:anywhere"><b>Tavolo di ' + e(t.host || '…') + '</b><span class="vis-b">' + (t.vis === 'friends' ? 'Solo amici' : pub ? 'Aperto a tutti' : 'Solo su invito') + '</span></div>' +
         '<div class="muted" style="font-size:13px">' + t.n + (t.max ? '/' + t.max : '') + ' giocatori · ' + state + (t.note ? ' · ' + e(t.note) : '') + '</div></div>' + btn + '</div>';
     }).join('');
   }
-  function panelHTML() { ensureCss(); return (window.Account ? Account.chipHTML() : '') + (window.Alerts ? Alerts.controlHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
+  function panelHTML() { ensureCss(); return (window.Account ? Account.chipHTML() : '') + (window.Alerts ? Alerts.controlHTML() : '') + (window.Coach ? Coach.buttonHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
   function pickHTML() {
-    var v = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })() === 'invite' ? 'invite' : 'public';
+    var fr = window.Account && Account.user(), v0 = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })();
+    var v = v0 === 'invite' ? 'invite' : v0 === 'friends' && fr ? 'friends' : 'public';
     return '<div class="vis-pick" role="radiogroup" aria-label="Chi può sedersi">' +
       '<label><input type="radio" name="vis" value="public"' + (v === 'public' ? ' checked' : '') + '><span><b>Aperto a tutti</b><br><span class="muted" style="font-size:13px">compare nella lista e chi ha gli avvisi accesi riceve una notifica</span></span></label>' +
-      '<label><input type="radio" name="vis" value="invite"' + (v === 'invite' ? ' checked' : '') + '><span><b>Solo su invito</b><br><span class="muted" style="font-size:13px">compare nella lista, ma serve il codice</span></span></label></div>';
+      '<label><input type="radio" name="vis" value="invite"' + (v === 'invite' ? ' checked' : '') + '><span><b>Solo su invito</b><br><span class="muted" style="font-size:13px">compare nella lista, ma serve il codice</span></span></label>' +
+      (fr ? '<label><input type="radio" name="vis" value="friends"' + (v === 'friends' ? ' checked' : '') + '><span><b>Solo amici</b><br><span class="muted" style="font-size:13px">lo vedono e ricevono la notifica solo i tuoi amici</span></span></label>' : '') + '</div>';
   }
   function pickedVis() {
-    var el = document.querySelector('input[name="vis"]:checked'), v = el && el.value === 'invite' ? 'invite' : 'public';
+    var el = document.querySelector('input[name="vis"]:checked'), v = el && (el.value === 'invite' || el.value === 'friends') ? el.value : 'public';
     try { localStorage.setItem('pp-vis', v); } catch (x) {}
     return v;
   }
   function roomHTML(doc, isHost) {
     ensureCss();
-    var v = doc.vis === 'invite' ? 'invite' : 'public';
+    var v = doc.vis === 'invite' || doc.vis === 'friends' ? doc.vis : 'public', fr = v === 'friends' || (window.Account && Account.user());
+    if (doc.practice) return (window.Score ? Score.roomHTML(doc, isHost) : '') + '<p class="muted" style="margin:0;font-size:15px">Partita di prova: il tavolo non compare nella lista.</p>';
     return '<label style="display:grid;gap:6px"><span><b>Chi può sedersi</b><br><span class="muted" style="font-size:15px">' +
-      (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
-      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option></select></label>' + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
+      (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : v === 'friends' ? 'Il tavolo lo vedono solo gli amici dell’host, che possono sedersi con un tocco.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
+      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option>' + (fr ? '<option value="friends"' + (v === 'friends' ? ' selected' : '') + '>Solo amici</option>' : '') + '</select></label>' + (window.Score ? Score.roomHTML(doc, isHost) : '') + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
   }
   return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
     setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget };
@@ -1317,7 +1536,7 @@ var Chat = (function () {
   }
   function badgeHTML() {
     ensureCss();
-    return '<button class="iconbtn" data-chat="open" aria-label="Chat del tavolo' + (unread ? ', ' + unread + ' messaggi nuovi' : '') + '">Chat<span class="chat-n"' + (unread ? '' : ' hidden') + '>' + unread + '</span></button>';
+    return (window.Reactions && window.App && App.doc ? Reactions.buttonHTML() : '') + '<button class="iconbtn" data-chat="open" aria-label="Chat del tavolo' + (unread ? ', ' + unread + ' messaggi nuovi' : '') + '">Chat<span class="chat-n"' + (unread ? '' : ' hidden') + '>' + unread + '</span></button>';
   }
   function paintBadges() {
     document.querySelectorAll('[data-chat="open"]').forEach(function (b) {
@@ -1384,6 +1603,69 @@ var Chat = (function () {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) close(); });
   function reset() { close(); hideBubble(); unread = 0; code = Net.tableCode; paintBadges(); paintDock(false); }
   return { badgeHTML: badgeHTML, dockHTML: dockHTML, isPinned: function () { return pinned; }, open: open, close: close, reset: reset, isOpen: function () { return isOpen; } };
+})();
+
+/* ===== Reazioni rapide al tavolo (condivise): un tocco e tutti vedono l'emoji per qualche secondo =====
+   Il pulsante sta accanto a «Chat» nella barra in alto (Chat.badgeHTML lo aggiunge). Passano direttamente
+   tra i giocatori sul canale «react» del tavolo, come la chat, senza cronologia. */
+var Reactions = (function () {
+  var EMO = ['😂', '👏', '😱', '😡', '😎', '🤞', '🙏', '💀'];
+  var last = 0, seen = {}, open = false;
+  var CSS = '.rx-btn{min-width:40px}.rx-pick{position:fixed;z-index:9990;top:calc(54px + env(safe-area-inset-top,0px));right:max(8px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px;border-radius:16px;background:#1d1b22;border:1px solid rgba(255,255,255,.18);box-shadow:0 12px 30px rgba(0,0,0,.5);animation:rxin .15s ease-out}' +
+    '.rx-pick button{appearance:none;border:0;background:rgba(255,255,255,.06);border-radius:12px;font-size:28px;line-height:1;width:52px;height:52px;cursor:pointer}.rx-pick button:active{transform:scale(.9)}' +
+    '.rx-lay{position:fixed;left:0;right:0;top:calc(64px + env(safe-area-inset-top,0px));z-index:9989;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px}' +
+    '.rx-b{display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border-radius:999px;background:rgba(20,18,26,.88);color:#fff;font:600 15px system-ui,sans-serif;box-shadow:0 8px 20px rgba(0,0,0,.4);animation:rxpop 3.2s ease-out forwards}' +
+    '.rx-b i{font-style:normal;font-size:34px;line-height:1;animation:rxbig .6s ease-out}' +
+    '@keyframes rxin{from{opacity:0;transform:translateY(-6px)}}@keyframes rxbig{0%{transform:scale(.3)}60%{transform:scale(1.35)}100%{transform:scale(1)}}' +
+    '@keyframes rxpop{0%{opacity:0;transform:translateY(-10px)}10%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}' +
+    '@media (prefers-reduced-motion: reduce){.rx-b,.rx-b i,.rx-pick{animation:none}}';
+  function css() { if (!document.getElementById('rx-css')) { var s = document.createElement('style'); s.id = 'rx-css'; s.textContent = CSS; document.head.appendChild(s); } }
+  function buttonHTML() { css(); return '<button class="iconbtn rx-btn" type="button" data-rx="open" aria-label="Reazione rapida">😊</button>'; }
+  function myNick() {
+    var d = window.App && App.doc; if (!d || !window.Net) return '';
+    var s = d.seats.filter(function (x) { return x.uid === Net.uid; })[0];
+    return s ? s.nick : (window.Account && Account.user() ? Account.user().username : 'Spettatore');
+  }
+  function close() { var p = document.querySelector('.rx-pick'); if (p) p.remove(); open = false; }
+  function pick() {
+    css(); close(); open = true;
+    var p = document.createElement('div'); p.className = 'rx-pick'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Scegli una reazione');
+    p.innerHTML = EMO.map(function (e) { return '<button type="button" data-rx="send" data-e="' + e + '">' + e + '</button>'; }).join('');
+    document.body.appendChild(p);
+  }
+  function show(nick, e) {
+    css();
+    var lay = document.querySelector('.rx-lay'); if (!lay) { lay = document.createElement('div'); lay.className = 'rx-lay'; lay.setAttribute('aria-live', 'polite'); document.body.appendChild(lay); }
+    while (lay.children.length > 3) lay.firstChild.remove();
+    var b = document.createElement('div'); b.className = 'rx-b'; b.innerHTML = '<i></i><span></span>';
+    b.querySelector('i').textContent = e; b.querySelector('span').textContent = nick;
+    lay.appendChild(b); setTimeout(function () { b.remove(); }, 3300);
+  }
+  function send(e) {
+    if (EMO.indexOf(e) < 0 || !window.Net) return;
+    if (Date.now() - last < 1200) return;   // niente raffiche
+    last = Date.now();
+    var nick = myNick();
+    if (Net.sendReact(e, nick)) show(nick, e);
+  }
+  if (window.Net && Net.onReact) Net.onReact(function (m) {
+    if (!m || m.uid === Net.uid || EMO.indexOf(m.e) < 0) return;
+    var now = Date.now(), s = seen[m.uid] || (seen[m.uid] = []);
+    while (s.length && now - s[0] > 6000) s.shift();
+    if (s.length >= 4) return;              // chi esagera viene ignorato per qualche secondo
+    s.push(now);
+    var d = window.App && App.doc, seat = d && d.seats.filter(function (x) { return x.uid === m.uid; })[0];
+    show(seat ? seat.nick : String(m.nick || 'Spettatore').slice(0, 18), m.e);
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-rx]');
+    if (!b) { if (open && !(ev.target.closest && ev.target.closest('.rx-pick'))) close(); return; }
+    var k = b.getAttribute('data-rx');
+    if (k === 'open') { ev.stopPropagation(); if (open) close(); else pick(); }
+    else if (k === 'send') { send(b.getAttribute('data-e')); close(); }
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) close(); });
+  return { buttonHTML: buttonHTML, send: send, show: show, EMO: EMO };
 })();
 
 /* ===== Suoni e musica (condiviso) =====
@@ -1624,9 +1906,20 @@ var Alerts = (function () {
   // Chi è già seduto a un tavolo (in attesa o in partita) non riceve avvisi: lo distrarrebbero e basta.
   function busy() { return typeof App !== 'undefined' && App && App.screen === 'table' && App.doc && Net.tableCode; }
   function isMine(g, code) { var m = obj(MINE); return !!m[g.p + code]; }
+  // Tavolo «solo amici»: il codice non è nella lista pubblica, lo sa il server (dove si trova l'amico adesso).
+  function friendCode(e, g) {
+    if (e.vis !== 'friends' || !window.Account || !Account.friend) return null;
+    var f = Account.friend(e.u); if (!f) return null;
+    if (f.table && f.game === g.path.replace(/\/$/, '')) return f.table;
+    if (Account.refreshFriendsSoon) Account.refreshFriendsSoon();
+    return null;
+  }
+  function visible(t) { return t.e.vis !== 'friends' || !!(window.Account && Account.friend && Account.friend(t.e.u)); }
+  function codeOf(t) { return t.e.vis === 'friends' ? friendCode(t.e, t.g) : t.e.vis === 'public' ? t.e.code : null; }
   function maybeAlert(k, t) {
-    var e = t.e, g = t.g;
-    if (!enabled() || e.phase !== 'lobby' || e.vis !== 'public' || !/^[A-Z]{4}$/.test(e.code || '')) return;
+    var e = t.e, g = t.g, fc = e.vis === 'friends' ? friendCode(e, g) : null;
+    if (fc) e = Object.assign({}, e, { code: fc });
+    if (!enabled() || e.phase !== 'lobby' || (e.vis !== 'public' && !fc) || !/^[A-Z]{4}$/.test(e.code || '')) return;
     if (prefs().games.indexOf(g.path.replace(/\/$/, '')) < 0) return;            // gioco escluso nelle preferenze
     if (!e.c || e.t - e.c > 90000 || e.t < e.c - 5000) return;       // solo tavoli aperti adesso (orari dello stesso telefono)
     if (isMine(g, e.code) || (here && here.p === g.p && Net.tableCode === e.code) || busy()) return;
@@ -1634,7 +1927,7 @@ var Alerts = (function () {
     if (seen[k]) return;                                               // già avvisato (anche da un'altra scheda)
     Object.keys(seen).forEach(function (x) { if (now - seen[x] > 3600e3) delete seen[x]; });
     seen[k] = now; set(SEEN, JSON.stringify(seen));
-    var title = 'Nuovo tavolo: ' + nameOf(t), body = (e.host || 'Qualcuno') + ' ha aperto un tavolo ed è in attesa di giocatori.', url = urlFor(g, e.code);
+    var title = (fc ? 'Tavolo tra amici: ' : 'Nuovo tavolo: ') + nameOf(t), body = (e.host || 'Qualcuno') + (fc ? ' ha aperto un tavolo per i suoi amici.' : ' ha aperto un tavolo ed è in attesa di giocatori.'), url = urlFor(g, e.code);
     if (document.visibilityState === 'visible') banner(title, body, url);
     else if (sysOn() && !pushOn()) sysNotify(title, body + ' Tocca per sederti.', url, k); // con le notifiche push ci pensa il server
   }
@@ -1821,14 +2114,40 @@ var Alerts = (function () {
   function mountHome(el) { homeEl = el; css(); start(); paintHome(); setTimeout(function () { if (homeEl && !list().length) paintHome(true); }, 6000); }
   function paintHome(waited) {
     if (!homeEl) return;
-    var l = list();
+    var l = list().filter(visible);
     if (!l.length) { homeEl.innerHTML = '<p>' + (waited || started && Object.keys(tables).length ? 'Nessun tavolo aperto in questo momento: aprine uno tu da un gioco qui sotto, comparirà qui per tutti.' : 'Cerco i tavoli aperti…') + '</p>'; return; }
     homeEl.innerHTML = '<div class="ppa-home">' + l.slice(0, 8).map(function (t) {
-      var e = t.e, full = e.max && e.n >= e.max, pub = e.vis === 'public' && /^[A-Z]{4}$/.test(e.code || '');
+      var code = codeOf(t), e = Object.assign({}, t.e, { code: code }), full = e.max && e.n >= e.max, pub = /^[A-Z]{4}$/.test(code || '');
       var state = e.phase === 'play' ? 'in partita' : full ? 'completo' : 'in attesa di giocatori';
       var btn = !pub ? '<a href="' + esc(urlFor(t.g)) + '">Ho il codice</a>' : e.phase === 'play' || full ? '<a href="' + esc(urlFor(t.g, e.code)) + '">Guarda</a>' : '<a class="sit" href="' + esc(urlFor(t.g, e.code)) + '">Siediti</a>';
-      return '<div class="ppa-row"><div class="g"><b>' + esc(nameOf(t)) + '</b> · tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + '<small>' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori · ' + state + (pub ? '' : ' · solo su invito') + '</small></div>' + btn + '</div>';
+      return '<div class="ppa-row"><div class="g"><b>' + esc(nameOf(t)) + '</b> · tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + '<small>' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori · ' + state + (t.e.vis === 'friends' ? ' · solo amici' : pub ? '' : ' · solo su invito') + '</small></div>' + btn + '</div>';
     }).join('') + '</div>';
+  }
+
+  /* --- home: «Continua la partita», i tavoli dove sei seduto in qualsiasi gioco --- */
+  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table' };
+  function mountContinue(el) {
+    if (!el || typeof Net === 'undefined' || !Net.peekAt) return;
+    var box = el.closest('section') || el, cards = {};
+    function paint() {
+      var l = GAMES.map(function (g) { return cards[g.path]; }).filter(Boolean);
+      box.hidden = !l.length;
+      el.innerHTML = l.map(function (c) {
+        return '<div class="ppa-row"><div class="g"><b>' + esc(c.g.n) + '</b> · tavolo ' + esc(c.d.code) + (c.d.practice ? ' (prova)' : '') +
+          '<small>' + esc(c.st) + (c.others.length ? ' · con ' + esc(c.others.join(', ')) : '') + '</small></div><a class="sit" href="' + esc(urlFor(c.g, c.d.code)) + '">Continua</a></div>';
+      }).join('');
+    }
+    css(); el.classList.add('ppa-home'); paint();
+    GAMES.forEach(function (g) {
+      var code = get(SEAT[g.path]); if (!/^[A-Z]{4}$/.test(code || '')) return;
+      Net.peekAt(g.p, code).then(function (f) {
+        if (f && f.closed) { set(SEAT[g.path], null); return; }
+        var d = f && f.doc; if (!d || !d.seats || !d.seats.some(function (x) { return x.uid === Net.uid; })) return;
+        var st = d.phase === 'play' ? 'partita in corso' : d.phase === 'over' ? 'partita finita' : 'in attesa di giocatori';
+        cards[g.path] = { g: g, d: d, st: st, others: d.seats.filter(function (x) { return x.uid !== Net.uid; }).map(function (x) { return x.nick; }).slice(0, 4) };
+        paint();
+      });
+    });
   }
 
   /* --- chi apre un tavolo pubblico lo fa annunciare dal server a chi ha le notifiche attive --- */
@@ -1837,13 +2156,14 @@ var Alerts = (function () {
     Object.keys(m).forEach(function (x) { if (now - m[x] > 24 * 3600e3) delete m[x]; });
     m[prefix + code] = now; set(MINE, JSON.stringify(m));
     if (vis === 'invite' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
+    if (window.Account && Account.presence) Account.presence();   // gli amici devono sapere subito dove si trova il tavolo
     var g = GAMES.filter(function (x) { return x.p === prefix; })[0]; if (!g) return;
-    if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code }).catch(function (e) { console.warn('annuncio', e); });
+    if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code, vis: vis === 'friends' ? 'friends' : 'public' }).catch(function (e) { console.warn('annuncio', e); });
   }
 
   if (enabled()) setTimeout(start, 1200);
   return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables,
-    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner };
+    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
 })();
 
 /* ===== Account (nome utente e password), amici e inviti — server Supabase =====
@@ -1855,15 +2175,19 @@ var Account = (function () {
   function set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
   function jget(k) { try { return JSON.parse(get(k) || 'null'); } catch (e) { return null; } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  var cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
+  var sig = null, cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
   var readyRes; var ready = new Promise(function (r) { readyRes = r; });
 
   /* ---------- server ---------- */
   function load() {
+    sig = configured() + ':' + !!user();
     fetch(ROOT + 'server.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : (r.status === 404 ? false : null); }).then(function (j) {
       if (j && j.url && j.anon) { cfg = j; set('pp-server', JSON.stringify(j)); }
       else if (j === false) { cfg = null; set('pp-server', null); }
+      var was = sig; sig = configured() + ':' + !!user();
       readyRes(); repaint(); check();
+      // La scelta «chi può sedersi» era stata disegnata prima di sapere se c'è l'account: la si aggiorna (opzione «Solo amici»).
+      if (was !== sig && window.Lobby && Lobby.pickHTML) document.querySelectorAll('.vis-pick').forEach(function (el) { el.outerHTML = Lobby.pickHTML(); });
     }, function () { readyRes(); });
   }
   function configured() { return !!(cfg && cfg.url); }
@@ -1911,6 +2235,68 @@ var Account = (function () {
     if (!user()) return Promise.resolve(null);
     return rpc('friends', { p_token: session.token }).then(function (d) { friendsData = d; repaint(); if (!quiet) render(); return d; });
   }
+  function friend(name) {
+    if (!name || !friendsData || !friendsData.friends) return null;
+    var n = String(name).toLowerCase();
+    return friendsData.friends.filter(function (f) { return f.username.toLowerCase() === n; })[0] || null;
+  }
+  var soonAt = 0;
+  function refreshFriendsSoon() { if (Date.now() - soonAt < 10000 || !user()) return; soonAt = Date.now(); refreshFriends(true).then(paintLists, function () {}); }
+  function paintLists() { if (window.Lobby && Lobby.paint) Lobby.paint(); if (window.Alerts && Alerts.paintHome) Alerts.paintHome(); }
+
+  /* ---------- presenza: gli amici vedono se sei collegato e a quale tavolo ---------- */
+  // Ogni minuto con l'app aperta (e subito quando entri o esci da un tavolo). Il server risponde con gli amici aggiornati.
+  var presSig = null, presAt = 0, presBusy = false;
+  function where() {
+    var g = A.here ? A.here.path.replace(/\/$/, '') : null, d = window.App && App.doc, code = window.Net && Net.tableCode;
+    var seated = d && d.seats && window.Net && d.seats.some(function (x) { return x.uid === Net.uid; });
+    if (!d || !code || d.practice || !(seated || App.screen === 'table')) return { g: g, t: null, v: null, ph: null };
+    return { g: g, t: code, v: d.vis || 'public', ph: d.phase };
+  }
+  function presenceTick(force) {
+    if (!user() || presBusy || document.visibilityState === 'hidden') return;
+    var w = where(), sig = JSON.stringify(w);
+    if (!force && sig === presSig && Date.now() - presAt < 60000) return;
+    presBusy = true; presSig = sig; presAt = Date.now();
+    rpc('presence', { p_token: session.token, p_game: w.g, p_table: w.t, p_vis: w.v, p_phase: w.ph })
+      .then(function (d) { friendsData = d; repaint(); paintLists(); if (view && (view.v === 'account' || view.v === 'invite')) render(); }, function () { presSig = null; })
+      .then(function () { presBusy = false; });
+  }
+  setInterval(function () { presenceTick(false); }, 4000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') presenceTick(true); });
+  function gameName(id) { var g = (A.GAMES || []).filter(function (x) { return x.path === id + '/'; })[0]; return g ? g.n : id; }
+  function friendLine(f) {
+    if (!f.online) return 'non in linea';
+    if (!f.game) return 'collegato';
+    if (!f.table) return 'sta guardando ' + gameName(f.game);
+    return (f.phase === 'play' ? 'sta giocando a ' : f.phase === 'over' ? 'ha appena finito a ' : 'è al tavolo di ') + gameName(f.game) + (f.phase === 'lobby' ? ', in attesa' : '');
+  }
+  function joinHref(f) { return f.online && f.game && f.table ? ROOT + f.game + '/?t=' + f.table : null; }
+
+  /* ---------- statistiche ---------- */
+  var statsData = null, boardData = null, boardGame = '';
+  function loadStats() {
+    return Promise.all([rpc('my_stats', { p_token: session.token }), rpc('friends_board', { p_token: session.token, p_game: boardGame || null })])
+      .then(function (r) { statsData = r[0]; boardData = r[1]; render(); }, function (er) { msg = { t: String(er) }; render(); });
+  }
+  function statsHTML() {
+    var h = '<h2>Statistiche</h2>' + msgHTML();
+    if (!statsData) return h + '<p class="pa-note">Carico…</p><button class="pa-btn g" data-pa="go" data-v="account">Indietro</button>';
+    var gs = statsData.games, tp = 0, tw = 0; gs.forEach(function (x) { tp += x.played; tw += x.won; });
+    h += '<h3>Le tue partite</h3>';
+    h += gs.length ? '<div class="pa-list">' + gs.map(function (x) { return '<div class="pa-row"><b>' + esc(gameName(x.game)) + '</b><span class="pa-num">' + x.won + ' vinte su ' + x.played + '</span><span class="pa-pct">' + Math.round(100 * x.won / Math.max(1, x.played)) + '%</span></div>'; }).join('') +
+      '<div class="pa-row pa-tot"><b>Totale</b><span class="pa-num">' + tw + ' vinte su ' + tp + '</span><span class="pa-pct">' + Math.round(100 * tw / Math.max(1, tp)) + '%</span></div></div>'
+      : '<p class="pa-note">Ancora nessuna partita registrata: si contano quelle finite da quando hai l’account (non le partite di prova).</p>';
+    h += '<h3>Classifica tra amici</h3><div class="pa-bar pa-filter"><button type="button" class="pa-btn s' + (boardGame ? ' g' : '') + '" data-pa="board" data-g="">Tutti i giochi</button>' +
+      (A.GAMES || []).map(function (g) { var id = g.path.replace(/\/$/, ''); return '<button type="button" class="pa-btn s' + (boardGame === id ? '' : ' g') + '" data-pa="board" data-g="' + id + '">' + esc(g.n) + '</button>'; }).join('') + '</div>';
+    h += boardData && boardData.length ? '<div class="pa-list">' + boardData.map(function (r, i) { return '<div class="pa-row' + (r.me ? ' pa-me' : '') + '"><span class="pa-pos">' + (i + 1) + '</span><b>' + esc(r.username) + (r.me ? ' (tu)' : '') + '</b><span class="pa-num">' + r.won + ' vinte · ' + r.played + ' giocate</span></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun risultato.</p>';
+    if (statsData.recent.length) h += '<h3>Ultime partite</h3><div class="pa-list">' + statsData.recent.map(function (x) {
+      var d = new Date(x.at), when = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      return '<div class="pa-row"><span class="pa-res">' + (x.won ? '🏆' : '·') + '</span><span style="flex:1;min-width:0"><b>' + esc(gameName(x.game)) + '</b> · ' + (x.won ? 'vinta' : x.place ? x.place + 'º posto' : 'persa') + (x.score != null ? ' · ' + x.score + ' punti' : '') +
+        '<br><span class="pa-note">' + when + (x.rivals && x.rivals.length ? ' · con ' + x.rivals.map(esc).join(', ') : '') + '</span></span></div>';
+    }).join('') + '</div>';
+    return h + '<button class="pa-btn g" data-pa="go" data-v="account">Indietro</button>';
+  }
   function incoming() { return friendsData && friendsData.incoming ? friendsData.incoming.length : 0; }
   function addFriend(name) {
     return notify({ kind: 'friend', to: name }).then(function (r) {
@@ -1932,6 +2318,8 @@ var Account = (function () {
     '.pa-err{color:#ff9b86;font-size:14.5px}.pa-ok{color:#9fdc95;font-size:14.5px}' +
     '.pa-list{display:grid;gap:6px}.pa-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}.pa-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
     '.pa-dot{width:9px;height:9px;border-radius:50%;background:#8a9097;flex:none}.pa-dot.on{background:#43d17c}' +
+    '.pa-row a.pa-btn{text-decoration:none;display:inline-flex;align-items:center}.pa-num{font-size:13.5px;color:#cfc8ba;white-space:nowrap}.pa-pct{min-width:42px;text-align:right;font-weight:700;color:#e6c56f}' +
+    '.pa-tot{background:rgba(230,197,111,.1)}.pa-me{box-shadow:inset 0 0 0 1px rgba(230,197,111,.6)}.pa-pos{width:22px;text-align:center;font-weight:800;color:#e6c56f}.pa-res{width:22px;text-align:center}.pa-filter{gap:6px}' +
     '.pa-chip{appearance:none;display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(230,197,111,.45);background:rgba(230,197,111,.1);color:inherit;border-radius:999px;padding:6px 12px;font:600 14px system-ui,sans-serif;cursor:pointer;position:relative}' +
     '.pa-chip .n{background:#c4301f;color:#fff;border-radius:999px;font-size:11px;padding:0 6px;font-weight:800}.pa-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
     '.pa-check{display:flex!important;flex-direction:row!important;gap:10px!important;align-items:center;font-size:15px!important;color:inherit!important;padding:4px 0}.pa-check input{width:20px;height:20px;accent-color:#e6c56f;flex:none}' +
@@ -1945,6 +2333,7 @@ var Account = (function () {
     if (view.v !== 'login' && view.v !== 'register' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
     render();
     if (user() && (view.v === 'account' || view.v === 'invite')) refreshFriends().catch(function () {});
+    if (user() && view.v === 'stats') { statsData = null; loadStats(); }
   }
   function render() {
     if (!view) return;
@@ -1972,12 +2361,13 @@ var Account = (function () {
         '<button class="pa-btn g" data-pa="close" type="button">' + (view.x.why ? 'Non ora' : 'Chiudi') + '</button>';
     }
     if (!u) return '';
+    if (v === 'stats') return statsHTML();
     if (v === 'invite') {
       var x = view.x, fr = friendsData ? friendsData.friends : null;
       return '<h2>Invita un amico</h2><p class="pa-note">Gli arriva una notifica: toccandola si siede al tavolo <b>' + esc(x.code) + '</b>.</p>' + msgHTML() +
         (fr == null ? '<p class="pa-note">Carico i tuoi amici…</p>' : fr.length ? '<div class="pa-list">' + fr.map(function (f) {
           var k = x.code + ':' + f.username, sent = inviteSent[k];
-          return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '" title="' + (f.online ? 'In linea di recente' : 'Non in linea') + '"></span><b>' + esc(f.username) + '</b><button class="pa-btn s' + (sent ? ' g' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato ✓' : 'Invita') + '</button></div>';
+          return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '" title="' + (f.online ? 'Collegato' : 'Non in linea') + '"></span><span style="flex:1;min-width:0"><b>' + esc(f.username) + '</b><br><span class="pa-note">' + esc(friendLine(f)) + '</span></span><button class="pa-btn s' + (sent ? ' g' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato ✓' : 'Invita') + '</button></div>';
         }).join('') + '</div>' : '<p>Non hai ancora amici nella lista.</p>') +
         '<button class="pa-btn g" data-pa="go" data-v="account">Aggiungi amici</button><button class="pa-btn g" data-pa="close">Chiudi</button>';
     }
@@ -1987,9 +2377,10 @@ var Account = (function () {
     h += '<h3>Notifiche</h3>' + (window.Alerts && Alerts.settingsHTML ? Alerts.settingsHTML() : '');
     h += '<hr class="pa-sep"><h3>Amici</h3>';
     if (inc.length) h += '<div class="pa-list">' + inc.map(function (n) { return '<div class="pa-row"><b>' + esc(n) + ' vuole essere tuo amico</b><button class="pa-btn s" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button class="pa-btn s g" data-pa="decline" data-u="' + esc(n) + '">No</button></div>'; }).join('') + '</div>';
-    h += d == null ? '<p class="pa-note">Carico…</p>' : fr2.length ? '<div class="pa-list">' + fr2.map(function (f) { return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '"></span><b>' + esc(f.username) + '</b><button class="pa-btn s g" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici">Togli</button></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun amico per ora. Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica.</p>';
+    h += d == null ? '<p class="pa-note">Carico…</p>' : fr2.length ? '<div class="pa-list">' + fr2.map(function (f) { var j = joinHref(f); return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><b>' + esc(f.username) + '</b><br><span class="pa-note">' + esc(friendLine(f)) + '</span></span>' + (j ? '<a class="pa-btn s" href="' + esc(j) + '">' + (f.phase === 'lobby' ? 'Raggiungi' : 'Guarda') + '</a>' : '') + '<button class="pa-btn s g" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici">×</button></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun amico per ora. Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica.</p>';
     if (out.length) h += '<p class="pa-note">In attesa di risposta: ' + out.map(esc).join(', ') + '</p>';
     h += '<form data-pa-form="friend" class="pa-bar"><input type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" style="flex:1;min-width:170px" required><button class="pa-btn s" type="submit">Aggiungi</button></form>';
+    h += '<hr class="pa-sep"><h3>Partite</h3><div class="pa-bar"><button class="pa-btn s" data-pa="go" data-v="stats">📊 Statistiche e classifica tra amici</button></div>';
     h += '<hr class="pa-sep"><h3>Account</h3>';
     if (view.x.pw) h += '<form data-pa-form="password"><label>Password attuale<input type="password" name="o" autocomplete="current-password" required></label><label>Nuova password<input type="password" name="n" autocomplete="new-password" required></label><button class="pa-btn s" type="submit">Cambia password</button></form>';
     if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p><label>Password<input type="password" name="d" autocomplete="current-password" required></label><button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
@@ -2026,7 +2417,8 @@ var Account = (function () {
     var k = b.getAttribute('data-pa'), uname = b.getAttribute('data-u');
     if (k === 'open') { e.preventDefault(); open(b.getAttribute('data-v')); }
     else if (k === 'close') close();
-    else if (k === 'tab' || k === 'go') { view = { v: b.getAttribute('data-v'), x: {} }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); }
+    else if (k === 'tab' || k === 'go') { view = { v: b.getAttribute('data-v'), x: {} }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); if (view.v === 'stats') { statsData = null; loadStats(); } }
+    else if (k === 'board') { boardGame = b.getAttribute('data-g') || ''; rpc('friends_board', { p_token: session.token, p_game: boardGame || null }).then(function (r) { boardData = r; render(); }, function (er) { msg = { t: String(er) }; render(); }); render(); }
     else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
     else if (k === 'invite') {
       b.disabled = true;
@@ -2063,7 +2455,7 @@ var Account = (function () {
 
   load();
   return { ready: ready, configured: configured, user: user, open: open, close: close, allow: allow, allowQuiet: allowQuiet, chipHTML: chipHTML, inviteHTML: inviteHTML,
-    rpc: rpc, notify: notify, refreshFriends: refreshFriends, toast: toastMsg, get config() { return cfg; }, get token() { return session && session.token; }, render: render };
+    rpc: rpc, notify: notify, refreshFriends: refreshFriends, refreshFriendsSoon: refreshFriendsSoon, friend: friend, presence: function () { presenceTick(true); }, gameName: gameName, toast: toastMsg, get config() { return cfg; }, get token() { return session && session.token; }, render: render };
 })();
 
 /* ===== Presagio: regole (equivalenti al gioco di prese a previsione con Maghi e Giullari) ===== */
@@ -2379,7 +2771,7 @@ var TV = (function () {
   function mount() {
     var root = $id('app');
     root.innerHTML = '<div class="tv" id="tv"><div class="tv-sky"></div>' +
-      '<div class="tv-top"><span class="brand">Presagio</span><span class="info" id="tv-info"></span>' + Sound.buttonHTML() + '<button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
+      '<div class="tv-top"><span class="brand">Wizard</span><span class="info" id="tv-info"></span>' + Sound.buttonHTML() + '<button class="iconbtn" data-act="scores">Punti</button><span id="tv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="menu">Menu</button></div>' +
       '<div id="tv-banner" class="tv-banner"></div>' + Chat.dockHTML() +
       '<div class="tv-table" id="tv-table"><div class="tv-oval"></div><div class="tv-trump" id="tv-trump"></div><div class="tv-pr" id="tv-pr"></div><div class="tv-msg" id="tv-msg"></div><div class="tv-zone" id="tv-zone"></div><div id="tv-seats"></div></div>' +
       '<div class="tv-status" id="tv-status" aria-live="polite"></div><div class="tv-me" id="tv-me"></div><div class="tv-hand" id="tv-hand" aria-label="La tua mano"></div><div class="tv-actions" id="tv-actions"></div></div>';
@@ -2817,6 +3209,19 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Coach.setup({ bots: 2, tip: function (g, me, mine) {
+  var P = g.players[me]; if (!P) return null;
+  var where = ' In questa mano: previste <b>' + (P.bid == null ? '?' : P.bid) + '</b>, fatte <b>' + (P.tricks || 0) + '</b>.';
+  if (!mine) return g.phase === 'play' && P.bid != null ? 'Tocca a un bot.' + where + ' Ricorda: fai esattamente le prese previste.' : null;
+  if (g.phase === 'trump') return 'È uscito un <b>Arcimago</b>: scegli tu il colore di <b>briscola</b>, quello di cui hai più carte alte.';
+  if (g.phase === 'bid') return '<b>Prevedi quante prese farai</b> in questa mano. Contano le carte alte, le briscole e gli Arcimaghi; i Giullari non prendono mai. Se indovini esattamente guadagni 20 punti + 10 per presa, se sbagli li perdi.';
+  if (g.phase === 'play') return 'Gioca una carta. Devi <b>seguire il colore</b> della prima carta se puoi; l’<b>Arcimago</b> vince sempre, il <b>Giullare</b> perde sempre, la briscola batte gli altri colori.' + where;
+  return 'Mano finita: guarda i punti, poi si passa alla mano successiva.';
+} });
+Score.setup({ game: 'presagio', result: function (g) {
+  var w = Array.isArray(g.winner) ? g.winner : [];
+  return g.players.map(function (P, i) { return { won: w.indexOf(i) >= 0, place: 1 + g.players.filter(function (Q) { return Q.score > P.score; }).length, score: P.score }; });
+} });
 Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) {
@@ -2907,8 +3312,8 @@ function leaveTable(silent) {
 function inviteLink() { return location.origin + location.pathname + '?t=' + App.code; }
 function copyText(t, ok) { try { navigator.clipboard.writeText(t).then(function () { toast(ok || 'Copiato'); }, function () { toast(t); }); } catch (e) { toast(t); } }
 function invite() {
-  var url = inviteLink(), text = 'Siediti al mio tavolo di Presagio: codice ' + App.code;
-  if (navigator.share) { navigator.share({ title: 'Presagio', text: text, url: url }).catch(function () {}); return; }
+  var url = inviteLink(), text = 'Siediti al mio tavolo di Wizard: codice ' + App.code;
+  if (navigator.share) { navigator.share({ title: 'Wizard', text: text, url: url }).catch(function () {}); return; }
   copyText(url, 'Link d’invito copiato');
 }
 
@@ -2991,7 +3396,7 @@ function lobbyHTML() {
   var fan = [cardHTML(52), cardHTML(12), cardHTML(56)].map(function (h, i) { return h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 12) + 'deg) translateX(' + ((i - 1) * 20) + 'px)" class="card'); }).join('');
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
-    '<section class="hero"><div style="display:grid;gap:10px"><h1>Presagio</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: incisioni di Gustave Doré e di antichi atlanti celesti, di pubblico dominio</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
+    '<section class="hero"><div style="display:grid;gap:10px"><h1>Wizard</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: incisioni di Gustave Doré e di antichi atlanti celesti, di pubblico dominio</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
@@ -3010,7 +3415,7 @@ function roomHTML() {
   }
   var noEven = !!(d.opts && d.opts.noEven), hidden = !!(d.opts && d.opts.hidden);
   var rounds = n >= 3 ? 60 / Math.max(3, Math.min(6, n)) : 20;
-  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Wizard</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
@@ -3079,7 +3484,7 @@ function sheetBody(s) {
     var rank = g.players.map(function (P, i) { return { P: P, i: i }; }).sort(function (a, b) { return b.P.score - a.P.score; });
     return '<div class="winner">' + (g.winner.length > 1 ? 'Pari merito' : 'Vince ' + esc(g.players[g.winner[0]].nick)) + '</div>' +
       '<div class="tbl-wrap"><table class="sc"><tr><th>#</th><th class="l">Giocatore</th><th>Indovinate</th><th>Punti</th></tr>' + rank.map(function (r, k) { var ok = r.P.hist.filter(function (h) { return h.bid === h.tricks; }).length; return '<tr><td>' + (k + 1) + '</td><td class="l">' + esc(r.P.nick) + (r.i === me ? ' (tu)' : '') + '</td><td>' + ok + '/' + r.P.hist.length + '</td><td>' + r.P.score + '</td></tr>'; }).join('') + '</table></div>' +
-      (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') +
+      Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') +
       '<button class="btn block ghost" data-act="scores">Tutti i punteggi</button><button class="btn block ghost" data-act="close">Guarda il tavolo</button>';
   }
   if (s.kind === 'menu' && App.doc) {

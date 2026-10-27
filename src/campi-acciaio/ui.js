@@ -86,6 +86,22 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Coach.setup({ bots: 2, tip: function (g, me, mine) {
+  var P = g.players[me]; if (!P) return null;
+  if (g.pend && E.decider(g) === me) {
+    if (g.pend.k === 'combat') return '<b>Battaglia</b>: scegli quanta forza spendere (e le carte combattimento). Vince chi ha il totale più alto; la forza spesa si perde.';
+    if (g.pend.k === 'enc') return '<b>Incontro</b>: scegli una delle opzioni della carta. Alcune costano monete o popolarità.';
+    if (g.pend.k === 'factory') return '<b>Fabbrica</b>: scegli una carta; ti dà un’azione in più per il resto della partita.';
+  }
+  if (!mine) return null;
+  var st = g.ts && g.ts.stage;
+  if (st === 'bottom' || st === 'botwait') return 'Ora l’<b>azione in basso</b> della stessa colonna (Aggiorna, Schiera, Costruisci, Arruola), se puoi pagarla. Puoi anche saltarla.';
+  return 'Scegli una <b>colonna</b> della plancia (diversa da quella del turno scorso) e fai l’<b>azione in alto</b>: Muovi, Commercia, Produci o Rinforza. Obiettivo: le <b>6 stelle</b> chiudono la partita, ma vince chi ha più <b>monete</b> alla fine.';
+} });
+Score.setup({ game: 'campi-acciaio', result: function (g) {
+  var f = g.final || [];
+  return g.players.map(function (P, i) { var k = -1; f.forEach(function (x, j) { if (x.p === i) k = j; }); return { won: k === 0, place: k >= 0 ? k + 1 : null, score: k >= 0 ? f[k].total : null }; });
+} });
 Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var g = cur.game; g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true; }
@@ -166,8 +182,8 @@ function leaveTable(silent) {
 function inviteLink() { return location.origin + location.pathname + '?t=' + App.code; }
 function copyText(t, ok) { try { navigator.clipboard.writeText(t).then(function () { toast(ok || 'Copiato'); }, function () { toast(esc(t)); }); } catch (e) { toast(esc(t)); } }
 function invite() {
-  var url = inviteLink(), text = 'Siediti al mio tavolo di Campi d’Acciaio: codice ' + App.code;
-  if (navigator.share) { navigator.share({ title: 'Campi d’Acciaio', text: text, url: url }).catch(function () {}); return; }
+  var url = inviteLink(), text = 'Siediti al mio tavolo di Scythe: codice ' + App.code;
+  if (navigator.share) { navigator.share({ title: 'Scythe', text: text, url: url }).catch(function () {}); return; }
   copyText(url, 'Link d’invito copiato');
 }
 
@@ -269,7 +285,7 @@ function lobbyHTML() {
   var art = '<svg class="hero-art" viewBox="0 0 360 170" aria-hidden="true">' + ART.DEFS +
     '<g transform="translate(80 150) scale(1.1)">' + ART.mech('ferro') + '</g><g transform="translate(190 150) scale(1.15)">' + ART.mech('brina') + '</g><g transform="translate(292 150) scale(1)">' + ART.mech('carbone') + '</g></svg>';
   return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
-    '<section class="hero"><div class="hero-txt"><h1>Campi d’Acciaio</h1><p class="tag">Cinque fazioni, una vecchia Fabbrica di mech e campagne da contendersi. Produci, costruisci, arruola e combatti: vince chi alla fine ha più monete. Da 2 a 5 giocatori, ognuno dal proprio telefono.</p>' +
+    '<section class="hero"><div class="hero-txt"><h1>Scythe</h1><p class="tag">Cinque fazioni, una vecchia Fabbrica di mech e campagne da contendersi. Produci, costruisci, arruola e combatti: vince chi alla fine ha più monete. Da 2 a 5 giocatori, ognuno dal proprio telefono.</p>' +
     '<div class="faces">' + D.FAC_ORDER.map(function (k) { return ART.portrait(k, 54); }).join('') + '</div></div>' + art + '</section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
@@ -288,7 +304,7 @@ function roomHTML() {
     else seats += '<div class="seat"><div class="ava empty">·</div><div class="sub">Posto libero</div></div>';
   }
   var o = d.opts || {}, ban = o.ban !== false;
-  return '<div class="topbar"><div class="wrap"><span class="brand">Campi d’Acciaio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Scythe</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 2 a 5 giocatori; i posti mancanti si riempiono con giocatori automatici. Fazioni e plance vengono assegnate a caso all’inizio.</p></section>' +

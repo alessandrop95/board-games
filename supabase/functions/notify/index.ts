@@ -67,10 +67,11 @@ Deno.serve(async (req) => {
     const url = needTable ? SITE + game + '/?t=' + code : SITE + '?amici=1';
     let out: Record<string, unknown> = { ok: true };
     if (kind === 'table') {
-      const r = await rpc('srv_table', { p_token: token, p_game: game });
+      const friendsOnly = b.vis === 'friends';
+      const r = await rpc('srv_table', { p_token: token, p_game: game, p_vis: friendsOnly ? 'friends' : 'public' });
       out.sent = await deliver(r.subs, {
-        title: 'Nuovo tavolo: ' + GAMES[game],
-        body: clean(r.from, 18) + ' ha aperto un tavolo ed è in attesa di giocatori. Tocca per sederti.',
+        title: (friendsOnly ? 'Tavolo tra amici: ' : 'Nuovo tavolo: ') + GAMES[game],
+        body: clean(r.from, 18) + (friendsOnly ? ' ha aperto un tavolo per i suoi amici. Tocca per sederti.' : ' ha aperto un tavolo ed è in attesa di giocatori. Tocca per sederti.'),
         url, tag: 'table-' + game + '-' + code, kind
       }, 'table' + code);
     } else if (kind === 'invite') {

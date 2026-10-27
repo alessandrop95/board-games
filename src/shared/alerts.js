@@ -58,9 +58,20 @@ var Alerts = (function () {
   // Chi è già seduto a un tavolo (in attesa o in partita) non riceve avvisi: lo distrarrebbero e basta.
   function busy() { return typeof App !== 'undefined' && App && App.screen === 'table' && App.doc && Net.tableCode; }
   function isMine(g, code) { var m = obj(MINE); return !!m[g.p + code]; }
+  // Tavolo «solo amici»: il codice non è nella lista pubblica, lo sa il server (dove si trova l'amico adesso).
+  function friendCode(e, g) {
+    if (e.vis !== 'friends' || !window.Account || !Account.friend) return null;
+    var f = Account.friend(e.u); if (!f) return null;
+    if (f.table && f.game === g.path.replace(/\/$/, '')) return f.table;
+    if (Account.refreshFriendsSoon) Account.refreshFriendsSoon();
+    return null;
+  }
+  function visible(t) { return t.e.vis !== 'friends' || !!(window.Account && Account.friend && Account.friend(t.e.u)); }
+  function codeOf(t) { return t.e.vis === 'friends' ? friendCode(t.e, t.g) : t.e.vis === 'public' ? t.e.code : null; }
   function maybeAlert(k, t) {
-    var e = t.e, g = t.g;
-    if (!enabled() || e.phase !== 'lobby' || e.vis !== 'public' || !/^[A-Z]{4}$/.test(e.code || '')) return;
+    var e = t.e, g = t.g, fc = e.vis === 'friends' ? friendCode(e, g) : null;
+    if (fc) e = Object.assign({}, e, { code: fc });
+    if (!enabled() || e.phase !== 'lobby' || (e.vis !== 'public' && !fc) || !/^[A-Z]{4}$/.test(e.code || '')) return;
     if (prefs().games.indexOf(g.path.replace(/\/$/, '')) < 0) return;            // gioco escluso nelle preferenze
     if (!e.c || e.t - e.c > 90000 || e.t < e.c - 5000) return;       // solo tavoli aperti adesso (orari dello stesso telefono)
     if (isMine(g, e.code) || (here && here.p === g.p && Net.tableCode === e.code) || busy()) return;
@@ -68,7 +79,7 @@ var Alerts = (function () {
     if (seen[k]) return;                                               // già avvisato (anche da un'altra scheda)
     Object.keys(seen).forEach(function (x) { if (now - seen[x] > 3600e3) delete seen[x]; });
     seen[k] = now; set(SEEN, JSON.stringify(seen));
-    var title = 'Nuovo tavolo: ' + nameOf(t), body = (e.host || 'Qualcuno') + ' ha aperto un tavolo ed è in attesa di giocatori.', url = urlFor(g, e.code);
+    var title = (fc ? 'Tavolo tra amici: ' : 'Nuovo tavolo: ') + nameOf(t), body = (e.host || 'Qualcuno') + (fc ? ' ha aperto un tavolo per i suoi amici.' : ' ha aperto un tavolo ed è in attesa di giocatori.'), url = urlFor(g, e.code);
     if (document.visibilityState === 'visible') banner(title, body, url);
     else if (sysOn() && !pushOn()) sysNotify(title, body + ' Tocca per sederti.', url, k); // con le notifiche push ci pensa il server
   }
@@ -255,14 +266,40 @@ var Alerts = (function () {
   function mountHome(el) { homeEl = el; css(); start(); paintHome(); setTimeout(function () { if (homeEl && !list().length) paintHome(true); }, 6000); }
   function paintHome(waited) {
     if (!homeEl) return;
-    var l = list();
+    var l = list().filter(visible);
     if (!l.length) { homeEl.innerHTML = '<p>' + (waited || started && Object.keys(tables).length ? 'Nessun tavolo aperto in questo momento: aprine uno tu da un gioco qui sotto, comparirà qui per tutti.' : 'Cerco i tavoli aperti…') + '</p>'; return; }
     homeEl.innerHTML = '<div class="ppa-home">' + l.slice(0, 8).map(function (t) {
-      var e = t.e, full = e.max && e.n >= e.max, pub = e.vis === 'public' && /^[A-Z]{4}$/.test(e.code || '');
+      var code = codeOf(t), e = Object.assign({}, t.e, { code: code }), full = e.max && e.n >= e.max, pub = /^[A-Z]{4}$/.test(code || '');
       var state = e.phase === 'play' ? 'in partita' : full ? 'completo' : 'in attesa di giocatori';
       var btn = !pub ? '<a href="' + esc(urlFor(t.g)) + '">Ho il codice</a>' : e.phase === 'play' || full ? '<a href="' + esc(urlFor(t.g, e.code)) + '">Guarda</a>' : '<a class="sit" href="' + esc(urlFor(t.g, e.code)) + '">Siediti</a>';
-      return '<div class="ppa-row"><div class="g"><b>' + esc(nameOf(t)) + '</b> · tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + '<small>' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori · ' + state + (pub ? '' : ' · solo su invito') + '</small></div>' + btn + '</div>';
+      return '<div class="ppa-row"><div class="g"><b>' + esc(nameOf(t)) + '</b> · tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + '<small>' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori · ' + state + (t.e.vis === 'friends' ? ' · solo amici' : pub ? '' : ' · solo su invito') + '</small></div>' + btn + '</div>';
     }).join('') + '</div>';
+  }
+
+  /* --- home: «Continua la partita», i tavoli dove sei seduto in qualsiasi gioco --- */
+  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table' };
+  function mountContinue(el) {
+    if (!el || typeof Net === 'undefined' || !Net.peekAt) return;
+    var box = el.closest('section') || el, cards = {};
+    function paint() {
+      var l = GAMES.map(function (g) { return cards[g.path]; }).filter(Boolean);
+      box.hidden = !l.length;
+      el.innerHTML = l.map(function (c) {
+        return '<div class="ppa-row"><div class="g"><b>' + esc(c.g.n) + '</b> · tavolo ' + esc(c.d.code) + (c.d.practice ? ' (prova)' : '') +
+          '<small>' + esc(c.st) + (c.others.length ? ' · con ' + esc(c.others.join(', ')) : '') + '</small></div><a class="sit" href="' + esc(urlFor(c.g, c.d.code)) + '">Continua</a></div>';
+      }).join('');
+    }
+    css(); el.classList.add('ppa-home'); paint();
+    GAMES.forEach(function (g) {
+      var code = get(SEAT[g.path]); if (!/^[A-Z]{4}$/.test(code || '')) return;
+      Net.peekAt(g.p, code).then(function (f) {
+        if (f && f.closed) { set(SEAT[g.path], null); return; }
+        var d = f && f.doc; if (!d || !d.seats || !d.seats.some(function (x) { return x.uid === Net.uid; })) return;
+        var st = d.phase === 'play' ? 'partita in corso' : d.phase === 'over' ? 'partita finita' : 'in attesa di giocatori';
+        cards[g.path] = { g: g, d: d, st: st, others: d.seats.filter(function (x) { return x.uid !== Net.uid; }).map(function (x) { return x.nick; }).slice(0, 4) };
+        paint();
+      });
+    });
   }
 
   /* --- chi apre un tavolo pubblico lo fa annunciare dal server a chi ha le notifiche attive --- */
@@ -271,11 +308,12 @@ var Alerts = (function () {
     Object.keys(m).forEach(function (x) { if (now - m[x] > 24 * 3600e3) delete m[x]; });
     m[prefix + code] = now; set(MINE, JSON.stringify(m));
     if (vis === 'invite' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
+    if (window.Account && Account.presence) Account.presence();   // gli amici devono sapere subito dove si trova il tavolo
     var g = GAMES.filter(function (x) { return x.p === prefix; })[0]; if (!g) return;
-    if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code }).catch(function (e) { console.warn('annuncio', e); });
+    if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code, vis: vis === 'friends' ? 'friends' : 'public' }).catch(function (e) { console.warn('annuncio', e); });
   }
 
   if (enabled()) setTimeout(start, 1200);
   return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables,
-    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner };
+    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
 })();

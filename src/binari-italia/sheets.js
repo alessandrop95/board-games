@@ -163,7 +163,7 @@ function overBody(g, me) {
   return '<div class="over"><div class="crown">' + ART.pieceIcon(g.players[W].col, 90) + '</div><h2>' + (W === me ? 'Hai vinto!' : 'Vince ' + esc(g.players[W].nick)) + '</h2>' +
     '<p class="lead">' + F.rows[W].total + ' punti. La linea continua più lunga misura ' + F.maxL + ' vagoni: +10 a ' + F.order.filter(function (p) { return F.rows[p].bonus; }).map(function (p) { return esc(g.players[p].nick); }).join(' e ') + '.</p>' +
     '<div class="frs">' + rows + '</div>' +
-    (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda la mappa') + '</div>';
+    Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda la mappa') + '</div>';
 }
 
 /* ---------- eventi ---------- */

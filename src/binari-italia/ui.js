@@ -83,6 +83,20 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Coach.setup({ bots: 2,
+  myTurn: function (g, me) { return g.stage === 'setup' ? !g.players[me].ready : E.decider(g) === me; },
+  tip: function (g, me, mine) {
+    var P = g.players[me]; if (!P) return null;
+    if (g.stage === 'setup' && !P.ready) return 'Scegli quali <b>biglietti</b> tenere (almeno 2). Ogni biglietto collega due città: se le colleghi con i tuoi binari guadagni i punti, altrimenti li perdi a fine partita.';
+    if (!mine) return null;
+    if (g.stage === 'draw2') return 'Prendi la <b>seconda carta</b> vagone (dal mazzo o scoperta, ma non una locomotiva scoperta).';
+    if (g.stage === 'tickets') return 'Scegli quali dei <b>nuovi biglietti</b> tenere (almeno 1).';
+    return 'Nel tuo turno fai <b>una sola cosa</b>: pesca 2 carte vagone, oppure conquista una <b>tratta</b> pagando carte del suo colore (le locomotive valgono come jolly), oppure prendi nuovi biglietti. Ti restano <b>' + P.trains + '</b> vagoni.';
+  } });
+Score.setup({ game: 'binari-italia', result: function (g) {
+  var o = g.final ? g.final.order : [], rows = g.final ? g.final.rows : [];
+  return g.players.map(function (P, i) { var k = o.indexOf(i), r = rows.filter(function (x) { return x.p === i; })[0]; return { won: k === 0, place: k >= 0 ? k + 1 : null, score: r ? r.total : null }; });
+} });
 Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var g = cur.game; g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true; }

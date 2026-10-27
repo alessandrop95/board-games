@@ -55,36 +55,47 @@ var Lobby = (function () {
     if (failed) return '<p class="lead">Non riesco a caricare la lista dei tavoli. Controlla la connessione; puoi sempre entrare con il codice.</p>';
     if (!list) return '<p class="lead">Cerco i tavoli aperti…</p>';
     if (!list.length) return '<p class="lead">Nessun tavolo aperto in questo momento. Aprine uno tu: comparirà qui per tutti.</p>';
-    return list.map(function (t) {
+    var A = window.Account, shown = list.filter(function (t) { return t.vis !== 'friends' || (A && A.friend && A.friend(t.u)); });
+    if (!shown.length) return '<p class="lead">Nessun tavolo aperto in questo momento. Aprine uno tu: comparirà qui per tutti.</p>';
+    return shown.map(function (t) {
       var full = t.max && t.n >= t.max, pub = t.vis === 'public';
+      if (t.vis === 'friends') {   // tavolo di un amico: il codice arriva dal server (dove si trova l'amico adesso)
+        var f = A.friend(t.u), here = window.Alerts && Alerts.here, code = f && f.table && here && f.game === here.path.replace(/\/$/, '') ? f.table : null;
+        if (!code && A.refreshFriendsSoon) A.refreshFriendsSoon();
+        t = Object.assign({}, t, { code: code }); pub = !!code;
+      }
       var state = t.phase === 'play' ? 'in partita' : full ? 'completo' : 'in attesa';
       var btn;
-      if (!pub) btn = '<button class="btn small ghost" data-act="lobbycode" data-host="' + e(t.host) + '">Ho il codice</button>';
+      if (!pub && t.vis === 'friends') btn = '<button class="btn small ghost" disabled>Un attimo…</button>';
+      else if (!pub) btn = '<button class="btn small ghost" data-act="lobbycode" data-host="' + e(t.host) + '">Ho il codice</button>';
       else if (t.phase === 'play') btn = '<button class="btn small ghost" data-act="lobbyjoin" data-code="' + e(t.code) + '">Guarda</button>';
       else if (full) btn = '<button class="btn small ghost" disabled>Completo</button>';
       else btn = '<button class="btn small" data-act="lobbyjoin" data-code="' + e(t.code) + '">Siediti</button>';
-      return '<div class="trow"><div class="grow" style="min-width:0"><div style="overflow-wrap:anywhere"><b>Tavolo di ' + e(t.host || '…') + '</b><span class="vis-b">' + (pub ? 'Aperto a tutti' : 'Solo su invito') + '</span></div>' +
+      return '<div class="trow"><div class="grow" style="min-width:0"><div style="overflow-wrap:anywhere"><b>Tavolo di ' + e(t.host || '…') + '</b><span class="vis-b">' + (t.vis === 'friends' ? 'Solo amici' : pub ? 'Aperto a tutti' : 'Solo su invito') + '</span></div>' +
         '<div class="muted" style="font-size:13px">' + t.n + (t.max ? '/' + t.max : '') + ' giocatori · ' + state + (t.note ? ' · ' + e(t.note) : '') + '</div></div>' + btn + '</div>';
     }).join('');
   }
-  function panelHTML() { ensureCss(); return (window.Account ? Account.chipHTML() : '') + (window.Alerts ? Alerts.controlHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
+  function panelHTML() { ensureCss(); return (window.Account ? Account.chipHTML() : '') + (window.Alerts ? Alerts.controlHTML() : '') + (window.Coach ? Coach.buttonHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
   function pickHTML() {
-    var v = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })() === 'invite' ? 'invite' : 'public';
+    var fr = window.Account && Account.user(), v0 = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })();
+    var v = v0 === 'invite' ? 'invite' : v0 === 'friends' && fr ? 'friends' : 'public';
     return '<div class="vis-pick" role="radiogroup" aria-label="Chi può sedersi">' +
       '<label><input type="radio" name="vis" value="public"' + (v === 'public' ? ' checked' : '') + '><span><b>Aperto a tutti</b><br><span class="muted" style="font-size:13px">compare nella lista e chi ha gli avvisi accesi riceve una notifica</span></span></label>' +
-      '<label><input type="radio" name="vis" value="invite"' + (v === 'invite' ? ' checked' : '') + '><span><b>Solo su invito</b><br><span class="muted" style="font-size:13px">compare nella lista, ma serve il codice</span></span></label></div>';
+      '<label><input type="radio" name="vis" value="invite"' + (v === 'invite' ? ' checked' : '') + '><span><b>Solo su invito</b><br><span class="muted" style="font-size:13px">compare nella lista, ma serve il codice</span></span></label>' +
+      (fr ? '<label><input type="radio" name="vis" value="friends"' + (v === 'friends' ? ' checked' : '') + '><span><b>Solo amici</b><br><span class="muted" style="font-size:13px">lo vedono e ricevono la notifica solo i tuoi amici</span></span></label>' : '') + '</div>';
   }
   function pickedVis() {
-    var el = document.querySelector('input[name="vis"]:checked'), v = el && el.value === 'invite' ? 'invite' : 'public';
+    var el = document.querySelector('input[name="vis"]:checked'), v = el && (el.value === 'invite' || el.value === 'friends') ? el.value : 'public';
     try { localStorage.setItem('pp-vis', v); } catch (x) {}
     return v;
   }
   function roomHTML(doc, isHost) {
     ensureCss();
-    var v = doc.vis === 'invite' ? 'invite' : 'public';
+    var v = doc.vis === 'invite' || doc.vis === 'friends' ? doc.vis : 'public', fr = v === 'friends' || (window.Account && Account.user());
+    if (doc.practice) return (window.Score ? Score.roomHTML(doc, isHost) : '') + '<p class="muted" style="margin:0;font-size:15px">Partita di prova: il tavolo non compare nella lista.</p>';
     return '<label style="display:grid;gap:6px"><span><b>Chi può sedersi</b><br><span class="muted" style="font-size:15px">' +
-      (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
-      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option></select></label>' + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
+      (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : v === 'friends' ? 'Il tavolo lo vedono solo gli amici dell’host, che possono sedersi con un tocco.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
+      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option>' + (fr ? '<option value="friends"' + (v === 'friends' ? ' selected' : '') + '>Solo amici</option>' : '') + '</select></label>' + (window.Score ? Score.roomHTML(doc, isHost) : '') + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
   }
   return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
     setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget };

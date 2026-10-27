@@ -2,7 +2,7 @@
 
 Giochi da tavolo da giocare online con gli amici.
 
-## Polvere & Piombo
+## Bang! (`polvere-e-piombo`)
 
 Gioco di carte western a ruoli segreti, da 4 a 7 giocatori, ognuno dal proprio telefono.
 
@@ -22,7 +22,7 @@ Wikimedia Commons e appena virati in seppia da `tools/process_pp.py`; originali 
 - Animazioni: carte che volano tra mano, mazzo, scarti e tavolo; colpi di pistola, Mitraglia, Stampede, esplosioni del
   Candelotto, sfide, eliminazioni, estrazioni, distribuzione iniziale e fine partita.
 
-## Presagio
+## Wizard (`presagio`)
 
 Gioco di carte a prese con previsione, da 3 a 6 giocatori.
 
@@ -40,7 +40,7 @@ Illustrazioni: incisioni antiche di pubblico dominio da Wikimedia Commons (Gusta
 il planisfero di Cellarius e la xilografia Flammarion), ricolorate in stile fantasy da `tools/process_assets.py`.
 Originali e crediti in `presagio/img/src/` (scaricati dalla Action «assets»).
 
-## Gattomina
+## Exploding Kittens (`gattomina`)
 
 Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori (regole equivalenti al gioco base dei gattini esplosivi, con nomi e grafica originali).
 
@@ -52,7 +52,7 @@ Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori (regole equivalenti al 
 - Combinazioni: coppia (rubi a caso), tris (chiedi una carta precisa), cinque diverse (prendi dagli scarti).
 - Grafica: emoji 3D di [Noto Emoji](https://github.com/googlefonts/noto-emoji) di Google, licenza Apache 2.0 (copia in `gattomina/img/e/`), composte in carte cartoon.
 
-## Campi d’Acciaio
+## Scythe (`campi-acciaio`)
 
 Strategia dieselpunk da 2 a 5 giocatori (regole equivalenti a un noto gioco di mech e campagne; nomi, testi, carte e grafica originali).
 
@@ -92,13 +92,18 @@ Gioco di treni e tratte ferroviarie da 2 a 5 giocatori (regole equivalenti a un 
 ## Tavoli aperti e chiusura
 
 - Nella schermata iniziale di ogni gioco c'è la lista dal vivo dei **Tavoli aperti**.
-- Chi apre un tavolo sceglie: **Aperto a tutti** (ci si siede con un tocco; in partita si può guardare) oppure **Solo su invito** (compare nella lista ma serve il codice o il link). L'host può cambiarlo dalla sala d'attesa.
+- Chi apre un tavolo sceglie: **Aperto a tutti** (ci si siede con un tocco; in partita si può guardare), **Solo su invito** (compare nella lista ma serve il codice o il link) oppure, con l'account, **Solo amici** (lo vedono e ricevono la notifica solo i tuoi amici, che si siedono con un tocco). L'host può cambiarlo dalla sala d'attesa.
+- **Serie di partite**: in sala d'attesa l'host sceglie *Partite singole*, *Al meglio di 3* o *Al meglio di 5*. Con «Nuova partita con lo stesso tavolo» le vittorie si sommano; la classifica della serie è in sala d'attesa e nella schermata finale.
+- **Partita guidata**: nella lista dei tavoli di ogni gioco, *🎓 Partita guidata* apre una partita di prova contro i bot (non compare nella lista, nessun limite di tempo). Una barra in alto spiega cosa fare in quel momento e *Fai la mossa consigliata* gioca la mossa che sceglierebbe un giocatore esperto. Si nasconde con ×.
+- In **home**, *Continua la partita* mostra i tavoli dove sei seduto, in qualsiasi gioco.
 - L'host può **chiudere il tavolo** (sala d'attesa o Menu): tutti tornano alla home e il tavolo sparisce dalla lista. I tavoli abbandonati spariscono da soli dopo poco più di un minuto.
 - **Uscire (pulsante *Esci*):**
   - **host**: sceglie tra *Esci e lascia il comando a…* (passa da solo al primo giocatore collegato; in partita al suo posto gioca l'automatico) e *Chiudi il tavolo per tutti*. Se al tavolo restano solo giocatori automatici, il tavolo si può solo chiudere e la partita finisce;
   - **gli altri, a partita iniziata**: *Lascia la partita* (l'automatico prende il posto fino alla fine) oppure *Esci per ora* (il posto resta tuo e puoi rientrare). In sala d'attesa si esce e basta.
 
 ## Chat al tavolo
+
+- **Reazioni rapide**: il pulsante 😊 accanto a *Chat* manda un'emoji che tutti vedono per qualche secondo.
 
 - Pulsante **Chat** in alto, nella sala d'attesa e durante la partita, con il numero di messaggi nuovi e un'anteprima quando arriva un messaggio.
 - Frasi rapide ("Ben giocata!", "Tocca a te!"…); chi entra dopo vede gli ultimi messaggi; i messaggi arrivano anche se l'host è assente.
@@ -135,6 +140,13 @@ e il gioco online resta com'era. Conviene modificare `src/`: se cambi a mano una
 - **Invitare:** nella sala d’attesa del tavolo tocca *Invita un amico* → *Invita*: all’amico arriva una notifica che lo porta direttamente al tavolo.
 - Dal pannello 👤 si cambia la password, si esce o si cancella l’account (con amici e notifiche).
 - Le password sono salvate cifrate (bcrypt); dopo troppi tentativi sbagliati l’accesso a quel nome si blocca per qualche minuto.
+- **Amici online**: nella lista amici (pulsante 👤) un pallino verde indica chi è collegato, con dove si trova («sta giocando a Wizard», «è al tavolo di Bang!, in attesa»); *Raggiungi* ti porta al suo tavolo.
+- **Statistiche** (👤 → *Statistiche e classifica tra amici*): partite giocate e vinte per gioco, ultime partite e classifica tra te e i tuoi amici, per tutti i giochi o per uno. Contano le partite finite da quando hai l'account (non quelle di prova).
+
+## Prove automatiche
+
+In `tests/` ci sono le prove di tutto il progetto (regole, notifiche, database e partite vere nel browser con più telefoni simulati): vedi `tests/README.md`.
+Le fa girare da solo il workflow **Prove** dopo ogni ricostruzione dei giochi e quando cambiano server, home o pagine: se qualcosa si rompe il pallino in *Actions* diventa rosso e arriva una email da GitHub.
 
 ## Configurare il server
 

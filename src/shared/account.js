@@ -7,15 +7,19 @@ var Account = (function () {
   function set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
   function jget(k) { try { return JSON.parse(get(k) || 'null'); } catch (e) { return null; } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  var cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
+  var sig = null, cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
   var readyRes; var ready = new Promise(function (r) { readyRes = r; });
 
   /* ---------- server ---------- */
   function load() {
+    sig = configured() + ':' + !!user();
     fetch(ROOT + 'server.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : (r.status === 404 ? false : null); }).then(function (j) {
       if (j && j.url && j.anon) { cfg = j; set('pp-server', JSON.stringify(j)); }
       else if (j === false) { cfg = null; set('pp-server', null); }
+      var was = sig; sig = configured() + ':' + !!user();
       readyRes(); repaint(); check();
+      // La scelta «chi può sedersi» era stata disegnata prima di sapere se c'è l'account: la si aggiorna (opzione «Solo amici»).
+      if (was !== sig && window.Lobby && Lobby.pickHTML) document.querySelectorAll('.vis-pick').forEach(function (el) { el.outerHTML = Lobby.pickHTML(); });
     }, function () { readyRes(); });
   }
   function configured() { return !!(cfg && cfg.url); }
@@ -63,6 +67,68 @@ var Account = (function () {
     if (!user()) return Promise.resolve(null);
     return rpc('friends', { p_token: session.token }).then(function (d) { friendsData = d; repaint(); if (!quiet) render(); return d; });
   }
+  function friend(name) {
+    if (!name || !friendsData || !friendsData.friends) return null;
+    var n = String(name).toLowerCase();
+    return friendsData.friends.filter(function (f) { return f.username.toLowerCase() === n; })[0] || null;
+  }
+  var soonAt = 0;
+  function refreshFriendsSoon() { if (Date.now() - soonAt < 10000 || !user()) return; soonAt = Date.now(); refreshFriends(true).then(paintLists, function () {}); }
+  function paintLists() { if (window.Lobby && Lobby.paint) Lobby.paint(); if (window.Alerts && Alerts.paintHome) Alerts.paintHome(); }
+
+  /* ---------- presenza: gli amici vedono se sei collegato e a quale tavolo ---------- */
+  // Ogni minuto con l'app aperta (e subito quando entri o esci da un tavolo). Il server risponde con gli amici aggiornati.
+  var presSig = null, presAt = 0, presBusy = false;
+  function where() {
+    var g = A.here ? A.here.path.replace(/\/$/, '') : null, d = window.App && App.doc, code = window.Net && Net.tableCode;
+    var seated = d && d.seats && window.Net && d.seats.some(function (x) { return x.uid === Net.uid; });
+    if (!d || !code || d.practice || !(seated || App.screen === 'table')) return { g: g, t: null, v: null, ph: null };
+    return { g: g, t: code, v: d.vis || 'public', ph: d.phase };
+  }
+  function presenceTick(force) {
+    if (!user() || presBusy || document.visibilityState === 'hidden') return;
+    var w = where(), sig = JSON.stringify(w);
+    if (!force && sig === presSig && Date.now() - presAt < 60000) return;
+    presBusy = true; presSig = sig; presAt = Date.now();
+    rpc('presence', { p_token: session.token, p_game: w.g, p_table: w.t, p_vis: w.v, p_phase: w.ph })
+      .then(function (d) { friendsData = d; repaint(); paintLists(); if (view && (view.v === 'account' || view.v === 'invite')) render(); }, function () { presSig = null; })
+      .then(function () { presBusy = false; });
+  }
+  setInterval(function () { presenceTick(false); }, 4000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') presenceTick(true); });
+  function gameName(id) { var g = (A.GAMES || []).filter(function (x) { return x.path === id + '/'; })[0]; return g ? g.n : id; }
+  function friendLine(f) {
+    if (!f.online) return 'non in linea';
+    if (!f.game) return 'collegato';
+    if (!f.table) return 'sta guardando ' + gameName(f.game);
+    return (f.phase === 'play' ? 'sta giocando a ' : f.phase === 'over' ? 'ha appena finito a ' : 'è al tavolo di ') + gameName(f.game) + (f.phase === 'lobby' ? ', in attesa' : '');
+  }
+  function joinHref(f) { return f.online && f.game && f.table ? ROOT + f.game + '/?t=' + f.table : null; }
+
+  /* ---------- statistiche ---------- */
+  var statsData = null, boardData = null, boardGame = '';
+  function loadStats() {
+    return Promise.all([rpc('my_stats', { p_token: session.token }), rpc('friends_board', { p_token: session.token, p_game: boardGame || null })])
+      .then(function (r) { statsData = r[0]; boardData = r[1]; render(); }, function (er) { msg = { t: String(er) }; render(); });
+  }
+  function statsHTML() {
+    var h = '<h2>Statistiche</h2>' + msgHTML();
+    if (!statsData) return h + '<p class="pa-note">Carico…</p><button class="pa-btn g" data-pa="go" data-v="account">Indietro</button>';
+    var gs = statsData.games, tp = 0, tw = 0; gs.forEach(function (x) { tp += x.played; tw += x.won; });
+    h += '<h3>Le tue partite</h3>';
+    h += gs.length ? '<div class="pa-list">' + gs.map(function (x) { return '<div class="pa-row"><b>' + esc(gameName(x.game)) + '</b><span class="pa-num">' + x.won + ' vinte su ' + x.played + '</span><span class="pa-pct">' + Math.round(100 * x.won / Math.max(1, x.played)) + '%</span></div>'; }).join('') +
+      '<div class="pa-row pa-tot"><b>Totale</b><span class="pa-num">' + tw + ' vinte su ' + tp + '</span><span class="pa-pct">' + Math.round(100 * tw / Math.max(1, tp)) + '%</span></div></div>'
+      : '<p class="pa-note">Ancora nessuna partita registrata: si contano quelle finite da quando hai l’account (non le partite di prova).</p>';
+    h += '<h3>Classifica tra amici</h3><div class="pa-bar pa-filter"><button type="button" class="pa-btn s' + (boardGame ? ' g' : '') + '" data-pa="board" data-g="">Tutti i giochi</button>' +
+      (A.GAMES || []).map(function (g) { var id = g.path.replace(/\/$/, ''); return '<button type="button" class="pa-btn s' + (boardGame === id ? '' : ' g') + '" data-pa="board" data-g="' + id + '">' + esc(g.n) + '</button>'; }).join('') + '</div>';
+    h += boardData && boardData.length ? '<div class="pa-list">' + boardData.map(function (r, i) { return '<div class="pa-row' + (r.me ? ' pa-me' : '') + '"><span class="pa-pos">' + (i + 1) + '</span><b>' + esc(r.username) + (r.me ? ' (tu)' : '') + '</b><span class="pa-num">' + r.won + ' vinte · ' + r.played + ' giocate</span></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun risultato.</p>';
+    if (statsData.recent.length) h += '<h3>Ultime partite</h3><div class="pa-list">' + statsData.recent.map(function (x) {
+      var d = new Date(x.at), when = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      return '<div class="pa-row"><span class="pa-res">' + (x.won ? '🏆' : '·') + '</span><span style="flex:1;min-width:0"><b>' + esc(gameName(x.game)) + '</b> · ' + (x.won ? 'vinta' : x.place ? x.place + 'º posto' : 'persa') + (x.score != null ? ' · ' + x.score + ' punti' : '') +
+        '<br><span class="pa-note">' + when + (x.rivals && x.rivals.length ? ' · con ' + x.rivals.map(esc).join(', ') : '') + '</span></span></div>';
+    }).join('') + '</div>';
+    return h + '<button class="pa-btn g" data-pa="go" data-v="account">Indietro</button>';
+  }
   function incoming() { return friendsData && friendsData.incoming ? friendsData.incoming.length : 0; }
   function addFriend(name) {
     return notify({ kind: 'friend', to: name }).then(function (r) {
@@ -84,6 +150,8 @@ var Account = (function () {
     '.pa-err{color:#ff9b86;font-size:14.5px}.pa-ok{color:#9fdc95;font-size:14.5px}' +
     '.pa-list{display:grid;gap:6px}.pa-row{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}.pa-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
     '.pa-dot{width:9px;height:9px;border-radius:50%;background:#8a9097;flex:none}.pa-dot.on{background:#43d17c}' +
+    '.pa-row a.pa-btn{text-decoration:none;display:inline-flex;align-items:center}.pa-num{font-size:13.5px;color:#cfc8ba;white-space:nowrap}.pa-pct{min-width:42px;text-align:right;font-weight:700;color:#e6c56f}' +
+    '.pa-tot{background:rgba(230,197,111,.1)}.pa-me{box-shadow:inset 0 0 0 1px rgba(230,197,111,.6)}.pa-pos{width:22px;text-align:center;font-weight:800;color:#e6c56f}.pa-res{width:22px;text-align:center}.pa-filter{gap:6px}' +
     '.pa-chip{appearance:none;display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(230,197,111,.45);background:rgba(230,197,111,.1);color:inherit;border-radius:999px;padding:6px 12px;font:600 14px system-ui,sans-serif;cursor:pointer;position:relative}' +
     '.pa-chip .n{background:#c4301f;color:#fff;border-radius:999px;font-size:11px;padding:0 6px;font-weight:800}.pa-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
     '.pa-check{display:flex!important;flex-direction:row!important;gap:10px!important;align-items:center;font-size:15px!important;color:inherit!important;padding:4px 0}.pa-check input{width:20px;height:20px;accent-color:#e6c56f;flex:none}' +
@@ -97,6 +165,7 @@ var Account = (function () {
     if (view.v !== 'login' && view.v !== 'register' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
     render();
     if (user() && (view.v === 'account' || view.v === 'invite')) refreshFriends().catch(function () {});
+    if (user() && view.v === 'stats') { statsData = null; loadStats(); }
   }
   function render() {
     if (!view) return;
@@ -124,12 +193,13 @@ var Account = (function () {
         '<button class="pa-btn g" data-pa="close" type="button">' + (view.x.why ? 'Non ora' : 'Chiudi') + '</button>';
     }
     if (!u) return '';
+    if (v === 'stats') return statsHTML();
     if (v === 'invite') {
       var x = view.x, fr = friendsData ? friendsData.friends : null;
       return '<h2>Invita un amico</h2><p class="pa-note">Gli arriva una notifica: toccandola si siede al tavolo <b>' + esc(x.code) + '</b>.</p>' + msgHTML() +
         (fr == null ? '<p class="pa-note">Carico i tuoi amici…</p>' : fr.length ? '<div class="pa-list">' + fr.map(function (f) {
           var k = x.code + ':' + f.username, sent = inviteSent[k];
-          return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '" title="' + (f.online ? 'In linea di recente' : 'Non in linea') + '"></span><b>' + esc(f.username) + '</b><button class="pa-btn s' + (sent ? ' g' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato ✓' : 'Invita') + '</button></div>';
+          return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '" title="' + (f.online ? 'Collegato' : 'Non in linea') + '"></span><span style="flex:1;min-width:0"><b>' + esc(f.username) + '</b><br><span class="pa-note">' + esc(friendLine(f)) + '</span></span><button class="pa-btn s' + (sent ? ' g' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato ✓' : 'Invita') + '</button></div>';
         }).join('') + '</div>' : '<p>Non hai ancora amici nella lista.</p>') +
         '<button class="pa-btn g" data-pa="go" data-v="account">Aggiungi amici</button><button class="pa-btn g" data-pa="close">Chiudi</button>';
     }
@@ -139,9 +209,10 @@ var Account = (function () {
     h += '<h3>Notifiche</h3>' + (window.Alerts && Alerts.settingsHTML ? Alerts.settingsHTML() : '');
     h += '<hr class="pa-sep"><h3>Amici</h3>';
     if (inc.length) h += '<div class="pa-list">' + inc.map(function (n) { return '<div class="pa-row"><b>' + esc(n) + ' vuole essere tuo amico</b><button class="pa-btn s" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button class="pa-btn s g" data-pa="decline" data-u="' + esc(n) + '">No</button></div>'; }).join('') + '</div>';
-    h += d == null ? '<p class="pa-note">Carico…</p>' : fr2.length ? '<div class="pa-list">' + fr2.map(function (f) { return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '"></span><b>' + esc(f.username) + '</b><button class="pa-btn s g" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici">Togli</button></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun amico per ora. Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica.</p>';
+    h += d == null ? '<p class="pa-note">Carico…</p>' : fr2.length ? '<div class="pa-list">' + fr2.map(function (f) { var j = joinHref(f); return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><b>' + esc(f.username) + '</b><br><span class="pa-note">' + esc(friendLine(f)) + '</span></span>' + (j ? '<a class="pa-btn s" href="' + esc(j) + '">' + (f.phase === 'lobby' ? 'Raggiungi' : 'Guarda') + '</a>' : '') + '<button class="pa-btn s g" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici">×</button></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun amico per ora. Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica.</p>';
     if (out.length) h += '<p class="pa-note">In attesa di risposta: ' + out.map(esc).join(', ') + '</p>';
     h += '<form data-pa-form="friend" class="pa-bar"><input type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" style="flex:1;min-width:170px" required><button class="pa-btn s" type="submit">Aggiungi</button></form>';
+    h += '<hr class="pa-sep"><h3>Partite</h3><div class="pa-bar"><button class="pa-btn s" data-pa="go" data-v="stats">📊 Statistiche e classifica tra amici</button></div>';
     h += '<hr class="pa-sep"><h3>Account</h3>';
     if (view.x.pw) h += '<form data-pa-form="password"><label>Password attuale<input type="password" name="o" autocomplete="current-password" required></label><label>Nuova password<input type="password" name="n" autocomplete="new-password" required></label><button class="pa-btn s" type="submit">Cambia password</button></form>';
     if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p><label>Password<input type="password" name="d" autocomplete="current-password" required></label><button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
@@ -178,7 +249,8 @@ var Account = (function () {
     var k = b.getAttribute('data-pa'), uname = b.getAttribute('data-u');
     if (k === 'open') { e.preventDefault(); open(b.getAttribute('data-v')); }
     else if (k === 'close') close();
-    else if (k === 'tab' || k === 'go') { view = { v: b.getAttribute('data-v'), x: {} }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); }
+    else if (k === 'tab' || k === 'go') { view = { v: b.getAttribute('data-v'), x: {} }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); if (view.v === 'stats') { statsData = null; loadStats(); } }
+    else if (k === 'board') { boardGame = b.getAttribute('data-g') || ''; rpc('friends_board', { p_token: session.token, p_game: boardGame || null }).then(function (r) { boardData = r; render(); }, function (er) { msg = { t: String(er) }; render(); }); render(); }
     else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
     else if (k === 'invite') {
       b.disabled = true;
@@ -215,5 +287,5 @@ var Account = (function () {
 
   load();
   return { ready: ready, configured: configured, user: user, open: open, close: close, allow: allow, allowQuiet: allowQuiet, chipHTML: chipHTML, inviteHTML: inviteHTML,
-    rpc: rpc, notify: notify, refreshFriends: refreshFriends, toast: toastMsg, get config() { return cfg; }, get token() { return session && session.token; }, render: render };
+    rpc: rpc, notify: notify, refreshFriends: refreshFriends, refreshFriendsSoon: refreshFriendsSoon, friend: friend, presence: function () { presenceTick(true); }, gameName: gameName, toast: toastMsg, get config() { return cfg; }, get token() { return session && session.token; }, render: render };
 })();

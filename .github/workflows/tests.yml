@@ -1,0 +1,59 @@
+name: Prove
+# Fa girare tutte le prove (tests/run.sh): regole, notifiche, database e partite vere nel browser.
+# Parte dopo ogni ricostruzione dei giochi (così prova le pagine appena rigenerate) e quando cambiano prove,
+# server, home o pagine modificate a mano. Se qualcosa non va il pallino diventa rosso e GitHub manda una email;
+# nel riepilogo dell'esecuzione c'è l'elenco delle prove, tra gli allegati le schermate.
+on:
+  workflow_run:
+    workflows: ['Ricostruisci i giochi']
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ['tests/**', 'supabase/**', 'index.html', 'sw.js', '*/index.html', '.github/workflows/tests.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: prove
+  cancel-in-progress: true
+jobs:
+  prove:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Browser per le prove
+        run: |
+          pip install -q playwright
+          python -m playwright install --with-deps chromium
+      - name: Prove
+        run: bash tests/run.sh
+      - name: Schermate e registri
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prove
+          path: tests/.out
+          retention-days: 7

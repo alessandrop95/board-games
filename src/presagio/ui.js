@@ -83,6 +83,19 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Coach.setup({ bots: 2, tip: function (g, me, mine) {
+  var P = g.players[me]; if (!P) return null;
+  var where = ' In questa mano: previste <b>' + (P.bid == null ? '?' : P.bid) + '</b>, fatte <b>' + (P.tricks || 0) + '</b>.';
+  if (!mine) return g.phase === 'play' && P.bid != null ? 'Tocca a un bot.' + where + ' Ricorda: fai esattamente le prese previste.' : null;
+  if (g.phase === 'trump') return 'È uscito un <b>Arcimago</b>: scegli tu il colore di <b>briscola</b>, quello di cui hai più carte alte.';
+  if (g.phase === 'bid') return '<b>Prevedi quante prese farai</b> in questa mano. Contano le carte alte, le briscole e gli Arcimaghi; i Giullari non prendono mai. Se indovini esattamente guadagni 20 punti + 10 per presa, se sbagli li perdi.';
+  if (g.phase === 'play') return 'Gioca una carta. Devi <b>seguire il colore</b> della prima carta se puoi; l’<b>Arcimago</b> vince sempre, il <b>Giullare</b> perde sempre, la briscola batte gli altri colori.' + where;
+  return 'Mano finita: guarda i punti, poi si passa alla mano successiva.';
+} });
+Score.setup({ game: 'presagio', result: function (g) {
+  var w = Array.isArray(g.winner) ? g.winner : [];
+  return g.players.map(function (P, i) { return { won: w.indexOf(i) >= 0, place: 1 + g.players.filter(function (Q) { return Q.score > P.score; }).length, score: P.score }; });
+} });
 Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) {
@@ -173,8 +186,8 @@ function leaveTable(silent) {
 function inviteLink() { return location.origin + location.pathname + '?t=' + App.code; }
 function copyText(t, ok) { try { navigator.clipboard.writeText(t).then(function () { toast(ok || 'Copiato'); }, function () { toast(t); }); } catch (e) { toast(t); } }
 function invite() {
-  var url = inviteLink(), text = 'Siediti al mio tavolo di Presagio: codice ' + App.code;
-  if (navigator.share) { navigator.share({ title: 'Presagio', text: text, url: url }).catch(function () {}); return; }
+  var url = inviteLink(), text = 'Siediti al mio tavolo di Wizard: codice ' + App.code;
+  if (navigator.share) { navigator.share({ title: 'Wizard', text: text, url: url }).catch(function () {}); return; }
   copyText(url, 'Link d’invito copiato');
 }
 
@@ -257,7 +270,7 @@ function lobbyHTML() {
   var fan = [cardHTML(52), cardHTML(12), cardHTML(56)].map(function (h, i) { return h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 12) + 'deg) translateX(' + ((i - 1) * 20) + 'px)" class="card'); }).join('');
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
-    '<section class="hero"><div style="display:grid;gap:10px"><h1>Presagio</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: incisioni di Gustave Doré e di antichi atlanti celesti, di pubblico dominio</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
+    '<section class="hero"><div style="display:grid;gap:10px"><h1>Wizard</h1><p class="tag">Prevedi quante prese farai, poi fanne esattamente quelle. Da 3 a 6 giocatori, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: incisioni di Gustave Doré e di antichi atlanti celesti, di pubblico dominio</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
@@ -276,7 +289,7 @@ function roomHTML() {
   }
   var noEven = !!(d.opts && d.opts.noEven), hidden = !!(d.opts && d.opts.hidden);
   var rounds = n >= 3 ? 60 / Math.max(3, Math.min(6, n)) : 20;
-  return '<div class="topbar"><div class="wrap"><span class="brand">Presagio</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Wizard</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
@@ -345,7 +358,7 @@ function sheetBody(s) {
     var rank = g.players.map(function (P, i) { return { P: P, i: i }; }).sort(function (a, b) { return b.P.score - a.P.score; });
     return '<div class="winner">' + (g.winner.length > 1 ? 'Pari merito' : 'Vince ' + esc(g.players[g.winner[0]].nick)) + '</div>' +
       '<div class="tbl-wrap"><table class="sc"><tr><th>#</th><th class="l">Giocatore</th><th>Indovinate</th><th>Punti</th></tr>' + rank.map(function (r, k) { var ok = r.P.hist.filter(function (h) { return h.bid === h.tricks; }).length; return '<tr><td>' + (k + 1) + '</td><td class="l">' + esc(r.P.nick) + (r.i === me ? ' (tu)' : '') + '</td><td>' + ok + '/' + r.P.hist.length + '</td><td>' + r.P.score + '</td></tr>'; }).join('') + '</table></div>' +
-      (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') +
+      Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') +
       '<button class="btn block ghost" data-act="scores">Tutti i punteggi</button><button class="btn block ghost" data-act="close">Guarda il tavolo</button>';
   }
   if (s.kind === 'menu' && App.doc) {

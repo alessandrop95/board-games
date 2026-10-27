@@ -121,6 +121,27 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Coach.setup({ bots: 3, tip: function (g, me, mine) {
+  var P = g.players[me]; if (!P) return null;
+  var goal = { sceriffo: 'Sei lo <b>Sceriffo</b> (tutti lo sanno): elimina Fuorilegge e Rinnegato.', vice: 'Sei un <b>Vicesceriffo</b>: proteggi lo Sceriffo, ma non dirlo a nessuno.', bandito: 'Sei un <b>Fuorilegge</b>: il tuo bersaglio è lo Sceriffo.', traditore: 'Sei il <b>Rinnegato</b>: devi restare l’ultimo in piedi, Sceriffo per ultimo.' }[P.role] || '';
+  if (!P.alive) return 'Sei stato eliminato: guarda come finisce la sfida.';
+  var f = g.stack[g.stack.length - 1];
+  if (f && f.who === me) {
+    if (f.type === 'react' || f.type === 'multi') return 'Ti stanno colpendo! Gioca uno <b>Schivata!</b> (o usa il Barile) per salvarti, altrimenti perdi un punto vita.';
+    if (f.type === 'duel') return '<b>Duello</b>: a turno si scarta un <b>Bang!</b>; chi non ne ha più perde un punto vita. Ne hai ancora? Allora rispondi.';
+    if (f.type === 'dying') return 'Hai finito i punti vita! Se hai una <b>Birra</b> giocala subito per restare in partita.';
+    if (f.type === 'discard') return 'Fine turno: puoi tenere tante carte quanti punti vita hai. Scegli quali scartare.';
+    if (f.type === 'store') return '<b>Emporio</b>: scegli una delle carte scoperte e tienila.';
+    return 'Scegli una delle carte proposte.';
+  }
+  if (!mine) return null;
+  if (g.step === 'draw') return 'Inizia il tuo turno: <b>pesca 2 carte</b>. ' + goal;
+  return goal + ' Gioca le carte che vuoi: un solo <b>Bang!</b> per turno, armi e cavalli restano davanti a te, la distanza conta. Quando hai finito tocca <b>Fine turno</b>.';
+} });
+Score.setup({ game: 'polvere-e-piombo', result: function (g) {
+  var team = { legge: ['sceriffo', 'vice'], banditi: ['bandito'], traditore: ['traditore'] }[g.winner] || [];
+  return g.players.map(function (P) { var w = team.indexOf(P.role) >= 0; return { won: w, place: w ? 1 : 2, score: null }; });
+} });
 Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var P = cur.game.players[d]; P.bot = true; P.away = true; Turns.awayLog(cur.game, d); return true; }
@@ -252,8 +273,8 @@ function leaveTable(silent) {
 }
 function inviteLink() { return location.origin + location.pathname + '?t=' + App.code; }
 function invite() {
-  var url = inviteLink(), text = 'Siediti al mio tavolo di Polvere & Piombo: codice ' + App.code;
-  if (navigator.share) { navigator.share({ title: 'Polvere & Piombo', text: text, url: url }).catch(function () {}); return; }
+  var url = inviteLink(), text = 'Siediti al mio tavolo di Bang!: codice ' + App.code;
+  if (navigator.share) { navigator.share({ title: 'Bang!', text: text, url: url }).catch(function () {}); return; }
   copyText(url, 'Link d’invito copiato');
 }
 function myIdx() { var g = App.doc && App.doc.game; if (!g) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].uid === Net.uid) return i; return -1; }
@@ -304,7 +325,7 @@ function lobbyHTML() {
   fanItems.forEach(function (f, i) { fan += f.h.replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 22) + 'px)" class="card'); });
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b class="mono">' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a href="../" style="color:var(--muted);text-decoration:none;font-size:15px">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
-    '<section class="hero"><div style="display:grid;gap:10px"><h1>Polvere <span class="amp">&amp;</span> Piombo</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: disegni e dipinti di Frederic Remington e stampe western dell’Ottocento, di pubblico dominio</p></div>' +
+    '<section class="hero"><div style="display:grid;gap:10px"><h1>Bang!</h1><p class="tag">Ruoli segreti, pistole e whisky. Apri un tavolo, condividi il codice e sfida i tuoi amici, ognuno dal proprio telefono.</p><p class="credit">Illustrazioni: disegni e dipinti di Frederic Remington e stampe western dell’Ottocento, di pubblico dominio</p></div>' +
     '<div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2">' +
     '<section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Rattlesnake Ale" value="' + esc(myNick()) + '">' +
@@ -328,7 +349,7 @@ function roomHTML() {
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
   var n = d.seats.length;
-  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Bang!</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' +
     '<section class="panel"><span class="lead">Codice del tavolo</span><div class="row"><span class="codebig">' + esc(d.code) + '</span></div>' +
     '<div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
@@ -408,7 +429,7 @@ function tableHTML() {
       '<div class="eqs">' + eqListHTML(P, false) + '</div></div></section>';
   }
   var alive = g.players.filter(function (P) { return P.alive; }).length;
-  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info"><b>' + connInfo(alive + ' in vita') + '</b><span>' + esc(d.code) + '</span></span>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Bang!</span><span class="info"><b>' + connInfo(alive + ' in vita') + '</b><span>' + esc(d.code) + '</span></span>' +
     Sound.buttonHTML() + '<button class="iconbtn" data-act="log">Registro</button>' + Chat.badgeHTML() + '<button class="iconbtn" data-act="menu">Menu</button></div></div>' +
     '<main class="wrap board">' + hostBanner() + Chat.dockHTML('position:sticky;top:calc(60px + env(safe-area-inset-top,0px));z-index:15;margin:0') +
     '<div class="sec-title">Al saloon, in ordine di turno</div><div class="opps">' + order.map(function (i) { return plateHTML(g, i, me, targets); }).join('') + '</div>' +
@@ -458,7 +479,7 @@ function dockHTML(g, me) {
 }
 
 function galleryHTML() {
-  return '<div class="topbar"><div class="wrap"><span class="brand">P&amp;P</span><span class="info">Mazzo e personaggi</span><button class="iconbtn" data-act="back">Indietro</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Bang!</span><span class="info">Mazzo e personaggi</span><button class="iconbtn" data-act="back">Indietro</button></div></div>' +
     '<div class="wrap gallery"><h2>Le 80 carte del mazzo</h2><div class="ggrid">' +
     D.ORDER.map(function (t) { return '<div class="gitem">' + typeCardHTML(t) + '<span class="cnt">× ' + D.TYPES[t].count + '</span></div>'; }).join('') +
     '<div class="gitem">' + backHTML() + '<span class="cnt">dorso</span></div></div>' +
@@ -524,7 +545,7 @@ function sheetBody(s) {
     return '<div class="over"><div class="poster"><div class="kick">Avviso alla cittadinanza</div><div class="who-won">' + (W === 'legge' ? 'Vince la legge' : W === 'banditi' ? 'Vincono i Banditi' : 'Vince il Traditore') + '</div></div>' +
       (me >= 0 ? '<p style="margin:0">' + (won(g.players[me]) ? 'Hai vinto, pistolero.' : 'Stavolta è andata male.') + '</p>' : '') +
       '<table>' + g.players.map(function (P) { return '<tr><td>' + esc(P.nick) + '</td><td class="muted">' + D.CHAR[P.char].n + '</td><td>' + D.ROLES[P.role].n + '</td><td class="w">' + (won(P) ? 'vince' : '') + '</td></tr>'; }).join('') + '</table>' +
-      (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="muted" style="margin:0">L’host può avviare una nuova partita.</p>') +
+      Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="muted" style="margin:0">L’host può avviare una nuova partita.</p>') +
       '<button class="btn block ghost" data-act="close">Guarda il tavolo</button></div>';
   }
   if (s.kind === 'decide' && g && me >= 0) return decideBody(g, me);

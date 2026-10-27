@@ -35,7 +35,7 @@ var Game = (function () {
   }
   function info(g) {
     var t = g.phase === 'over' ? 'Partita finita' : 'Turno ' + g.round;
-    return '<b>Campi d’Acciaio</b> <span class="muted">· ' + connInfo(t + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>';
+    return '<b>Scythe</b> <span class="muted">· ' + connInfo(t + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>';
   }
 
   /* ---------- piano locale (anteprima delle mosse) ---------- */

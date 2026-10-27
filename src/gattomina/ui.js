@@ -82,6 +82,21 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
+Coach.setup({ bots: 2, tip: function (g, me, mine) {
+  var P = g.players[me]; if (!P) return null;
+  if (!P.alive) return 'Sei esploso! Guarda chi resta in piedi.';
+  if (g.wait && g.wait.who === me) {
+    if (g.wait.type === 'favor') return '<b>Favore</b>: un giocatore ti ha chiesto una carta. Scegli tu quale regalargli (tieni i Disinnesgatti!).';
+    if (g.wait.type === 'insert') return 'Hai disinnescato l’<b>Exploding Kitten</b>! Rimettilo nel mazzo dove vuoi: in cima colpirà il prossimo giocatore.';
+    if (g.wait.type === 'five') return 'Scegli una carta dagli scarti da prendere.';
+  }
+  if (g.pend && E.canNope(g, me)) return 'Qualcuno ha appena giocato una carta: se vuoi annullarla gioca un <b>NO!</b>, altrimenti lasciala passare.';
+  if (!mine) return null;
+  return 'Gioca tutte le carte azione che vuoi (<b>Salta</b> e <b>Attacco</b> evitano di pescare, <b>Prevedi il futuro</b> mostra il mazzo, due gatti uguali rubano una carta), poi <b>pesca</b> per finire il turno. Se peschi un Exploding Kitten ti salva solo un <b>Disinnesgatto</b>: ne hai ' + P.hand.filter(function (c) { return E.ty(c) === 'scatoletta'; }).length + '.';
+} });
+Score.setup({ game: 'gattomina', result: function (g) {
+  return g.players.map(function (P, i) { return { won: g.winner === i, place: g.winner === i ? 1 : null, score: null }; });
+} });
 Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var g = cur.game; g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true; }
@@ -166,8 +181,8 @@ function leaveTable(silent) {
 function inviteLink() { return location.origin + location.pathname + '?t=' + App.code; }
 function copyText(t, ok) { try { navigator.clipboard.writeText(t).then(function () { toast(ok || 'Copiato'); }, function () { toast(t); }); } catch (e) { toast(t); } }
 function invite() {
-  var url = inviteLink(), text = 'Siediti al mio tavolo di Gattomina: codice ' + App.code;
-  if (navigator.share) { navigator.share({ title: 'Gattomina', text: text, url: url }).catch(function () {}); return; }
+  var url = inviteLink(), text = 'Siediti al mio tavolo di Exploding Kittens: codice ' + App.code;
+  if (navigator.share) { navigator.share({ title: 'Exploding Kittens', text: text, url: url }).catch(function () {}); return; }
   copyText(url, 'Link d’invito copiato');
 }
 
@@ -265,7 +280,7 @@ function lobbyHTML() {
   var fan = ids.map(function (id, i) { return GMCards.html(id).replace('class="card', 'style="transform:translateX(-50%) rotate(' + ((i - 1) * 13) + 'deg) translateX(' + ((i - 1) * 24) + 'px)" class="card'); }).join('');
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
-    '<section class="hero"><div style="display:grid;gap:10px"><h1>Gattomina</h1><p class="tag">Pesca una carta alla volta e spera che non sia una Gattomina. L’ultimo che resta intero vince! Da 2 a 5 giocatori, ognuno dal proprio telefono.</p><p class="credit">Grafica: emoji 3D Noto di Google (licenza Apache 2.0)</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
+    '<section class="hero"><div style="display:grid;gap:10px"><h1>Exploding Kittens</h1><p class="tag">Pesca una carta alla volta e spera che non sia una Gattomina. L’ultimo che resta intero vince! Da 2 a 5 giocatori, ognuno dal proprio telefono.</p><p class="credit">Grafica: emoji 3D Noto di Google (licenza Apache 2.0)</p></div><div class="fan" aria-hidden="true">' + fan + '</div></section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
@@ -281,7 +296,7 @@ function roomHTML() {
       ((isHost && s.uid !== Net.uid) || (s.uid === Net.uid && !isHost) ? '<button class="x" data-act="kick" data-uid="' + esc(s.uid) + '" aria-label="Togli ' + esc(s.nick) + '">×</button>' : '') + '</div>';
     else seats += '<div class="seat"><div class="ava">·</div><div class="sub">Posto libero</div></div>';
   }
-  return '<div class="topbar"><div class="wrap"><span class="brand">Gattomina</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Exploding Kittens</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 2 a 5 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
@@ -297,7 +312,7 @@ function nopeOptHTML(d, isHost) {
     '</select><span class="muted" style="font-size:14px">Dopo ogni carta giocata. Se tutti toccano «Lascia passare», si va avanti subito.</span></label>';
 }
 function galleryHTML() {
-  return '<div class="topbar"><div class="wrap"><span class="brand">Gattomina</span><span class="info">Le 56 carte</span><button class="iconbtn" data-act="tolobby">Indietro</button></div></div><div class="wrap gallery"><div class="ggrid">' +
+  return '<div class="topbar"><div class="wrap"><span class="brand">Exploding Kittens</span><span class="info">Le 56 carte</span><button class="iconbtn" data-act="tolobby">Indietro</button></div></div><div class="wrap gallery"><div class="ggrid">' +
     D.ORDER.map(function (t) { return '<div class="gitem">' + GMCards.typeHTML(t) + '<span class="cnt">× ' + D.TYPES[t].count + '</span></div>'; }).join('') +
     '<div class="gitem">' + GMCards.back() + '<span class="cnt">dorso</span></div></div><p class="muted">Grafica: emoji 3D di Noto Emoji (Google), licenza Apache 2.0, composte in carte originali.</p></div>';
 }
@@ -374,7 +389,7 @@ function sheetBody(s) {
   if (s.kind === 'over' && g.phase === 'over') {
     var W = g.players[g.winner];
     return '<div class="over"><img class="crown" src="' + GMCards.src('1f3c6') + '" alt=""><h2>' + (g.winner === me ? 'Hai vinto!' : 'Vince ' + esc(W.nick)) + '</h2><p class="lead">L’ultimo rimasto intero al tavolo. Gli altri sono esplosi in ordine sparso.</p>' +
-      (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + '<button class="btn block ghost" data-act="close">Guarda il tavolo</button></div>';
+      Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + '<button class="btn block ghost" data-act="close">Guarda il tavolo</button></div>';
   }
   return '';
 }

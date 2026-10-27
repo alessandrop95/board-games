@@ -61,7 +61,7 @@ var Chat = (function () {
   }
   function badgeHTML() {
     ensureCss();
-    return '<button class="iconbtn" data-chat="open" aria-label="Chat del tavolo' + (unread ? ', ' + unread + ' messaggi nuovi' : '') + '">Chat<span class="chat-n"' + (unread ? '' : ' hidden') + '>' + unread + '</span></button>';
+    return (window.Reactions && window.App && App.doc ? Reactions.buttonHTML() : '') + '<button class="iconbtn" data-chat="open" aria-label="Chat del tavolo' + (unread ? ', ' + unread + ' messaggi nuovi' : '') + '">Chat<span class="chat-n"' + (unread ? '' : ' hidden') + '>' + unread + '</span></button>';
   }
   function paintBadges() {
     document.querySelectorAll('[data-chat="open"]').forEach(function (b) {
