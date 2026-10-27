@@ -21,5 +21,11 @@
   "purr": {"search": "cat purring", "maxdur": 60},
   "explosion": {"file": "Explosion 10.ogg"},
   "hiss": {"search": "cat hissing", "maxdur": 20}
+ },
+ "campi-acciaio": {
+  "m1": {"search": "Kevin MacLeod Heroic Age", "maxdur": 400},
+  "m2": {"search": "Kevin MacLeod Volatile Reaction", "maxdur": 400},
+  "m3": {"search": "Kevin MacLeod Crusade", "maxdur": 400},
+  "steam": {"search": "steam locomotive whistle", "maxdur": 20}
  }
 }

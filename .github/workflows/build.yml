@@ -1,11 +1,18 @@
 name: Ricostruisci i giochi
 # A ogni modifica dei sorgenti (anche fatta dal telefono su github.com) rigenera le pagine dei giochi
 # con build.py, le salva nel repository e fa ripartire la pubblicazione su GitHub Pages.
+# Si rigenerano SOLO i giochi i cui sorgenti (src/<gioco>/) sono cambiati: le pagine degli altri giochi
+# restano esattamente come sono, anche se sono state modificate a mano.
 on:
   push:
     branches: [main]
     paths: ['src/**', 'build.py', '.github/workflows/build.yml']
   workflow_dispatch:
+    inputs:
+      giochi:
+        description: 'Giochi da ricostruire, separati da spazi (polvere-e-piombo presagio gattomina campi-acciaio)'
+        required: true
+        default: 'campi-acciaio'
 permissions:
   contents: write
   pages: write
@@ -17,21 +24,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Controlla che il codice non abbia errori di scrittura
         run: |
           fail=0
           for f in $(find src -name '*.js'); do node --check "$f" || fail=1; done
           if [ $fail = 1 ]; then echo "::error::C'è un errore di sintassi in un file JavaScript: le pagine NON sono state aggiornate."; exit 1; fi
+      - name: Scegli i giochi da ricostruire
+        id: which
+        env:
+          BEFORE: ${{ github.event.before }}
+          INPUT: ${{ github.event.inputs.giochi }}
+        run: |
+          if [ -n "$INPUT" ]; then games="$INPUT"
+          else
+            if git cat-file -e "$BEFORE" 2>/dev/null; then changed=$(git diff --name-only "$BEFORE" HEAD); else changed=$(git diff --name-only HEAD~1 HEAD); fi
+            games=""
+            for g in polvere-e-piombo presagio gattomina campi-acciaio; do
+              if echo "$changed" | grep -q "^src/$g/"; then games="$games $g"; fi
+            done
+            # build.py o le parti condivise: si ricostruisce solo Campi d'Acciaio (gli altri giochi restano come sono)
+            if echo "$changed" | grep -q -e "^src/shared/" -e "^build.py$"; then case " $games " in *" campi-acciaio "*) ;; *) games="$games campi-acciaio";; esac; fi
+          fi
+          echo "Giochi da ricostruire:$games"
+          echo "games=$games" >> "$GITHUB_OUTPUT"
       - name: Genera le pagine
-        run: python3 build.py
+        if: steps.which.outputs.games != ''
+        run: python3 build.py ${{ steps.which.outputs.games }}
       - name: Salva le pagine aggiornate
         id: save
+        if: steps.which.outputs.games != ''
         env:
           MSG: ${{ github.event.head_commit.message }}
+          GAMES: ${{ steps.which.outputs.games }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add polvere-e-piombo/index.html presagio/index.html gattomina/index.html
+          for g in $GAMES; do git add "$g/index.html"; done
           if git diff --cached --quiet; then echo "changed=no" >> "$GITHUB_OUTPUT"; echo "Pagine già aggiornate."; exit 0; fi
           first=$(printf '%s' "${MSG:-avvio manuale}" | head -n 1)
           git commit -m "Pagine dei giochi ricostruite ($first)"

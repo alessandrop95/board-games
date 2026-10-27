@@ -40,21 +40,39 @@ def page(title, desc, theme, fonts, css, js, short):
 
 net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js') + '\n' + r('src', 'shared', 'audio.js')
 
-pp = 'src/polvere-e-piombo/'
-pp_css = 'html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}\n' + r(pp, 'style.css')
-pp_js = "window.GAME_PREFIX = 'polvere-piombo/v1/';\n" + '\n'.join(r(pp, f) for f in ['data.js', 'engine.js', 'bot.js', 'cards.js', 'fx.js']) + '\n' + net + '\n' + r(pp, 'sound.js') + '\n' + r(pp, 'ui.js')
-open(os.path.join(ROOT, 'polvere-e-piombo', 'index.html'), 'w', encoding='utf-8').write(page(
-    'Polvere &amp; Piombo', 'Gioco di carte western a ruoli segreti, da 4 a 7 giocatori, ognuno dal proprio telefono.', '#1d140e',
-    'family=Courier+Prime:wght@400;700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Rye', pp_css, pp_js, 'Polvere&amp;Piombo'))
+def build_pp():
+    pp = 'src/polvere-e-piombo/'
+    pp_css = 'html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}\n' + r(pp, 'style.css')
+    pp_js = "window.GAME_PREFIX = 'polvere-piombo/v1/';\n" + '\n'.join(r(pp, f) for f in ['data.js', 'engine.js', 'bot.js', 'cards.js', 'fx.js']) + '\n' + net + '\n' + r(pp, 'sound.js') + '\n' + r(pp, 'ui.js')
+    open(os.path.join(ROOT, 'polvere-e-piombo', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Polvere &amp; Piombo', 'Gioco di carte western a ruoli segreti, da 4 a 7 giocatori, ognuno dal proprio telefono.', '#1d140e',
+        'family=Courier+Prime:wght@400;700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Rye', pp_css, pp_js, 'Polvere&amp;Piombo'))
 
-pr = 'src/presagio/'
-pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
-open(os.path.join(ROOT, 'presagio', 'index.html'), 'w', encoding='utf-8').write(page(
-    'Presagio', 'Gioco di carte a prese con previsione, da 3 a 6 giocatori, ognuno dal proprio telefono.', '#06050d',
-    'family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:wght@500;600;700', r(pr, 'style.css'), pr_js, 'Presagio'))
-gm = 'src/gattomina/'
-gm_js = "window.GAME_PREFIX = 'gattomina/v1/';\n" + net + '\n' + '\n'.join(r(gm, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
-open(os.path.join(ROOT, 'gattomina', 'index.html'), 'w', encoding='utf-8').write(page(
-    'Gattomina', 'Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori, ognuno dal proprio telefono.', '#2a1446',
-    'family=Fredoka:wght@400;500;600;700&family=Luckiest+Guy', r(gm, 'style.css'), gm_js, 'Gattomina'))
+def build_pr():
+    pr = 'src/presagio/'
+    pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
+    open(os.path.join(ROOT, 'presagio', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Presagio', 'Gioco di carte a prese con previsione, da 3 a 6 giocatori, ognuno dal proprio telefono.', '#06050d',
+        'family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:wght@500;600;700', r(pr, 'style.css'), pr_js, 'Presagio'))
+
+def build_gm():
+    gm = 'src/gattomina/'
+    gm_js = "window.GAME_PREFIX = 'gattomina/v1/';\n" + net + '\n' + '\n'.join(r(gm, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
+    open(os.path.join(ROOT, 'gattomina', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Gattomina', 'Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori, ognuno dal proprio telefono.', '#2a1446',
+        'family=Fredoka:wght@400;500;600;700&family=Luckiest+Guy', r(gm, 'style.css'), gm_js, 'Gattomina'))
+
+def build_ca():
+    ca = 'src/campi-acciaio/'
+    ca_js = "window.GAME_PREFIX = 'campi-acciaio/v1/';\n" + '\n'.join(r(ca, f) for f in ['data.js', 'engine.js', 'bot.js', 'terrain.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ca, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    open(os.path.join(ROOT, 'campi-acciaio', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Campi d’Acciaio', 'Strategia dieselpunk: cinque fazioni si contendono le campagne intorno a una Fabbrica di mech. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#1c1915',
+        'family=Big+Shoulders+Display:wght@600;700;800&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400', r(ca, 'style.css'), ca_js, 'Campi d’Acciaio'))
+
+# Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca}
+import sys
+for name in (sys.argv[1:] or list(GAMES)):
+    GAMES[name]()
 print('ok')

@@ -52,6 +52,18 @@ Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori (regole equivalenti al 
 - Combinazioni: coppia (rubi a caso), tris (chiedi una carta precisa), cinque diverse (prendi dagli scarti).
 - Grafica: emoji 3D di [Noto Emoji](https://github.com/googlefonts/noto-emoji) di Google, licenza Apache 2.0 (copia in `gattomina/img/e/`), composte in carte cartoon.
 
+## Campi d’Acciaio
+
+Strategia dieselpunk da 2 a 5 giocatori (regole equivalenti a un noto gioco di mech e campagne; nomi, testi, carte e grafica originali).
+
+**Gioca:** https://alessandrop95.github.io/board-games/campi-acciaio/
+
+- Cinque fazioni (Regno di Brina, Unione di Ferro, Orda della Steppa, Impero di Carbone, Repubblica dei Campi), ognuna con personaggio, animale, abilità e quattro mech diversi; cinque plance giocatore. Fazioni e plance vengono assegnate a caso.
+- Ogni turno si sceglie una colonna della plancia: azione in alto (Muovi, Rinforza, Commercia, Produci) e poi in basso (Aggiorna, Schiera, Costruisci, Arruola). La partita finisce quando qualcuno conquista la sesta stella; vince chi ha più monete.
+- Mappa di 54 esagoni dipinta dal codice (nessuna immagine esterna): fiumi animati, gallerie, laghi, incontri, la Fabbrica che fuma. Le mosse si preparano sulla mappa in anteprima e partono solo alla conferma.
+- Battaglie con scelta segreta di potere e carte, 28 incontri, 12 carte Fabbrica e 23 obiettivi scritti da zero. Ogni passo ha un «?» con la spiegazione; le regole complete sono nel gioco.
+- Giocatori automatici che valutano ogni colonna della plancia su una copia della partita.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).
@@ -83,9 +95,9 @@ Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori (regole equivalenti al 
 
 ## Modificare i giochi
 
-I sorgenti sono in `src/` (parte di rete condivisa in `src/shared/`). Dopo una modifica: `python3 build.py` rigenera le pagine.
+I sorgenti sono in `src/` (parte di rete condivisa in `src/shared/`). Dopo una modifica: `python3 build.py` rigenera tutte le pagine, oppure `python3 build.py campi-acciaio` solo quella di un gioco.
 
 **Modifiche dal telefono (o da github.com).** Modifica i file in `src/` e conferma con *Commit changes* sul ramo `main`.
-L'azione *Ricostruisci i giochi* controlla che il codice non abbia errori di scrittura, rigenera le pagine con `build.py`
-e le pubblica: dopo 1–2 minuti il gioco aggiornato è online. Se qualcosa va storto, la scheda *Actions* mostra l'errore in rosso
+L'azione *Ricostruisci i giochi* controlla che il codice non abbia errori di scrittura, rigenera con `build.py` solo le pagine
+dei giochi i cui sorgenti sono cambiati e le pubblica: dopo 1–2 minuti il gioco aggiornato è online. Se qualcosa va storto, la scheda *Actions* mostra l'errore in rosso
 e il gioco online resta com'era. Non modificare a mano `*/index.html`: vengono riscritti a ogni ricostruzione.
