@@ -85,10 +85,16 @@ jobs:
           BG_KEYSTORE: ${{ steps.chk.outputs.ok == '1' && format('{0}/android/firma.p12', github.workspace) || '' }}
           BG_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          gradle -p android --no-daemon --stacktrace assembleRelease -PversionCode="$N"
+          set -o pipefail
+          if ! gradle -p android --no-daemon assembleRelease -PversionCode="$N" 2>&1 | tee "$RUNNER_TEMP/gradle.txt"; then
+            # mostra il motivo anche nelle annotazioni del workflow
+            sed -n '/What went wrong/,/Try:/p' "$RUNNER_TEMP/gradle.txt" | grep -v '^\s*$' | head -25 | while IFS= read -r l; do echo "::error::$l"; done
+            grep -E '^e: |error:|ERROR' "$RUNNER_TEMP/gradle.txt" | head -15 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          fi
           APK=android/app/build/outputs/apk/release/app-release.apk
           [ -n "$BG_KEYSTORE" ] || APK=android/app/build/outputs/apk/release/app-release-unsigned.apk
-          [ -f "$APK" ] || { echo "::error::APK non trovato"; ls -R android/app/build/outputs || true; exit 1; }
+          [ -f "$APK" ] || { echo "::error::APK non trovato: $(cd android/app/build/outputs && find . -name '*.apk' | tr '\n' ' ')"; exit 1; }
           cp "$APK" board-games.apk
           ls -l board-games.apk
       - name: Pubblica la versione
