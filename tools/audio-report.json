@@ -109,16 +109,6 @@
   "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Heismark&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Heismark (page does not exist)\">Heismark</a>",
   "file": "meow2.oga"
  },
- "gattomina/purr": {
-  "title": "Purring cat bertie.ogg",
-  "url": "https://upload.wikimedia.org/wikipedia/commons/6/69/Purring_cat_bertie.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-  "size": 112983,
-  "duration": 8.724897959183673,
-  "mediatype": "AUDIO",
-  "license": "Public domain",
-  "artist": "jim_mowatt",
-  "file": "purr.ogg"
- },
  "gattomina/explosion": {
   "title": "Explosion 10.ogg",
   "url": "https://upload.wikimedia.org/wikipedia/commons/3/37/Explosion_10.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
@@ -178,5 +168,45 @@
   "license": "CC BY 4.0",
   "artist": "<a href=\"//commons.wikimedia.org/wiki/Commons:Work_With_Sounds\" title=\"Commons:Work With Sounds\">Work With Sounds</a> / Konrad Gutkowski",
   "file": "steam.ogg"
+ },
+ "binari-italia/m1": {
+  "title": "Kevin MacLeod - Carefree.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/58/Kevin_MacLeod_-_Carefree.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 5200704,
+  "duration": 205.1395918367347,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "<a rel=\"nofollow\" class=\"external text\" href=\"https://freemusicarchive.org/music/Kevin_MacLeod/\">Kevin MacLeod</a>",
+  "file": "m1.ogg"
+ },
+ "binari-italia/m2": {
+  "title": "Easy Lemon (ISRC USUAN1200076).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/0/0c/Easy_Lemon_%28ISRC_USUAN1200076%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 5057420,
+  "duration": 126.380425,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
+  "file": "m2.mp3"
+ },
+ "binari-italia/m3": {
+  "title": "Kevin MacLeod - Fluffing a Duck.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Kevin_MacLeod_-_Fluffing_a_Duck.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 1405902,
+  "duration": 67.36979591836734,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
+  "file": "m3.ogg"
+ },
+ "binari-italia/bell": {
+  "title": "Taco Bell Bong.ogg",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/a/af/Taco_Bell_Bong.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 60422,
+  "duration": 1.8138333333333334,
+  "mediatype": "AUDIO",
+  "license": "Public domain",
+  "artist": "<a href=\"https://en.wikipedia.org/wiki/Taco_Bell\" class=\"extiw\" title=\"wikipedia:Taco Bell\">Taco Bell</a>",
+  "file": "bell.ogg"
  }
 }
