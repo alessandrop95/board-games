@@ -64,6 +64,18 @@ Strategia dieselpunk da 2 a 5 giocatori (regole equivalenti a un noto gioco di m
 - Battaglie con scelta segreta di potere e carte, 28 incontri, 12 carte Fabbrica e 23 obiettivi scritti da zero. Ogni passo ha un «?» con la spiegazione; le regole complete sono nel gioco.
 - Giocatori automatici che valutano ogni colonna della plancia su una copia della partita.
 
+## Binari d’Italia
+
+Gioco di treni e tratte ferroviarie da 2 a 5 giocatori (regole equivalenti a un noto gioco di biglietti e vagoni, più i traghetti per le isole; mappa, nomi, carte e grafica originali).
+
+**Gioca:** https://alessandrop95.github.io/board-games/binari-italia/
+
+- Mappa dell’Italia con 43 città e 83 tratte (traghetti per Sicilia e Sardegna, binari doppi), 44 biglietti destinazione da 5 a 24 punti. Coste, laghi e fiumi da [Natural Earth](https://www.naturalearthdata.com/) (pubblico dominio), dipinti dal codice in stile carta ferroviaria d’epoca.
+- Ogni turno una sola azione: pescare 2 carte vagone, conquistare una tratta (toccandola sulla mappa: il gioco mostra le carte che userai e i punti) o pescare biglietti. Ultimo giro quando qualcuno scende a 2 vagoni; bonus di 10 punti al percorso continuo più lungo.
+- Otto carte vagone illustrate, ognuna con il suo simbolo per riconoscere i colori anche senza vederli; biglietti in stile cartoncino d’epoca con la cartina.
+- Presentazione delle regole alla prima partita, «?» su ogni fase, città dei propri biglietti cerchiate sulla mappa, conteggio finale con biglietti e percorsi evidenziati.
+- Giocatori automatici che pianificano i biglietti con il percorso più economico. Dati della mappa generati con gli script in `tools/binari-italia/`.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).

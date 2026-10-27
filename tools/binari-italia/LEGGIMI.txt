@@ -1,0 +1,7 @@
+Dati della mappa di Binari d'Italia
+1. geo.py      (facoltativo) coste, laghi e fiumi da Natural Earth -> geo.json
+               serve il repository natural-earth-vector: NE_GEOJSON=percorso/geojson/ python3 geo.py
+2. design.py   città e tratte -> net.json (lunghezze, colori, doppie, traghetti)
+3. tickets.py  biglietti destinazione -> tickets.json (valore = vagoni minimi)
+4. gen_data.py scrive src/binari-italia/data.js
+Poi: python3 build.py binari-italia

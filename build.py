@@ -66,12 +66,19 @@ def build_ca():
     ca = 'src/campi-acciaio/'
     ca_js = "window.GAME_PREFIX = 'campi-acciaio/v1/';\n" + '\n'.join(r(ca, f) for f in ['data.js', 'engine.js', 'bot.js', 'terrain.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ca, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     open(os.path.join(ROOT, 'campi-acciaio', 'index.html'), 'w', encoding='utf-8').write(page(
-        'Campi d’Acciaio', 'Strategia dieselpunk: cinque fazioni si contendono le campagne intorno a una Fabbrica di mech. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#1c1915',
+        'Scythe', 'Strategia dieselpunk: cinque fazioni si contendono le campagne intorno a una Fabbrica di mech. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#1c1915',
         'family=Big+Shoulders+Display:wght@600;700;800&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400', r(ca, 'style.css'), ca_js, 'Campi d’Acciaio'))
 
+def build_bi():
+    bi = 'src/binari-italia/'
+    bi_js = "window.GAME_PREFIX = 'binari-italia/v1/';\n" + '\n'.join(r(bi, f) for f in ['data.js', 'engine.js', 'bot.js', 'painter.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(bi, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    open(os.path.join(ROOT, 'binari-italia', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Binari d’Italia', 'Gioco di treni e tratte ferroviarie sulla mappa d’Italia: collega le città dei tuoi biglietti. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#102027',
+        'family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;0,6..96,800;1,6..96,500&family=Barlow:wght@400;500;600;700;800', r(bi, 'style.css'), bi_js, 'Binari d’Italia'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()
