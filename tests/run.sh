@@ -18,6 +18,8 @@ for f in supabase/migrations/*.sql; do psql -q -v ON_ERROR_STOP=1 -f "$f" || { e
 
 step "Regole di Binari d'Italia" node tests/rules/binari.js
 step "Partite intere tra bot (Binari d'Italia)" node tests/rules/binari_bots.js 6
+step "Regole di Catan" node tests/rules/catan.js
+step "Partite intere tra bot (Catan)" node tests/rules/catan_bots.js 20
 step "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs
 step "Database" python3 tests/db/test_db.py
 step "Funzione notify" node --experimental-strip-types --no-warnings tests/push/notify.mjs
