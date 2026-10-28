@@ -315,10 +315,18 @@ input.field.code { font-family: var(--f-disp); letter-spacing: .3em; text-transf
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--ink); padding: 10px 16px; border-radius: 16px; font-size: 15.5px; font-weight: 500; max-width: min(90vw, 460px); text-align: center; animation: up .3s var(--bounce); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; } }
 
-/* barra in alto della sala d'attesa: su schermi stretti i pulsanti vanno a capo (niente scorrimento laterale della pagina) */
+/* barra in alto della sala d'attesa: sul telefono nome del gioco e codice del tavolo in una riga,
+   i pulsanti (suoni, reazioni, chat, regole, esci) tutti nella riga sotto; la pagina non scorre mai di lato */
 .topbar .wrap { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
 .topbar .brand { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html { overflow-x: clip; }
+@media (max-width: 640px) {
+  .topbar .wrap { row-gap: 0; padding-block: 6px 8px; }
+  .topbar .wrap > * { order: 2; }
+  .topbar .wrap > .brand, .topbar .wrap > .info { order: 0; }
+  .topbar .wrap::after { content: ""; order: 1; flex-basis: 100%; height: 6px; }
+  .topbar .info { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 
 </style>
 </head>
