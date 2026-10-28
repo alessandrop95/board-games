@@ -31,3 +31,7 @@ B=binari-italia/audio
 music $B/src/m1.ogg $B/m1.mp3
 music $B/src/m2.mp3 $B/m2.mp3
 music $B/src/m3.ogg $B/m3.mp3
+T=catan/audio
+music $T/src/m1.ogg $T/m1.mp3
+music $T/src/m2.ogg $T/m2.mp3
+music $T/src/m3.mp3 $T/m3.mp3
