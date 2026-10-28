@@ -18,4 +18,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add */audio/src tools/audio-report.json
-          git diff --cached --quiet || (git commit -m "Musica e suoni con licenza libera da Wikimedia Commons" && git push)
+          git diff --cached --quiet || (git commit -m "Musica e suoni con licenza libera da Wikimedia Commons" && git pull --rebase origin main && git push)
