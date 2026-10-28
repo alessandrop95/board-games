@@ -1,18 +1,23 @@
-/* ===== Binari d'Italia: regole (stato in puro JSON, gira sull'host) =====
-   Regole base del gioco di tratte ferroviarie + traghetti (servono locomotive sugli spazi col simbolo). */
+/* ===== Ticket to Ride Italy: regole (stato in puro JSON, gira sull'host) =====
+   Regole della mappa Italia: 5 biglietti iniziali (se ne tengono almeno 3), se ne pescano 4, carte Traghetto
+   (al massimo 2 in mano; ognuna paga fino a 2 spazi con l'onda), tratte verso i Paesi confinanti (vicoli ciechi)
+   e bonus a fine partita per le regioni collegate in ogni rete. Niente bonus per il percorso più lungo. */
 var BIEngine = (function () {
   var D = BIData, R = D.routes, CC = D.CARD_COLORS;
   var ADJ = {}; Object.keys(D.cities).forEach(function (c) { ADJ[c] = []; });
   R.forEach(function (r) { ADJ[r.a].push(r); ADJ[r.b].push(r); });
 
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-  function cname(c) { return D.cities[c].n; }
+  function cname(c) { return D.place(c); }
   function rname(r) { return cname(r.a) + '–' + cname(r.b); }
   function nick(g, p) { return g.players[p].nick; }
   function log(g, t, k, p) { g.log.push({ n: ++g.logN, t: t, k: k || '', p: p == null ? null : p }); if (g.log.length > 80) g.log.splice(0, g.log.length - 80); }
   function fx(g, e) { g.fx.push(e); }
   function handCount(P) { var n = 0; for (var k in P.hand) n += P.hand[k]; return n; }
   function emptyHand() { var h = {}; CC.forEach(function (c) { h[c] = 0; }); h.L = 0; return h; }
+  function ferries(P) { return P.ferry || 0; }
+  function ferryPile(g) { return g.fdeck == null ? D.FERRY - g.players.reduce(function (s, P) { return s + ferries(P); }, 0) : g.fdeck; }
+  function waves(r) { return r.ferry || 0; }
 
   /* ---------- mazzo ---------- */
   function drawCard(g) {
@@ -43,17 +48,17 @@ var BIEngine = (function () {
   function newGame(seats, opts) {
     var deck = []; CC.forEach(function (c) { for (var i = 0; i < 12; i++) deck.push(c); }); for (var j = 0; j < 14; j++) deck.push('L');
     var g = {
-      v: 1, phase: 'play', stage: 'setup', seq: 0, round: 1,
-      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, trains: D.TRAINS, score: 0, hand: emptyHand(), tickets: [], offer: [], ready: false, drew: 0 }; }),
+      v: 2, phase: 'play', stage: 'setup', seq: 0, round: 1,
+      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, trains: D.TRAINS, score: 0, hand: emptyHand(), ferry: 0, tickets: [], offer: [], ready: false, drew: 0 }; }),
       deck: shuffle(deck), disc: [], face: [], tdeck: shuffle(D.tickets.map(function (t) { return t.id; })),
-      claims: {}, turn: Math.floor(Math.random() * seats.length), first: 0, last: null, drawn: [],
+      fdeck: D.FERRY, claims: {}, turn: Math.floor(Math.random() * seats.length), first: 0, last: null, drawn: [],
       log: [], logN: 0, fx: [], fxN: 0, final: null, nplayers: seats.length
     };
     g.first = g.turn;
-    g.players.forEach(function (P) { for (var k = 0; k < 4; k++) P.hand[drawCard(g)]++; P.offer = [g.tdeck.pop(), g.tdeck.pop(), g.tdeck.pop()]; });
+    g.players.forEach(function (P) { for (var k = 0; k < 4; k++) P.hand[drawCard(g)]++; P.offer = []; for (var t = 0; t < D.START_TICKETS; t++) P.offer.push(g.tdeck.pop()); });
     for (var f = 0; f < 5; f++) g.face.push(drawCard(g));
     checkLocos(g);
-    log(g, 'Si parte! Ognuno riceve 4 carte vagone e 3 biglietti: tienine almeno 2. Comincia ' + nick(g, g.turn) + '.', 'sys');
+    log(g, 'Si parte! Ognuno riceve 4 carte vagone e ' + D.START_TICKETS + ' biglietti: tienine almeno ' + D.START_KEEP + '. Comincia ' + nick(g, g.turn) + '.', 'sys');
     return g;
   }
 
@@ -70,27 +75,31 @@ var BIEngine = (function () {
     if (g.players[p].trains < r.len) return 'Ti restano solo ' + g.players[p].trains + ' vagoni: ne servono ' + r.len + '.';
     return null;
   }
-  // Modi possibili di pagare la tratta con la mano attuale: [{c, n, L}] (c = colore delle carte normali).
+  // Quanto costa: F carte Traghetto coprono fino a 2F spazi con l'onda; le altre onde vogliono locomotive (L),
+  // gli spazi rimasti carte di un solo colore (n) o altre locomotive.
+  function covered(r, F) { return Math.min(waves(r), 2 * F); }
+  // Modi possibili di pagare la tratta con la mano attuale: [{c, n, L, F}] (c = colore delle carte normali).
   function payOptions(g, p, r) {
-    var P = g.players[p], h = P.hand, out = [], need = r.len, minL = r.ferry || 0;
-    var cols = r.col === 'X' ? CC : [r.col];
-    cols.forEach(function (c) {
-      var have = h[c];
-      for (var L = minL; L <= Math.min(h.L, need); L++) {
-        var n = need - L; if (n > have) continue;
-        out.push({ c: n ? c : 'L', n: n, L: L }); break; // la combinazione con meno locomotive per quel colore
-      }
-    });
-    if (!out.length && h.L >= need) out.push({ c: 'L', n: 0, L: need });
-    // tutte locomotive è sempre ammesso se le hai (anche se c'è un'opzione col colore)
-    var uniq = {}; return out.filter(function (o) { var k = o.c + o.n + o.L; if (uniq[k]) return false; uniq[k] = 1; return true; })
-      .sort(function (a, b) { return a.L - b.L || b.n - a.n; });
+    var P = g.players[p], h = P.hand, out = [], w = waves(r);
+    var cols = r.col === 'X' ? CC : [r.col], fmax = w ? Math.min(ferries(P), Math.ceil(w / 2)) : 0;
+    for (var F = 0; F <= fmax; F++) {
+      var cov = covered(r, F), need = r.len - cov, minL = w - cov;
+      cols.forEach(function (c) {
+        for (var L = minL; L <= Math.min(h.L, need); L++) {
+          var n = need - L; if (n > h[c]) continue;
+          out.push({ c: n ? c : 'L', n: n, L: L, F: F }); break; // la combinazione con meno locomotive per quel colore
+        }
+      });
+      if (h.L >= need && need >= minL) out.push({ c: 'L', n: 0, L: need, F: F });
+    }
+    var uniq = {}; return out.filter(function (o) { var k = o.c + o.n + o.L + ':' + o.F; if (uniq[k]) return false; uniq[k] = 1; return true; })
+      .sort(function (a, b) { return a.L - b.L || a.F - b.F || b.n - a.n; });
   }
   function canClaim(g, p, r) {
     var why = blocked(g, p, r); if (why) return { ok: false, why: why };
     var opts = payOptions(g, p, r);
     if (!opts.length) {
-      var need = r.ferry ? ' (traghetto: almeno ' + r.ferry + ' locomotiv' + (r.ferry > 1 ? 'e' : 'a') + ')' : '';
+      var need = r.ferry ? ' (traghetto: ' + r.ferry + ' spazi con l’onda, da pagare con carte Traghetto o locomotive)' : '';
       return { ok: false, why: 'Non hai abbastanza carte: servono ' + r.len + ' carte ' + (r.col === 'X' ? 'dello stesso colore' : D.COLORS[r.col].n) + need + '.' };
     }
     return { ok: true, opts: opts };
@@ -98,7 +107,13 @@ var BIEngine = (function () {
 
   /* ---------- collegamenti e percorso più lungo ---------- */
   function myRoutes(g, p) { return R.filter(function (r) { return g.claims[r.id] === p; }); }
+  function gatesOf(id) { return D.zones[id] ? Object.keys(D.cities).filter(function (c) { return D.cities[c].zone === id; }) : [id]; }
+  // un Paese confinante è raggiunto se si arriva a uno qualunque dei suoi valichi (che sono vicoli ciechi)
   function connected(g, p, a, b) {
+    if (D.zones[a] || D.zones[b]) return gatesOf(a).some(function (x) { return gatesOf(b).some(function (y) { return connected1(g, p, x, y); }); });
+    return connected1(g, p, a, b);
+  }
+  function connected1(g, p, a, b) {
     if (a === b) return true;
     var seen = {}, st = [a]; seen[a] = 1;
     var mine = myRoutes(g, p);
@@ -112,6 +127,7 @@ var BIEngine = (function () {
     return false;
   }
   function ticketPath(g, p, t) { // tratte che collegano le due città del biglietto (per evidenziarle)
+    if (D.zones[t.a] || D.zones[t.b]) { var best = null; gatesOf(t.a).forEach(function (x) { gatesOf(t.b).forEach(function (y) { var pp = ticketPath(g, p, { a: x, b: y }); if (pp && (!best || pp.length < best.length)) best = pp; }); }); return best; }
     var mine = myRoutes(g, p), prev = {}, q = [t.a]; prev[t.a] = null;
     while (q.length) {
       var u = q.shift(); if (u === t.b) break;
@@ -138,6 +154,28 @@ var BIEngine = (function () {
     return best;
   }
 
+  /* ---------- reti e regioni ---------- */
+  // Reti separate di un giocatore (gruppi di tratte collegate) con le regioni che toccano e il bonus.
+  function networks(g, p) {
+    var mine = myRoutes(g, p), comp = {}, out = [];
+    mine.forEach(function (r) {
+      if (comp[r.id] != null) return;
+      var cities = {}, ids = [], st = [r]; comp[r.id] = out.length;
+      while (st.length) {
+        var x = st.pop(); ids.push(x.id); cities[x.a] = 1; cities[x.b] = 1;
+        mine.forEach(function (y) { if (comp[y.id] == null && (cities[y.a] || cities[y.b])) { comp[y.id] = out.length; st.push(y); } });
+      }
+      out.push({ routes: ids, cities: Object.keys(cities) });
+    });
+    out.forEach(function (n) {
+      var regs = {}; n.cities.forEach(function (c) { var rg = D.cities[c].reg; if (rg) regs[rg] = 1; });
+      n.regions = Object.keys(regs);
+      n.double = D.special.filter(function (k) { return regs[k] && D.regions[k].cities.every(function (c) { return n.cities.indexOf(c) >= 0; }); });
+      n.count = n.regions.length + n.double.length; n.pts = D.regionPts(n.count);
+    });
+    return out.sort(function (a, b) { return b.count - a.count; });
+  }
+
   /* ---------- fine turno e fine partita ---------- */
   function endTurn(g, p) {
     var P = g.players[p]; P.drew = 0; g.drawn = [];
@@ -156,13 +194,12 @@ var BIEngine = (function () {
     var rows = g.players.map(function (P, p) {
       var routes = myRoutes(g, p), rp = routes.reduce(function (s, r) { return s + D.SCORE[r.len]; }, 0);
       var tk = P.tickets.map(function (id) { var t = D.tickets[id], ok = connected(g, p, t.a, t.b); return { id: id, ok: ok, v: ok ? t.v : -t.v, path: ok ? ticketPath(g, p, t) : null }; });
-      var lg = longest(g, p);
-      return { p: p, routePts: rp, tickets: tk, tpts: tk.reduce(function (s, t) { return s + t.v; }, 0), done: tk.filter(function (t) { return t.ok; }).length, longest: lg.len, lpath: lg.ids, bonus: 0, total: 0 };
+      var nets = networks(g, p).filter(function (n) { return n.count > 0; }).map(function (n) { return { count: n.count, pts: n.pts, regions: n.regions, double: n.double, routes: n.routes }; });
+      return { p: p, routePts: rp, tickets: tk, tpts: tk.reduce(function (s, t) { return s + t.v; }, 0), done: tk.filter(function (t) { return t.ok; }).length, nets: nets, rpts: nets.reduce(function (s, n) { return s + n.pts; }, 0), total: 0 };
     });
-    var maxL = Math.max.apply(null, rows.map(function (r) { return r.longest; }));
-    rows.forEach(function (r) { if (maxL > 0 && r.longest === maxL) r.bonus = D.LONGEST; r.total = r.routePts + r.tpts + r.bonus; g.players[r.p].score = r.total; });
-    var order = rows.slice().sort(function (a, b) { return b.total - a.total || b.done - a.done || b.bonus - a.bonus; }).map(function (r) { return r.p; });
-    g.final = { rows: rows, order: order, maxL: maxL };
+    rows.forEach(function (r) { r.total = r.routePts + r.tpts + r.rpts; g.players[r.p].score = r.total; });
+    var order = rows.slice().sort(function (a, b) { return b.total - a.total || b.done - a.done || b.rpts - a.rpts; }).map(function (r) { return r.p; });
+    g.final = { rows: rows, order: order };
     g.winner = order[0]; g.phase = 'over'; g.stage = 'over';
     log(g, 'Fine della partita: vince ' + nick(g, order[0]) + ' con ' + rows[order[0]].total + ' punti!', 'win', order[0]);
     fx(g, { k: 'over' });
@@ -175,6 +212,7 @@ var BIEngine = (function () {
     return g.turn;
   }
   function waitingSetup(g) { return g.players.map(function (P, i) { return P.ready ? -1 : i; }).filter(function (i) { return i >= 0; }); }
+  function canFerry(g, p) { var P = g.players[p]; if (ferries(P) >= D.FERRY_MAX) return 'Hai già ' + D.FERRY_MAX + ' carte Traghetto: non puoi averne di più.'; if (ferryPile(g) <= 0) return 'Le carte Traghetto sono finite.'; return null; }
   function canDrawAny(g, second) {
     if (g.deck.length || g.disc.length) return true;
     return g.face.some(function (c) { return c && !(second && c === 'L'); });
@@ -193,7 +231,7 @@ var BIEngine = (function () {
       var ids = (a.ids || []).filter(function (x, i, arr) { return P.offer.indexOf(x) >= 0 && arr.indexOf(x) === i; });
       if (g.stage === 'setup') {
         if (P.ready) return 'Hai già scelto i biglietti.';
-        if (ids.length < 2) return 'All’inizio devi tenere almeno 2 biglietti.';
+        if (ids.length < Math.min(D.START_KEEP, P.offer.length)) return 'All’inizio devi tenere almeno ' + D.START_KEEP + ' biglietti.';
       } else {
         if (g.stage !== 'tickets' || g.turn !== p) return 'Non è il momento di scegliere biglietti.';
         if (ids.length < 1) return 'Devi tenere almeno 1 biglietto.';
@@ -241,9 +279,13 @@ var BIEngine = (function () {
     if (a.a === 'claim') {
       var r = D.byId[a.r]; if (!r) return 'Tratta sconosciuta.';
       var why = blocked(g, p, r); if (why) return why;
-      var c = a.c, L = +a.L || 0, n = r.len - L;
-      if (L < 0 || L > r.len) return 'Numero di locomotive non valido.';
-      if (L < (r.ferry || 0)) return 'Su questo traghetto servono almeno ' + r.ferry + ' locomotiv' + (r.ferry > 1 ? 'e' : 'a') + '.';
+      var c = a.c, L = +a.L || 0, F = +a.F || 0, cov = covered(r, F), n = r.len - L - cov;
+      if (L < 0 || L > r.len || F < 0 || F !== Math.floor(F) || L !== Math.floor(L)) return 'Pagamento non valido.';
+      if (F && !waves(r)) return 'Le carte Traghetto servono solo sugli spazi con l’onda dei traghetti.';
+      if (F > ferries(P)) return 'Non hai abbastanza carte Traghetto.';
+      if (F > Math.ceil(waves(r) / 2)) return 'Ti bastano meno carte Traghetto: ognuna copre 2 spazi con l’onda.';
+      if (L < waves(r) - cov) return 'Gli spazi con l’onda si pagano con carte Traghetto (2 spazi l’una) o locomotive (1 spazio l’una).';
+      if (n < 0) return 'Stai pagando troppe carte.';
       if (n > 0) {
         if (CC.indexOf(c) < 0) return 'Scegli il colore delle carte.';
         if (r.col !== 'X' && c !== r.col) return 'Questa tratta si prende con carte ' + D.COLORS[r.col].n + '.';
@@ -252,19 +294,28 @@ var BIEngine = (function () {
       if (P.hand.L < L) return 'Non hai abbastanza locomotive.';
       if (n > 0) { P.hand[c] -= n; for (var k = 0; k < n; k++) g.disc.push(c); }
       P.hand.L -= L; for (var m = 0; m < L; m++) g.disc.push('L');
+      if (F) { P.ferry = ferries(P) - F; g.fdeck = ferryPile(g) + F; }
       g.claims[r.id] = p; P.trains -= r.len; var pts = D.SCORE[r.len]; P.score += pts;
       fx(g, { k: 'claim', p: p, r: r.id, pts: pts });
-      log(g, nick(g, p) + ' prende ' + rname(r) + (r.ferry ? ' (traghetto)' : '') + ': ' + r.len + ' vagon' + (r.len > 1 ? 'i' : 'e') + ', +' + pts + ' punt' + (pts > 1 ? 'i' : 'o') + '.', 'claim', p);
+      log(g, nick(g, p) + ' prende ' + rname(r) + (r.ferry ? ' (traghetto' + (F ? ', con ' + F + (F > 1 ? ' carte' : ' carta') + ' Traghetto' : '') + ')' : '') + ': ' + r.len + ' vagon' + (r.len > 1 ? 'i' : 'e') + ', +' + pts + ' punt' + (pts > 1 ? 'i' : 'o') + '.', 'claim', p);
       if (!g.face.every(Boolean)) { for (var q = 0; q < 5; q++) if (!g.face[q]) refill(g, q); checkLocos(g); }
       endTurn(g, p); return null;
     }
+    if (a.a === 'ferry') {
+      var fw = canFerry(g, p); if (fw) return fw;
+      if (g.fdeck == null) g.fdeck = ferryPile(g);
+      g.fdeck--; P.ferry = ferries(P) + 1;
+      fx(g, { k: 'ferry', p: p });
+      log(g, nick(g, p) + ' prende una carta Traghetto (ora ne ha ' + P.ferry + ').', 'draw', p);
+      endTurn(g, p); return null;
+    }
     if (a.a === 'pass') {
-      if (canDrawAny(g, false) || g.tdeck.length || R.some(function (r) { return canClaim(g, p, r).ok; })) return 'Puoi ancora fare qualcosa: non si può passare.';
+      if (canDrawAny(g, false) || g.tdeck.length || !canFerry(g, p) || R.some(function (r) { return canClaim(g, p, r).ok; })) return 'Puoi ancora fare qualcosa: non si può passare.';
       log(g, nick(g, p) + ' non può fare nessuna mossa e passa.', 'sys', p); endTurn(g, p); return null;
     }
     if (a.a === 'tickets') {
       if (!g.tdeck.length) return 'Il mazzo dei biglietti è finito.';
-      P.offer = []; for (var t = 0; t < 3 && g.tdeck.length; t++) P.offer.push(g.tdeck.pop());
+      P.offer = []; for (var t = 0; t < D.DRAW_TICKETS && g.tdeck.length; t++) P.offer.push(g.tdeck.pop());
       g.stage = 'tickets'; fx(g, { k: 'tdraw', p: p, n: P.offer.length });
       log(g, nick(g, p) + ' pesca ' + P.offer.length + ' biglietti destinazione.', 'tk', p);
       return null;
@@ -274,7 +325,7 @@ var BIEngine = (function () {
 
   return {
     newGame: newGame, act: act, decider: decider, waitingSetup: waitingSetup, blocked: blocked, canClaim: canClaim, payOptions: payOptions,
-    connected: connected, longest: longest, ticketPath: ticketPath, myRoutes: myRoutes, handCount: handCount, owner: owner,
+    connected: connected, longest: longest, networks: networks, ferries: ferries, ferryPile: ferryPile, canFerry: canFerry, waves: waves, covered: covered, gatesOf: gatesOf, ticketPath: ticketPath, myRoutes: myRoutes, handCount: handCount, owner: owner,
     canDrawAny: canDrawAny, rname: rname, cname: cname, ADJ: ADJ, shuffle: shuffle
   };
 })();

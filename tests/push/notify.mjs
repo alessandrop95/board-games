@@ -54,7 +54,7 @@ await sub(A, 'ale-telefono', ['binari-italia']); await sub(B, 'bea-telefono', ['
 const pre = (await call({ kind: 'table', token: A.token, game: 'binari-italia', code: 'ABCD' }));
 t('nuovo tavolo: risposta', pre.status === 200 && pre.body.sent === 2, pre);
 t('…arriva ai due dispositivi di Bea, non ad Ale né a Cleo', inbox.map((m) => m.to).sort().join() === 'bea-pc,bea-telefono', inbox);
-t('…testo e link giusti', inbox[0].msg.title === 'Nuovo tavolo: Binari d’Italia' && /^Ale ha aperto un tavolo/.test(inbox[0].msg.body) && inbox[0].msg.url === 'https://alessandrop95.github.io/board-games/binari-italia/?t=ABCD', inbox[0].msg);
+t('…testo e link giusti', inbox[0].msg.title === 'Nuovo tavolo: Ticket to Ride Italy' && /^Ale ha aperto un tavolo/.test(inbox[0].msg.body) && inbox[0].msg.url === 'https://alessandrop95.github.io/board-games/binari-italia/?t=ABCD', inbox[0].msg);
 t('CORS per il sito', pre.cors === 'https://alessandrop95.github.io');
 inbox.length = 0;
 let r = await call({ kind: 'invite', token: A.token, to: 'Bea', game: 'presagio', code: 'WXYZ' });
@@ -82,7 +82,7 @@ t('limite di annunci per giocatore', r.status === 400 && /troppi/.test(r.body.er
 inbox.length = 0; sql("delete from notify_log", 'postgres');
 await sub(C, 'cleo-binari', ['binari-italia']);
 r = await call({ kind: 'table', token: B.token, game: 'binari-italia', code: 'AMIC', vis: 'friends' });
-t('tavolo solo amici: avvisato solo Ale', r.status === 200 && inbox.map((m) => m.to).join() === 'ale-telefono' && inbox[0].msg.title === 'Tavolo tra amici: Binari d’Italia', [r, inbox]);
+t('tavolo solo amici: avvisato solo Ale', r.status === 200 && inbox.map((m) => m.to).join() === 'ale-telefono' && inbox[0].msg.title === 'Tavolo tra amici: Ticket to Ride Italy', [r, inbox]);
 inbox.length = 0;
 r = await call({ kind: 'table', token: B.token, game: 'binari-italia', code: 'TUTT' });
 t('tavolo aperto a tutti: avvisati anche gli altri', inbox.map((m) => m.to).sort().join() === 'ale-telefono,cleo-binari', inbox.map((m) => m.to));

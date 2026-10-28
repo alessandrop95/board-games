@@ -16,8 +16,8 @@ psql -d postgres -qc "drop database if exists bgtest" -c "create database bgtest
 psql -q -v ON_ERROR_STOP=1 -f tests/db/setup.sql || exit 1
 for f in supabase/migrations/*.sql; do psql -q -v ON_ERROR_STOP=1 -f "$f" || { echo "Migrazione non riuscita: $f"; exit 1; }; done
 
-step "Regole di Binari d'Italia" node tests/rules/binari.js
-step "Partite intere tra bot (Binari d'Italia)" node tests/rules/binari_bots.js 6
+step "Regole di Ticket to Ride Italy" node tests/rules/binari.js
+step "Partite intere tra bot (Ticket to Ride Italy)" node tests/rules/binari_bots.js 6
 step "Regole di Catan" node tests/rules/catan.js
 step "Partite intere tra bot (Catan)" node tests/rules/catan_bots.js 20
 step "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs

@@ -1,4 +1,4 @@
-/* ===== Binari d'Italia: la mappa interattiva =====
+/* ===== Ticket to Ride Italy: la mappa interattiva =====
    Sotto il canvas dipinto (Painter), sopra un livello SVG con i binari spazio per spazio, le stazioni,
    i vagoni dei giocatori, le evidenziazioni e le animazioni. Si trascina con un dito e si ingrandisce con due. */
 var Board = (function () {
@@ -52,7 +52,7 @@ var Board = (function () {
     svg.innerHTML = A.DEFS;
     world.appendChild(svg);
     st = { root: root, stage: root.querySelector('#bd-stage'), world: world, svg: svg, view: { x: 0, y: 0, k: 1 }, opts: opts, claimSig: null, fxN: -1 };
-    ['lanes', 'hl', 'slots', 'claims', 'cities', 'labels', 'fx'].forEach(function (n) { var g = el('g', { class: 'bd-' + n }); svg.appendChild(g); st[n] = g; });
+    ['lanes', 'hl', 'slots', 'claims', 'cities', 'labels', 'regions', 'fx'].forEach(function (n) { var g = el('g', { class: 'bd-' + n }); svg.appendChild(g); st[n] = g; });
     // binari liberi
     D.routes.forEach(function (r) {
       var geo = G[r.id], k = C[r.col];
@@ -62,21 +62,34 @@ var Board = (function () {
         var loco = r.ferry && i < r.ferry;
         var h = '<rect x="' + (-s.w / 2).toFixed(1) + '" y="' + (-TH / 2) + '" width="' + s.w.toFixed(1) + '" height="' + TH + '" rx="2" fill="' + k.c + '" stroke="' + k.d + '" stroke-width="1.1"/>' +
           '<rect x="' + (-s.w / 2 + 1.5).toFixed(1) + '" y="' + (-TH / 2 + 1.2) + '" width="' + (s.w - 3).toFixed(1) + '" height="1.6" rx=".8" fill="rgba(255,255,255,' + (r.col === 'W' ? '.9' : '.32') + ')"/>' +
-          (loco ? '<g transform="rotate(' + (-s.ang).toFixed(1) + ') scale(.6)">' + A.glyph('L', '#fff') + '</g>' : '');
+          (loco ? '<g transform="rotate(' + (-s.ang).toFixed(1) + ') scale(.78)">' + A.wave('#fff') + '</g>' : '');
         g.appendChild(el('g', { transform: 'translate(' + s.x.toFixed(1) + ' ' + s.y.toFixed(1) + ') rotate(' + s.ang.toFixed(1) + ')' }, h));
       });
       st.slots.appendChild(g);
     });
-    // stazioni e nomi
+    // stazioni e nomi; i valichi verso i Paesi confinanti sono una bandierina col nome del Paese
     Object.keys(D.cities).forEach(function (id) {
       var c = D.cities[id], big = id === 'roma';
+      if (c.zone) {
+        var nm = c.n.toUpperCase(), w = nm.length * 6.2 + 26;
+        st.cities.appendChild(el('g', { class: 'bd-city bd-gate', 'data-city': id, transform: 'translate(' + c.x + ' ' + c.y + ')' },
+          '<circle class="bd-cring" r="15"/><rect x="' + (-w / 2) + '" y="-9" width="' + w + '" height="18" rx="9" fill="#f6ecd2" stroke="#5b4630" stroke-width="1.4" filter="url(#bi-shadow)"/>' +
+          '<g transform="translate(' + (-w / 2 + 5) + ' -5.5) scale(.75)"><g>' + A.flag(c.zone).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') + '</g></g>' +
+          '<text x="' + (-w / 2 + 19) + '" y="3.6" class="bd-gate-t">' + nm + '</text>'));
+        return;
+      }
       st.cities.appendChild(el('g', { class: 'bd-city', 'data-city': id, transform: 'translate(' + c.x + ' ' + c.y + ')' },
         '<circle class="bd-cring" r="15"/>' +
-        '<circle r="' + (big ? 10.5 : 8.6) + '" fill="#f6ecd2" stroke="#7a2418" stroke-width="2.6" filter="url(#bi-shadow)"/>' +
+        '<circle class="bd-st" r="' + (big ? 10.5 : 8.6) + '" fill="#f6ecd2" stroke="#7a2418" stroke-width="2.6" filter="url(#bi-shadow)"/>' +
         (big ? '<circle r="6.6" fill="none" stroke="#7a2418" stroke-width="1"/>' : '') +
         '<circle r="' + (big ? 3.6 : 3.2) + '" fill="#7a2418"/>'));
       var t = el('text', { x: c.x + c.lab[0], y: c.y + c.lab[1], 'text-anchor': c.lab[2], class: 'bd-label' + (big ? ' big' : ''), 'data-city': id });
       t.textContent = c.n; st.labels.appendChild(t);
+    });
+    // vista «Regioni»: nome di ogni regione accanto alle sue città
+    Object.keys(D.regions).forEach(function (k) {
+      var R2 = D.regions[k], x = 0, y = 0; R2.cities.forEach(function (c) { x += D.cities[c].x; y += D.cities[c].y; }); x /= R2.cities.length; y /= R2.cities.length;
+      var t2 = el('text', { x: x.toFixed(1), y: (y + (R2.cities.length === 1 ? 38 : 4)).toFixed(1), 'text-anchor': 'middle', class: 'bd-reg', fill: R2.c }); t2.textContent = R2.n.toUpperCase(); st.regions.appendChild(t2);
     });
     bindInput();
     fit();
@@ -120,7 +133,8 @@ var Board = (function () {
     Array.prototype.forEach.call(st.claims.children, function (n) { n.classList.toggle('focus', !!(opts.focus && opts.focus[n.getAttribute('data-route')])); });
     // città evidenziate
     var cs = opts.cities || {};
-    Array.prototype.forEach.call(st.cities.children, function (n) { var id = n.getAttribute('data-city'); n.setAttribute('class', 'bd-city' + (cs[id] ? ' ' + cs[id] : '')); });
+    Array.prototype.forEach.call(st.cities.children, function (n) { var id = n.getAttribute('data-city'), c = D.cities[id]; n.setAttribute('class', 'bd-city' + (c.zone ? ' bd-gate' : '') + (cs[id] ? ' ' + cs[id] : '')); if (!c.zone) n.style.setProperty('--rc', D.regions[c.reg].c); });
+    st.svg.classList.toggle('show-reg', !!opts.regions);
     Array.prototype.forEach.call(st.labels.children, function (n) { var id = n.getAttribute('data-city'); n.classList.toggle('hot', !!cs[id]); });
     // animazioni dei punti appena fatti
     if (st.fxN !== g.fxN) {

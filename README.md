@@ -64,17 +64,19 @@ Strategia dieselpunk da 2 a 5 giocatori (regole equivalenti a un noto gioco di m
 - Battaglie con scelta segreta di potere e carte, 28 incontri, 12 carte Fabbrica e 23 obiettivi scritti da zero. Ogni passo ha un «?» con la spiegazione; le regole complete sono nel gioco.
 - Giocatori automatici che valutano ogni colonna della plancia su una copia della partita.
 
-## Binari d’Italia
+## Ticket to Ride Italy
 
-Gioco di treni e tratte ferroviarie da 2 a 5 giocatori (regole equivalenti a un noto gioco di biglietti e vagoni, più i traghetti per le isole; mappa, nomi, carte e grafica originali).
+Gioco di treni e tratte ferroviarie da 2 a 5 giocatori con le regole della mappa Italia (cartella `binari-italia/`: indirizzi, tavoli e statistiche restano quelli di prima). Mappa, carte e grafica sono originali.
 
 **Gioca:** https://alessandrop95.github.io/board-games/binari-italia/
 
-- Mappa dell’Italia con 43 città e 83 tratte (traghetti per Sicilia e Sardegna, binari doppi), 44 biglietti destinazione da 5 a 24 punti. Coste, laghi e fiumi da [Natural Earth](https://www.naturalearthdata.com/) (pubblico dominio), dipinti dal codice in stile carta ferroviaria d’epoca.
-- Ogni turno una sola azione: pescare 2 carte vagone, conquistare una tratta (toccandola sulla mappa: il gioco mostra le carte che userai e i punti) o pescare biglietti. Ultimo giro quando qualcuno scende a 2 vagoni; bonus di 10 punti al percorso continuo più lungo.
-- Otto carte vagone illustrate, ognuna con il suo simbolo per riconoscere i colori anche senza vederli; biglietti in stile cartoncino d’epoca con la cartina.
-- Presentazione delle regole alla prima partita, «?» su ogni fase, città dei propri biglietti cerchiate sulla mappa, conteggio finale con biglietti e percorsi evidenziati.
-- Giocatori automatici che pianificano i biglietti con il percorso più economico. Dati della mappa generati con gli script in `tools/binari-italia/`.
+- Mappa dell’Italia con 43 città, 4 Paesi confinanti (Francia, Svizzera, Austria, Slovenia) con 10 valichi e 93 tratte, compresi i traghetti per Sicilia e Sardegna e i binari doppi. Coste, laghi e fiumi da [Natural Earth](https://www.naturalearthdata.com/) (pubblico dominio), dipinti dal codice in stile carta ferroviaria d’epoca.
+- 5 biglietti all’inizio (se ne tengono almeno 3), 56 biglietti in tutto, 12 dei quali verso i Paesi confinanti; durante la partita se ne pescano 4.
+- Quattro azioni per turno: pescare 2 carte vagone, conquistare una tratta, pescare biglietti o prendere una **carta Traghetto** (al massimo 2 in mano; ognuna paga fino a 2 spazi con l’onda, una locomotiva uno solo).
+- Le tratte verso i Paesi confinanti sono vicoli ciechi: tratte diverse verso lo stesso Paese non sono collegate tra loro.
+- A fine partita c’è il **bonus delle regioni**: ogni rete di tratte collegate vale punti secondo quante delle 19 regioni tocca, e Sicilia, Sardegna e Puglia complete valgono doppio. Non c’è il bonus per il percorso più lungo. Il pulsante con lo stemma colora le stazioni per regione; «Regioni e bonus» mostra le proprie reti.
+- Presentazione delle regole alla prima partita, «?» su ogni fase, mete dei propri biglietti cerchiate sulla mappa, conteggio finale con biglietti e regioni.
+- Giocatori automatici che pianificano i biglietti con il percorso più economico, prendono le carte Traghetto quando servono e cercano di unire le proprie reti. Dati della mappa generati con gli script in `tools/binari-italia/`.
 
 ## Catan
 

@@ -1,4 +1,4 @@
-/* ===== Binari d'Italia: la carta geografica dipinta (una volta sola, su canvas) =====
+/* ===== Ticket to Ride Italy: la carta geografica dipinta (una volta sola, su canvas) =====
    Stile carta ferroviaria d'epoca: mare con le fasce lungo la costa, terra color carta, rilievi a mano,
    laghi, fiumi, vulcani, nomi dei mari, rosa dei venti e cartiglio. Coste da Natural Earth (pubblico dominio). */
 var Painter = (function () {
@@ -143,7 +143,7 @@ var Painter = (function () {
       var rot = sd[0] === 'Mar Adriatico' ? -0.62 : sd[0] === 'Mar Ionio' ? -1.05 : sd[0] === 'Mar Ligure' ? 0.12 : 0;
       spaced(sd[0].toUpperCase(), sd[1], sd[2], sd[0] === 'Mar Tirreno' ? 17 : 13, 'rgba(25,70,90,.5)', true, rot);
     });
-    [['FRANCIA', 42, 400], ['SVIZZERA', 250, 48], ['AUSTRIA', 560, 40], ['SLOVENIA', 760, 210], ['CROAZIA', 850, 360], ['CORSICA', 210, 520], ['TUNISIA', 150, 1080], ['BOSNIA', 905, 470]].forEach(function (l) { spaced(l[0], l[1], l[2], 10.5, 'rgba(90,75,55,.62)', false, 0); });
+    [['CROAZIA', 850, 360], ['CORSICA', 210, 520], ['TUNISIA', 150, 1080], ['BOSNIA', 905, 470]].forEach(function (l) { spaced(l[0], l[1], l[2], 10.5, 'rgba(90,75,55,.62)', false, 0); });
 
     /* --- rosa dei venti --- */
     (function compass(x, y, r) {
@@ -180,10 +180,10 @@ var Painter = (function () {
       c.lineWidth = 0.8; c.strokeRect(x + 9, y + 9, w - 18, h - 18);
       c.fillStyle = '#7a2418'; c.textAlign = 'center';
       c.font = '500 9.5px "Barlow", sans-serif'; spaced('CARTA DELLE STRADE FERRATE', x + w / 2, y + 28, 9, '#7a2418', false, 0);
-      c.font = '800 30px "Bodoni Moda", Georgia, serif'; c.fillStyle = '#2a2420'; c.fillText('Binari d’Italia', x + w / 2, y + 62);
+      c.font = '800 29px "Bodoni Moda", Georgia, serif'; c.fillStyle = '#2a2420'; c.fillText('Ticket to Ride', x + w / 2, y + 60);
       c.strokeStyle = '#7a2418'; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 40, y + 74); c.lineTo(x + w - 40, y + 74); c.stroke();
       c.fillStyle = '#7a2418'; c.beginPath(); c.arc(x + w / 2, y + 74, 2.4, 0, 7); c.fill();
-      spaced('MDCCCLXXX', x + w / 2, y + 92, 8.5, 'rgba(60,40,30,.8)', false, 0);
+      spaced('ITALIA', x + w / 2, y + 93, 12, '#7a2418', false, 0);
     })(D.W - 272, 18, 250, 106);
 
     /* --- carta invecchiata --- */

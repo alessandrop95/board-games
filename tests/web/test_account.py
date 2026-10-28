@@ -75,7 +75,7 @@ with sync_playwright() as p:
     cdp.send('ServiceWorker.enable'); B.wait_for_timeout(800)
     rid = [r['registrationId'] for r in regs if not r.get('isDeleted')][0]
     B.reload(); B.wait_for_timeout(1500)
-    cdp.send('ServiceWorker.deliverPushMessage', {'origin': 'http://localhost:8898', 'registrationId': rid, 'data': json.dumps({'title': 'Ale ti invita a giocare', 'body': 'Tavolo ' + code + ' di Binari d’Italia: tocca per sederti.', 'url': B8 + 'binari-italia/?t=' + code + '&' + Q, 'kind': 'invite'})})
+    cdp.send('ServiceWorker.deliverPushMessage', {'origin': 'http://localhost:8898', 'registrationId': rid, 'data': json.dumps({'title': 'Ale ti invita a giocare', 'body': 'Tavolo ' + code + ' di Ticket to Ride Italy: tocca per sederti.', 'url': B8 + 'binari-italia/?t=' + code + '&' + Q, 'kind': 'invite'})})
     B.wait_for_timeout(1200)
     t('avviso dentro la pagina aperta', B.locator('.ppa-banner').count() == 1 and 'ti invita' in B.inner_text('.ppa-banner'))
     B.screenshot(path=S + 'banner.png')

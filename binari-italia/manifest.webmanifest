@@ -1,8 +1,8 @@
 {
  "id": "./",
- "name": "Binari d’Italia",
- "short_name": "Binari d’Italia",
- "description": "Gioco di treni e tratte ferroviarie sulla mappa d’Italia, da 2 a 5 giocatori.",
+ "name": "Ticket to Ride Italy",
+ "short_name": "TtR Italy",
+ "description": "Gioco di treni sulla mappa d’Italia: tratte, traghetti, Paesi confinanti e regioni. Da 2 a 5 giocatori.",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",

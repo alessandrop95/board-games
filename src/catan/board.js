@@ -1,7 +1,7 @@
 /* ===== Catan: il tabellone interattivo =====
    Sotto l'isola dipinta (CTPainter), sopra un livello SVG con porti, numeri, strade, colonie, città e ladro.
    Quando devi scegliere un posto (colonia, strada, città, ladro) i posti validi lampeggiano: tocchi, poi confermi.
-   Si trascina con un dito e si ingrandisce con due, come la mappa di Binari d'Italia. */
+   Si trascina con un dito e si ingrandisce con due, come la mappa di Ticket to Ride Italy. */
 var Board = (function () {
   var D = CTData, A = CTArt, NS = 'http://www.w3.org/2000/svg', V = D.verts, EDG = D.edges, HX = D.hexes;
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

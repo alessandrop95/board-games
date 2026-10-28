@@ -12,13 +12,18 @@ def sp(s):
             if c+w<d.get(v,1e9): d[v]=c+w; heapq.heappush(q,(c+w,v))
     return d
 DIST={c:sp(c) for c in n['pos']}
-PAIRS='''torino venezia|milano roma|genova firenze|bologna napoli|venezia firenze|trieste bologna|aosta genova|bolzano milano|verona ancona|parma perugia|pisa roma|firenze pescara|roma bari|napoli lecce|napoli reggio|bari cosenza|palermo reggio|catania napoli|sassari civitavecchia|cagliari roma|ventimiglia milano|cuneo bologna|domodossola venezia|udine rimini|trento firenze|brescia laspezia|laquila foggia|grosseto ancona|potenza agrigento|salerno taranto|messina bari|torino napoli|trieste foggia|ventimiglia napoli|bolzano cagliari|venezia bari|milano palermo|venezia napoli|genova catania|genova reggio|domodossola roma|olbia lecce|cuneo agrigento|verona cagliari'''
+GATES=collections.defaultdict(list)
+for g,z in n['gates'].items(): GATES[z].append(g)
+def dist(a,b):   # un Paese confinante vale quanto il suo valico più vicino
+    A=GATES.get(a,[a]); B=GATES.get(b,[b])
+    return min(DIST[x][y] for x in A for y in B)
+PAIRS='''torino venezia|milano roma|genova firenze|bologna napoli|venezia firenze|trieste bologna|aosta genova|bolzano milano|verona ancona|parma perugia|pisa roma|firenze pescara|roma bari|napoli lecce|napoli reggio|bari cosenza|palermo reggio|catania napoli|sassari civitavecchia|cagliari roma|ventimiglia milano|cuneo bologna|domodossola venezia|udine rimini|trento firenze|brescia laspezia|laquila foggia|grosseto ancona|potenza agrigento|salerno taranto|messina bari|torino napoli|trieste foggia|ventimiglia napoli|bolzano cagliari|venezia bari|milano palermo|venezia napoli|genova catania|genova reggio|domodossola roma|olbia lecce|cuneo agrigento|verona cagliari|francia napoli|francia venezia|francia bari|svizzera roma|svizzera firenze|svizzera palermo|austria milano|austria roma|austria lecce|slovenia torino|slovenia napoli|francia slovenia'''
 T=[]
 for i,p in enumerate(PAIRS.split('|')):
-    a,b=p.split(); v=DIST[a][b]; T.append({'id':i,'a':a,'b':b,'v':v})
+    a,b=p.split(); v=dist(a,b); T.append({'id':i,'a':a,'b':b,'v':v})
 T.sort(key=lambda t:t['v'])
 for t in T: print('%-12s %-12s %d'%(t['a'],t['b'],t['v']))
 cnt=collections.Counter(); [cnt.update([t['a'],t['b']]) for t in T]
-print('città senza biglietti:', [c for c in n['pos'] if c not in cnt])
+print('città senza biglietti:', [c for c in n['pos'] if c not in cnt and c not in n['gates']]); print('biglietti', len(T))
 print('valori', sorted(t['v'] for t in T))
 json.dump(T,open(D+'tickets.json','w'))

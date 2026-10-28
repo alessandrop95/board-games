@@ -1,4 +1,4 @@
-/* ===== Binari d'Italia: suoni (carte, binari, fischio, campanella) ===== */
+/* ===== Ticket to Ride Italy: suoni (carte, binari, fischio, campanella) ===== */
 (function () {
   var S = Sound, N = S.N;
   function clack(at, f, v) { S.hiss({ ft: 'bandpass', f: [f || 1900, (f || 1900) * .7], q: 5, dur: .05, vol: v || .16, at: at || 0 }); S.tone({ f: [140, 90], type: 'square', dur: .05, vol: .05, lp: 900, at: at || 0 }); }

@@ -1,6 +1,7 @@
-/* ===== Binari d'Italia: giocatori automatici =====
-   Pianificano i biglietti con il percorso più economico, raccolgono i colori che servono,
-   conquistano prima le tratte a rischio e chiudono la partita usando i vagoni rimasti. */
+/* ===== Ticket to Ride Italy: giocatori automatici =====
+   Pianificano i biglietti (anche verso i Paesi confinanti) con il percorso più economico, raccolgono i colori
+   che servono e le carte Traghetto per il mare, conquistano prima le tratte a rischio, cercano di unire
+   le proprie reti per il bonus delle regioni e chiudono la partita usando i vagoni rimasti. */
 var BIBot = (function () {
   var D = BIData, E = BIEngine, R = D.routes, CC = D.CARD_COLORS;
   var CITIES = Object.keys(D.cities);
@@ -11,9 +12,15 @@ var BIBot = (function () {
     if (o === p) return 0;
     if (o != null) return Infinity;
     if (r.twin != null) { var t = g.claims[r.twin]; if (t === p || (t != null && g.nplayers <= 3)) return Infinity; }
-    return r.len + (r.ferry ? r.ferry * 0.8 : 0) + (r.col === 'X' ? 0 : 0.15);
+    var w = r.ferry || 0, fc = Math.min(w, 2 * E.ferries(g.players[p]));
+    return r.len + (w - fc) * 0.8 + fc * 0.2 + (r.col === 'X' ? 0 : 0.15);
   }
-  function shortest(g, p, a, b) { // Dijkstra semplice: 43 città
+  // percorso più economico; un Paese confinante vale quanto il suo valico più comodo
+  function shortest(g, p, a, b) {
+    if (D.zones[a] || D.zones[b]) { var best = null; E.gatesOf(a).forEach(function (x) { E.gatesOf(b).forEach(function (y) { var s = shortest1(g, p, x, y); if (s && (!best || s.cost < best.cost)) best = s; }); }); return best; }
+    return shortest1(g, p, a, b);
+  }
+  function shortest1(g, p, a, b) { // Dijkstra semplice: 53 nodi
     var dist = {}, prev = {}, done = {}; CITIES.forEach(function (c) { dist[c] = Infinity; }); dist[a] = 0;
     for (;;) {
       var u = null, best = Infinity;
@@ -53,7 +60,7 @@ var BIBot = (function () {
     // usa il colore che serve meno alle altre tratte del piano e il minimo di locomotive
     var best = null;
     opts.forEach(function (o) {
-      var s = o.L * 3 + (needCols[o.c] || 0) * 0.5 - (g.players[p].hand[o.c] || 0) * 0.1;
+      var s = o.L * 3 + (o.F || 0) * 1.2 + (needCols[o.c] || 0) * 0.5 - (g.players[p].hand[o.c] || 0) * 0.1;
       if (!best || s < best.s) best = { s: s, o: o };
     });
     return best.o;
@@ -79,9 +86,9 @@ var BIBot = (function () {
     return plan(fake, p).trains;
   }
   function keepChoice(g, p) {
-    var P = g.players[p], offer = P.offer.slice(), min = g.stage === 'setup' ? 2 : 1;
+    var P = g.players[p], offer = P.offer.slice(), min = Math.min(offer.length, g.stage === 'setup' ? D.START_KEEP : 1);
     var base = scoreTickets(g, p, []), trains = P.trains - 3;
-    // prova tutte le combinazioni (al massimo 3 biglietti: 7 sottoinsiemi)
+    // prova tutte le combinazioni (al massimo 5 biglietti: 31 sottoinsiemi)
     var best = null;
     for (var m = 1; m < (1 << offer.length); m++) {
       var ids = offer.filter(function (_, i) { return m & (1 << i); }); if (ids.length < min) continue;
@@ -108,6 +115,25 @@ var BIBot = (function () {
     for (var j = 0; j < 5; j++) if (face[j] && !(second && face[j] === 'L')) return { a: 'draw', i: j };
     return null;
   }
+  // carte Traghetto: servono se le onde delle tratte del piano superano locomotive e traghetti in mano
+  function wantFerry(g, p, pl) {
+    if (E.canFerry(g, p)) return false;
+    var P = g.players[p], w = 0; pl.list.forEach(function (x) { w += x.r.ferry || 0; });
+    return w > 0 && w > E.ferries(P) * 2 + P.hand.L;
+  }
+  // regioni nuove che una tratta porterebbe alla rete più grande (per il bonus a fine partita)
+  function regionGain(g, p, r) {
+    var before = E.networks(g, p).reduce(function (s, n) { return s + n.pts; }, 0);
+    g.claims[r.id] = p; var after = E.networks(g, p).reduce(function (s, n) { return s + n.pts; }, 0); delete g.claims[r.id];
+    return after - before;
+  }
+  function claimOf(g, p, r, o) { o = o || E.canClaim(g, p, r).opts[0]; return { a: 'claim', r: r.id, c: o.c, L: o.L, F: o.F || 0 }; }
+  function bestAny(g, p) {
+    var any = R.filter(function (r) { return E.canClaim(g, p, r).ok; });
+    if (!any.length) return null;
+    any.forEach(function (r) { r._s = D.SCORE[r.len] + regionGain(g, p, r) * 0.8; });
+    return any.sort(function (a, b) { return b._s - a._s; })[0];
+  }
   function decide(g, p) {
     var P = g.players[p];
     if (g.stage === 'setup' || g.stage === 'tickets') return { a: 'keep', ids: keepChoice(g, p) };
@@ -121,24 +147,25 @@ var BIBot = (function () {
       cand.sort(function (a, b) { return b.s - a.s; });
       var r = cand[0].r, o = chooseOpt(g, p, r, E.canClaim(g, p, r).opts, nc);
       // non sprecare locomotive su tratte brevi se il resto del piano ne ha bisogno, salvo pericolo
-      if (!(o.L >= 2 && r.len <= 2 && pl.list.length > 3 && alternatives(g, p, r) > 2)) return { a: 'claim', r: r.id, c: o.c, L: o.L };
+      if (!(o.L >= 2 && r.len <= 2 && pl.list.length > 3 && alternatives(g, p, r) > 2)) return claimOf(g, p, r, o);
     }
+    if (pl.list.length && wantFerry(g, p, pl) && !g.last) return { a: 'ferry' };
     // 2) biglietti tutti fatti: altri biglietti se ci sono vagoni, altrimenti punti con le tratte lunghe
     if (!pl.list.length) {
-      if (!g.last && P.trains >= 14 && g.tdeck.length && P.tickets.length < 7) return { a: 'tickets' };
-      var any = R.filter(function (r) { return E.canClaim(g, p, r).ok; }).sort(function (a, b) { return b.len - a.len; });
-      if (any.length && (any[0].len >= 3 || P.trains <= 6 || g.last)) { var o2 = E.canClaim(g, p, any[0]).opts[0]; return { a: 'claim', r: any[0].id, c: o2.c, L: o2.L }; }
+      if (!g.last && P.trains >= 10 + 3 * g.nplayers && g.tdeck.length && P.tickets.length < 7) return { a: 'tickets' };
+      var b1 = bestAny(g, p);
+      if (b1 && (b1.len >= 3 || b1._s >= 4 || P.trains <= 6 || g.last)) return claimOf(g, p, b1);
     }
     // 3) ultimo giro o piano impossibile: meglio usare le carte che restano
     if (g.last || pl.trains > P.trains) {
-      var any2 = R.filter(function (r) { return E.canClaim(g, p, r).ok; }).sort(function (a, b) { return b.len - a.len; });
-      if (any2.length) { var o3 = E.canClaim(g, p, any2[0]).opts[0]; return { a: 'claim', r: any2[0].id, c: o3.c, L: o3.L }; }
+      var b2 = bestAny(g, p); if (b2) return claimOf(g, p, b2);
     }
     // 4) pescare carte
     if (E.canDrawAny(g, false)) return pickDraw(g, p, pl, false) || { a: 'draw', i: 'deck' };
     if (g.tdeck.length) return { a: 'tickets' };
     var any3 = R.filter(function (r) { return E.canClaim(g, p, r).ok; });
-    if (any3.length) { var o4 = E.canClaim(g, p, any3[0]).opts[0]; return { a: 'claim', r: any3[0].id, c: o4.c, L: o4.L }; }
+    if (any3.length) return claimOf(g, p, any3[0]);
+    if (!E.canFerry(g, p)) return { a: 'ferry' };
     return { a: 'pass' };
   }
   return { decide: decide, plan: plan, shortest: shortest, openTickets: openTickets };

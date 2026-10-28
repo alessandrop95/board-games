@@ -55,6 +55,30 @@ CITIES = {
 }
 pos = {k: (round(P(v[1], v[2])[0] + v[3], 1), round(P(v[1], v[2])[1] + v[4], 1)) for k, v in CITIES.items()}
 
+# Paesi confinanti (regole di Ticket to Ride Italy): ogni tratta verso un Paese finisce in un suo «valico»,
+# un vicolo cieco; valichi diversi dello stesso Paese non sono collegati tra loro. Posizioni in px sulla carta.
+ZONES = {'francia': 'Francia', 'svizzera': 'Svizzera', 'austria': 'Austria', 'slovenia': 'Slovenia'}
+GATES = {  # id: (paese, x, y)
+ 'fr-aosta': ('francia', 40, 210), 'fr-torino': ('francia', 42, 268), 'fr-ventimiglia': ('francia', 46, 404),
+ 'ch-aosta': ('svizzera', 108, 96), 'ch-domodossola': ('svizzera', 186, 58), 'ch-milano': ('svizzera', 262, 104),
+ 'at-bolzano': ('austria', 410, 30), 'at-udine': ('austria', 520, 58),
+ 'si-udine': ('slovenia', 606, 122), 'si-trieste': ('slovenia', 628, 214),
+}
+for k, (z, x, y) in GATES.items(): pos[k] = (float(x), float(y))
+
+# Regioni (bonus a fine partita): ogni città appartiene a una regione
+REGIONS = {
+ 'valledaosta': ("Valle d'Aosta", ['aosta']), 'piemonte': ('Piemonte', ['torino', 'cuneo', 'domodossola']),
+ 'liguria': ('Liguria', ['ventimiglia', 'genova', 'laspezia']), 'lombardia': ('Lombardia', ['milano', 'brescia']),
+ 'trentino': ('Trentino-Alto Adige', ['trento', 'bolzano']), 'veneto': ('Veneto', ['verona', 'venezia']),
+ 'friuli': ('Friuli-Venezia Giulia', ['udine', 'trieste']), 'emilia': ('Emilia-Romagna', ['parma', 'bologna', 'rimini']),
+ 'toscana': ('Toscana', ['firenze', 'pisa', 'grosseto']), 'umbria': ('Umbria', ['perugia']), 'marche': ('Marche', ['ancona']),
+ 'abruzzo': ('Abruzzo', ['pescara', 'laquila']), 'lazio': ('Lazio', ['roma', 'civitavecchia']), 'campania': ('Campania', ['napoli', 'salerno']),
+ 'puglia': ('Puglia', ['foggia', 'bari', 'taranto', 'lecce']), 'basilicata': ('Basilicata', ['potenza']), 'calabria': ('Calabria', ['cosenza', 'reggio']),
+ 'sicilia': ('Sicilia', ['palermo', 'messina', 'catania', 'agrigento']), 'sardegna': ('Sardegna', ['olbia', 'sassari', 'cagliari']),
+}
+SPECIAL = ['puglia', 'sicilia', 'sardegna']   # valgono 2 regioni se tutte le loro città sono nella stessa rete
+
 # (a, b, colore | 'grey', [lunghezza forzata], doppia: colore della seconda, traghetto: n locomotive)
 # colori: R rosso, B blu, G verde, Y giallo, O arancio, K nero, W bianco, P viola, X grigio
 ROUTES = [
@@ -88,10 +112,15 @@ ROUTES = [
  ('messina', 'palermo', 'W'), ('messina', 'catania', 'K'), ('palermo', 'agrigento', 'B'),
  ('catania', 'agrigento', 'Y'), ('palermo', 'catania', 'X'),
  ('olbia', 'sassari', 'X'), ('sassari', 'cagliari', 'G'), ('olbia', 'cagliari', 'P'),
- ('civitavecchia', 'olbia', 'X', 4, None, 2),
- ('napoli', 'palermo', 'X', 4, None, 2),
- ('cagliari', 'palermo', 'X', 5, None, 2),
- ('genova', 'olbia', 'X', 6, None, 2, 70),
+ ('civitavecchia', 'olbia', 'X', 4, None, 3),
+ ('napoli', 'palermo', 'X', 4, None, 3),
+ ('cagliari', 'palermo', 'X', 5, None, 4),
+ ('genova', 'olbia', 'X', 6, None, 4, 70),
+ # verso i Paesi confinanti
+ ('aosta', 'fr-aosta', 'W'), ('torino', 'fr-torino', 'Y'), ('ventimiglia', 'fr-ventimiglia', 'G'),
+ ('aosta', 'ch-aosta', 'O'), ('domodossola', 'ch-domodossola', 'R'), ('milano', 'ch-milano', 'K'),
+ ('bolzano', 'at-bolzano', 'P'), ('udine', 'at-udine', 'G'),
+ ('udine', 'si-udine', 'R'), ('trieste', 'si-trieste', 'W'),
 ]
 def dist(a, b): return math.hypot(pos[a][0] - pos[b][0], pos[a][1] - pos[b][1])
 UNIT = 30.0
@@ -113,4 +142,5 @@ if __name__ == '__main__':
     print('città', len(pos), 'tratte', len(routes), 'spazi', spaces, dict(sorted(by.items())))
     lens = collections.Counter(r['len'] for r in routes); print('lunghezze', dict(sorted(lens.items())))
     for r in routes: print('%-14s %-14s %d %s %.0f px/spazio%s' % (r['a'], r['b'], r['len'], r['col'], dist(r['a'], r['b']) / r['len'], ' traghetto' if r['ferry'] else ''))
-    json.dump({'pos': pos, 'cities': {k: v[0] for k, v in CITIES.items()}, 'routes': routes}, open(D + 'net.json', 'w'))
+    json.dump({'pos': pos, 'cities': {k: v[0] for k, v in CITIES.items()}, 'routes': routes, 'zones': ZONES, 'gates': {k: v[0] for k, v in GATES.items()},
+               'regions': {k: {'n': v[0], 'c': v[1]} for k, v in REGIONS.items()}, 'special': SPECIAL}, open(D + 'net.json', 'w'))

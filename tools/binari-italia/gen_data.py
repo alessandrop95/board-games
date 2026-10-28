@@ -48,6 +48,7 @@ SEAS = [('Mar Ligure', 43.75, 8.75), ('Mar Tirreno', 40.3, 12.0), ('Mar Adriatic
 seas = [[nm] + P(a, b) for nm, a, b in SEAS]
 
 # --- tratte: geometria per il posizionamento delle etichette ---
+GATE = n['gates']; CITY = [c for c in pos if c not in GATE]
 def seg_lines():
     L = []
     for r in n['routes']:
@@ -67,7 +68,7 @@ CAND = [('n', 0, -15, 'middle'), ('s', 0, 24, 'middle'), ('e', 14, 4.5, 'start')
         ('ne', 10, -11, 'start'), ('nw', -10, -11, 'end'), ('se', 10, 19, 'start'), ('sw', -10, 19, 'end')]
 placed = []
 labels = {}
-order = sorted(pos, key=lambda c: -sum(1 for r in n['routes'] if c in (r['a'], r['b'])))
+order = sorted(CITY, key=lambda c: -sum(1 for r in n['routes'] if c in (r['a'], r['b'])))
 for c in order:
     x, y = pos[c]; name = n['cities'][c]; w = len(name) * CW + 6; best = None
     for key, dx, dy, anc in CAND:
@@ -83,11 +84,17 @@ for c in order:
     placed.append(best[5]); labels[c] = [best[2], best[3], best[4]]
     if best[0] > 12: print('etichetta affollata:', name, best[0], best[1])
 
-cities = {c: {'n': n['cities'][c], 'x': pos[c][0], 'y': pos[c][1], 'lab': labels[c]} for c in pos}
+REG = {c: k for k, v in n['regions'].items() for c in v['c']}
+cities = {c: {'n': n['cities'][c], 'x': pos[c][0], 'y': pos[c][1], 'lab': labels[c], 'reg': REG[c]} for c in CITY}
+for c, z in GATE.items(): cities[c] = {'n': n['zones'][z], 'x': pos[c][0], 'y': pos[c][1], 'zone': z}
+# colori delle regioni (vista «Regioni» sulla carta)
+RCOL = ['#b8403a', '#d0752e', '#c99a1c', '#7f9a2a', '#3f8f4f', '#2f8a86', '#2f6fa8', '#5157b0', '#7b4aa6', '#a7457f',
+        '#8a5a35', '#4f7d3c', '#b25f5f', '#3d7f9e', '#9a7a2a', '#6b6fb5', '#a35a2a', '#2f7a63', '#8d4a6a']
+regions = {k: {'n': v['n'], 'cities': v['c'], 'c': RCOL[i % len(RCOL)]} for i, (k, v) in enumerate(n['regions'].items())}
 routes = [{k: v for k, v in r.items() if v not in (0, None) or k in ('id',)} for r in n['routes']]
-data = {'W': W, 'H': H, 'cities': cities, 'routes': routes, 'tickets': [{'id': i, 'a': t['a'], 'b': t['b'], 'v': t['v']} for i, t in enumerate(T)],
+data = {'W': W, 'H': H, 'cities': cities, 'routes': routes, 'zones': n['zones'], 'regions': regions, 'special': n['special'], 'tickets': [{'id': i, 'a': t['a'], 'b': t['b'], 'v': t['v']} for i, t in enumerate(T)],
         'geo': {'italy': italy, 'others': others, 'lakes': lakes, 'rivers': rivers, 'ridges': ridges, 'volc': VOLC, 'seas': seas}}
-js = '/* ===== Binari d\'Italia: dati della mappa (generati da tools/; coste, laghi e fiumi da Natural Earth, pubblico dominio) ===== */\n'
+js = '/* ===== Ticket to Ride Italy: dati della mappa (generati da tools/; coste, laghi e fiumi da Natural Earth, pubblico dominio) ===== */\n'
 js += 'var BIData = (function () {\n  var D = ' + json.dumps(data, ensure_ascii=False, separators=(',', ':')) + ';\n'
 js += """  D.COLORS = {
     R: { n: 'rosso', c: '#c9352b', d: '#7e1d17', ink: '#fff' }, O: { n: 'arancione', c: '#e5822a', d: '#94480c', ink: '#fff' },
@@ -98,7 +105,13 @@ js += """  D.COLORS = {
   };
   D.CARD_COLORS = ['R', 'O', 'Y', 'G', 'B', 'P', 'K', 'W'];
   D.SCORE = [0, 1, 2, 4, 7, 10, 15];
-  D.TRAINS = 45; D.LONGEST = 10;
+  D.TRAINS = 45; D.FERRY = 10; D.FERRY_MAX = 2;
+  D.START_TICKETS = 5; D.START_KEEP = 3; D.DRAW_TICKETS = 4;
+  // bonus delle regioni collegate in una stessa rete (Sicilia, Sardegna e Puglia complete valgono 2)
+  D.REGION_PTS = [0, 0, 0, 0, 0, 1, 3, 5, 8, 11, 15, 19, 24, 29, 34, 40, 46, 52, 56, 60, 64, 68, 72];
+  D.regionPts = function (n) { return D.REGION_PTS[Math.min(n, D.REGION_PTS.length - 1)]; };
+  D.isZone = function (id) { return !!D.zones[id]; };
+  D.place = function (id) { return D.zones[id] || D.cities[id].n; };
   D.PCOL = [
     { id: 'rosso', n: 'Rosso', c: '#d23b2f', d: '#7d1610' }, { id: 'blu', n: 'Blu', c: '#2f72c9', d: '#123f7c' },
     { id: 'verde', n: 'Verde', c: '#2f9e57', d: '#145a2c' }, { id: 'giallo', n: 'Giallo', c: '#f0b92a', d: '#8a6305' },

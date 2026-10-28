@@ -1,4 +1,4 @@
-/* ===== Binari d'Italia: disegni originali (carte vagone, locomotiva, biglietti, vagoni dei giocatori, icone) ===== */
+/* ===== Ticket to Ride Italy: disegni originali (carte vagone, locomotiva, carte Traghetto, biglietti, vagoni, bandiere, icone) ===== */
 var BIArt = (function () {
   var D = BIData, C = D.COLORS;
   var uid = 0;
@@ -109,15 +109,50 @@ var BIArt = (function () {
       '<rect x="6" y="6" width="88" height="128" rx="6" fill="#1f3a4a"/><rect x="11" y="11" width="78" height="118" rx="4" fill="none" stroke="#d9b45a" stroke-width="1.2"/>' +
       '<g transform="translate(50 70)"><circle r="26" fill="none" stroke="#d9b45a" stroke-width="1.5"/><circle r="20" fill="#b23a2a"/>' +
       '<path d="M-12 6h24M-12 1h24M-8-4h16" stroke="#f3e7c9" stroke-width="1.6"/><path d="M-14 9h28" stroke="#d9b45a" stroke-width="2"/></g>' +
-      '<text x="50" y="118" text-anchor="middle" font-family="Bodoni Moda, Georgia, serif" font-weight="700" font-size="10.5" fill="#f3e7c9" letter-spacing="1">BINARI</text>' +
-      '<text x="50" y="30" text-anchor="middle" font-family="Bodoni Moda, Georgia, serif" font-weight="700" font-size="10.5" fill="#f3e7c9" letter-spacing="1">D’ITALIA</text></svg>';
+      '<text x="50" y="118" text-anchor="middle" font-family="Bodoni Moda, Georgia, serif" font-weight="700" font-size="10.5" fill="#f3e7c9" letter-spacing="1">ITALIA</text>' +
+      '<text x="50" y="30" text-anchor="middle" font-family="Bodoni Moda, Georgia, serif" font-weight="700" font-size="9" fill="#f3e7c9" letter-spacing=".6">TICKET TO RIDE</text></svg>';
+  }
+
+  /* ---------- carta Traghetto (paga fino a 2 spazi con l'onda) ---------- */
+  var WAVE = '<path d="M-6.5 1.6q1.6-3 3.25 0t3.25 0 3.25 0 3.25 0M-6.5-2.6q1.6-3 3.25 0t3.25 0 3.25 0 3.25 0" fill="none" stroke-width="1.6" stroke-linecap="round"/>';
+  function wave(col) { return '<g stroke="' + (col || '#fff') + '">' + WAVE + '</g>'; }
+  function ferryCard() {
+    return '<svg class="bcard ferry" viewBox="0 0 100 140" role="img" aria-label="Carta Traghetto">' +
+      '<rect x="1" y="1" width="98" height="138" rx="9" fill="#f4ead1" stroke="#7a6a4c" stroke-width="1.2"/>' +
+      '<rect x="6" y="6" width="88" height="128" rx="6" fill="#1f6f8f"/><rect x="6" y="80" width="88" height="54" rx="6" fill="#185a76"/>' +
+      '<circle cx="74" cy="28" r="10" fill="#f3d27a" opacity=".9"/>' +
+      '<g transform="translate(50 74)"><path d="M-34 0h68l-10 14h-48z" fill="#f3efe4" stroke="#2b2a2c" stroke-width="1.4"/><path d="M-34 0h68l-2 3h-64z" fill="#b23a2a"/>' +
+      '<rect x="-20" y="-12" width="34" height="12" rx="2" fill="#f3efe4" stroke="#2b2a2c" stroke-width="1.2"/><rect x="-16" y="-9" width="5" height="4" fill="#2e6bb8"/><rect x="-8" y="-9" width="5" height="4" fill="#2e6bb8"/><rect x="0" y="-9" width="5" height="4" fill="#2e6bb8"/>' +
+      '<rect x="4" y="-24" width="6" height="12" fill="#b23a2a" stroke="#2b2a2c"/><path d="M4-20h6" stroke="#2b2a2c"/>' +
+      '<g fill="rgba(250,248,240,.85)"><circle cx="9" cy="-29" r="3.4"/><circle cx="14" cy="-34" r="4.2"/></g></g>' +
+      '<g stroke="rgba(255,255,255,.85)" fill="none" stroke-width="2.2" stroke-linecap="round"><path d="M14 98q6-6 12 0t12 0 12 0 12 0 12 0 12 0"/><path d="M14 107q6-6 12 0t12 0 12 0 12 0 12 0 12 0" opacity=".6"/></g>' +
+      '<g transform="translate(19 20)"><circle r="9.5" fill="rgba(255,255,255,.92)"/><g transform="scale(1.1)">' + wave('#185a76') + '</g></g>' +
+      '<text x="50" y="122" text-anchor="middle" font-family="Barlow, sans-serif" font-weight="800" font-size="11" letter-spacing="1.2" fill="#fff">TRAGHETTO</text>' +
+      '<text x="50" y="131" text-anchor="middle" font-family="Barlow, sans-serif" font-weight="700" font-size="7" fill="#d8eef6">VALE 2 ONDE</text></svg>';
+  }
+
+  /* ---------- bandiere dei Paesi confinanti e stemmi delle regioni ---------- */
+  var FLAGS = {
+    francia: '<rect x="0" y="0" width="5" height="10" fill="#2e4fa3"/><rect x="5" y="0" width="5" height="10" fill="#f6f2e6"/><rect x="10" y="0" width="5" height="10" fill="#c9352b"/>',
+    svizzera: '<rect x="0" y="0" width="15" height="10" fill="#d23b2f"/><path d="M6.4 2h2.2v2h2v2.2h-2v2h-2.2v-2h-2V4h2z" fill="#fff"/>',
+    austria: '<rect x="0" y="0" width="15" height="10" fill="#c9352b"/><rect x="0" y="3.4" width="15" height="3.2" fill="#f6f2e6"/>',
+    slovenia: '<rect x="0" y="0" width="15" height="10" fill="#f6f2e6"/><rect x="0" y="3.4" width="15" height="3.3" fill="#2e5fb0"/><rect x="0" y="6.7" width="15" height="3.3" fill="#c9352b"/><path d="M2.4 1.6h3.4v2.8c0 1.4-.8 2-1.7 2.4-.9-.4-1.7-1-1.7-2.4z" fill="#2e5fb0" stroke="#fff" stroke-width=".4"/>'
+  };
+  function flag(z, w) { return '<svg class="flag" viewBox="-.5 -.5 16 11" width="' + (w || 18) + '" aria-hidden="true"><g>' + FLAGS[z] + '</g><rect x="0" y="0" width="15" height="10" fill="none" stroke="rgba(0,0,0,.45)" stroke-width=".7"/></svg>'; }
+  function shield(rg, w) { var R = D.regions[rg]; return '<svg class="shield" viewBox="0 0 12 14" width="' + (w || 14) + '" aria-hidden="true"><path d="M1 1h10v6c0 3.4-2.6 5.2-5 6-2.4-.8-5-2.6-5-6z" fill="' + R.c + '" stroke="rgba(0,0,0,.45)" stroke-width=".8"/><path d="M2.6 2.6h3.4v4H2.6z" fill="rgba(255,255,255,.35)"/></svg>'; }
+  // un punto dei biglietti: città oppure Paese confinante (al centro dei suoi valichi)
+  function place(id) {
+    if (D.cities[id]) return D.cities[id];
+    var gs = Object.keys(D.cities).filter(function (c) { return D.cities[c].zone === id; }), x = 0, y = 0;
+    gs.forEach(function (c) { x += D.cities[c].x; y += D.cities[c].y; });
+    return { n: D.zones[id], x: x / gs.length, y: y / gs.length, zone: id };
   }
 
   /* ---------- biglietto destinazione (cartoncino d'epoca con la cartina) ---------- */
   var MAPSYM = '<symbol id="bi-italy" viewBox="0 0 ' + D.W + ' ' + D.H + '"><path d="' + D.geo.italy + '" fill="#e2cf9f" stroke="#8a7350" stroke-width="5"/></symbol>';
   function ticket(t, opts) {
     opts = opts || {};
-    var a = D.cities[t.a], b = D.cities[t.b], id = 'tk' + (++uid);
+    var a = place(t.a), b = place(t.b), id = 'tk' + (++uid);
     var mw = 58, mh = mw * D.H / D.W, sx = mw / D.W, mx = 8, my = 10;
     var ax = mx + a.x * sx, ay = my + a.y * sx, bx = mx + b.x * sx, by = my + b.y * sx;
     var st = opts.state; // 'ok' | 'ko' | null
@@ -168,6 +203,7 @@ var BIArt = (function () {
     help: '<circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.3 9.4a2.8 2.8 0 1 1 3.7 2.6c-.7.3-1 .8-1 1.5v.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.2"/>',
     route: '<path d="M4 19L20 5" stroke="currentColor" stroke-width="5" stroke-dasharray="4 2"/>',
     check: '<path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>',
+    region: '<path d="M5 3h14v8c0 5-3.6 7.6-7 9-3.4-1.4-7-4-7-9z"/>',
     longest: '<path d="M3 17c4-9 7 3 10-5s5-4 8-7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="3" cy="17" r="2"/><circle cx="21" cy="5" r="2"/>',
     ferry: '<path d="M3 15h18l-3 4H6z"/><rect x="7" y="9" width="10" height="5" rx="1"/><path d="M2 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 4-1" fill="none" stroke="currentColor" stroke-width="1.4"/>',
     deck: '<rect x="6" y="5" width="13" height="16" rx="2"/><rect x="4" y="3" width="13" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/>'
@@ -181,5 +217,5 @@ var BIArt = (function () {
   var DEFS = '<defs>' + MAPSYM + pieceSymbols() +
     '<filter id="bi-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.2" stdDeviation="1.1" flood-color="#000" flood-opacity=".45"/></filter>' +
     '<filter id="bi-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs>';
-  return { card: card, cardBack: cardBack, ticket: ticket, ticketBack: ticketBack, wagon: wagon, loco: loco, glyph: glyph, pieceIcon: pieceIcon, icon: icon, swatch: swatch, DEFS: DEFS, MAPSYM: MAPSYM };
+  return { ferryCard: ferryCard, wave: wave, flag: flag, shield: shield, place: place, card: card, cardBack: cardBack, ticket: ticket, ticketBack: ticketBack, wagon: wagon, loco: loco, glyph: glyph, pieceIcon: pieceIcon, icon: icon, swatch: swatch, DEFS: DEFS, MAPSYM: MAPSYM };
 })();

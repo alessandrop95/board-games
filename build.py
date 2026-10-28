@@ -73,8 +73,8 @@ def build_bi():
     bi = 'src/binari-italia/'
     bi_js = "window.GAME_PREFIX = 'binari-italia/v1/';\n" + '\n'.join(r(bi, f) for f in ['data.js', 'engine.js', 'bot.js', 'painter.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(bi, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     open(os.path.join(ROOT, 'binari-italia', 'index.html'), 'w', encoding='utf-8').write(page(
-        'Binari d’Italia', 'Gioco di treni e tratte ferroviarie sulla mappa d’Italia: collega le città dei tuoi biglietti. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#102027',
-        'family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;0,6..96,800;1,6..96,500&family=Barlow:wght@400;500;600;700;800', r(bi, 'style.css'), bi_js, 'Binari d’Italia'))
+        'Ticket to Ride Italy', 'Gioco di treni sulla mappa d’Italia: tratte, traghetti, Paesi confinanti e bonus delle regioni. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#102027',
+        'family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;0,6..96,800;1,6..96,500&family=Barlow:wght@400;500;600;700;800', r(bi, 'style.css'), bi_js, 'TtR Italy'))
 
 def build_ct():
     ct = 'src/catan/'

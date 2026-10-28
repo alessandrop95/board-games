@@ -1,4 +1,4 @@
-/* ===== Binari d'Italia: interfaccia (tavolo, sala d'attesa, giocatori automatici) ===== */
+/* ===== Ticket to Ride Italy: interfaccia (tavolo, sala d'attesa, giocatori automatici) ===== */
 var D = BIData, E = BIEngine, BOT = BIBot, ART = BIArt, RU = BIRules;
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -15,7 +15,8 @@ function G() { return App.doc && App.doc.game; }
 function myIdx() { var g = G(); if (!g) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].uid === Net.uid) return i; return -1; }
 function pname(g, p) { var P = g.players[p]; return '<b class="pn-c" style="--pc:' + D.PCOL[P.col].c + '">' + esc(P.nick) + '</b>'; }
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
-function cn(id) { return D.cities[id].n; }
+function cn(id) { return D.place(id); }
+function spots(id) { return D.zones[id] ? E.gatesOf(id) : [id]; }   // città, oppure i valichi di un Paese
 
 /* ---------- regole del tavolo (girano sull'host) ---------- */
 function uniqueNick(seats, n) { var base = n, k = 2; while (seats.some(function (s) { return s.nick.toLowerCase() === n.toLowerCase(); })) n = base + ' ' + k++; return n; }
@@ -87,11 +88,11 @@ Coach.setup({ bots: 2,
   myTurn: function (g, me) { return g.stage === 'setup' ? !g.players[me].ready : E.decider(g) === me; },
   tip: function (g, me, mine) {
     var P = g.players[me]; if (!P) return null;
-    if (g.stage === 'setup' && !P.ready) return 'Scegli quali <b>biglietti</b> tenere (almeno 2). Ogni biglietto collega due città: se le colleghi con i tuoi binari guadagni i punti, altrimenti li perdi a fine partita.';
+    if (g.stage === 'setup' && !P.ready) return 'Scegli quali <b>biglietti</b> tenere (almeno ' + D.START_KEEP + ' su ' + D.START_TICKETS + '). Ogni biglietto collega due città (o un Paese confinante): se le colleghi con i tuoi binari guadagni i punti, altrimenti li perdi a fine partita.';
     if (!mine) return null;
     if (g.stage === 'draw2') return 'Prendi la <b>seconda carta</b> vagone (dal mazzo o scoperta, ma non una locomotiva scoperta).';
     if (g.stage === 'tickets') return 'Scegli quali dei <b>nuovi biglietti</b> tenere (almeno 1).';
-    return 'Nel tuo turno fai <b>una sola cosa</b>: pesca 2 carte vagone, oppure conquista una <b>tratta</b> pagando carte del suo colore (le locomotive valgono come jolly), oppure prendi nuovi biglietti. Ti restano <b>' + P.trains + '</b> vagoni.';
+    return 'Nel tuo turno fai <b>una sola cosa</b>: pesca 2 carte vagone, oppure conquista una <b>tratta</b> pagando carte del suo colore (le locomotive valgono come jolly), oppure prendi 4 biglietti, oppure una <b>carta Traghetto</b> (serve per gli spazi con l’onda). Collegare tante <b>regioni</b> nella stessa rete dà un bonus a fine partita. Ti restano <b>' + P.trains + '</b> vagoni.';
   } });
 Score.setup({ game: 'binari-italia', result: function (g) {
   var o = g.final ? g.final.order : [], rows = g.final ? g.final.rows : [];
@@ -224,7 +225,7 @@ function onDoc() {
     if (App.sheet && App.sheet.kind === 'keep' && kind !== 'keep') App.sheet = null;
     if (App.sheet && App.sheet.kind === 'route' && (g.claims[App.sheet.r] != null && App.sheet.seq !== g.seq)) { /* resta aperta: mostra il nuovo proprietario */ }
     // presentazione delle regole la prima volta
-    if (me >= 0 && !App.introShown) { App.introShown = true; if (!lsGet('bi-intro-done')) { App.sheet = { kind: 'intro', page: 0, after: App.sheet }; } }
+    if (me >= 0 && !App.introShown) { App.introShown = true; if (!lsGet('bi-intro2-done')) { App.sheet = { kind: 'intro', page: 0, after: App.sheet }; } }
     // turno nuovo
     var tk = g.stage === 'act' ? g.turn + ':' + g.seq : null;
     if (g.phase === 'play' && g.stage === 'act' && g.turn === me && App.lastTurnKey !== 'me' + g.round + ':' + g.turn && App.seenFirstDoc) { Sound.play('turn'); banner('Tocca a te!'); }
@@ -239,6 +240,7 @@ function sounds(g, me) {
   (g.fx || []).forEach(function (e) {
     if (e.k === 'claim') { var r = D.byId[e.r]; Sound.play(r.ferry ? 'ferry' : 'claim', { n: r.len }); if (r.len >= 5) setTimeout(function () { Sound.play('whistle'); }, 500); }
     else if (e.k === 'draw') Sound.play('draw');
+    else if (e.k === 'ferry') { Sound.play('draw'); setTimeout(function () { Sound.play('ferry'); }, 150); }
     else if (e.k === 'tdraw') Sound.play('tickets');
     else if (e.k === 'keep') Sound.play('keep');
     else if (e.k === 'wipe') { Sound.play('wipe'); toast('Tre locomotive scoperte: le carte visibili vengono cambiate.'); }
@@ -268,13 +270,13 @@ function render() {
   renderSheet();
 }
 function heroArt() {
-  return '<div class="hero-cards" aria-hidden="true"><div class="hc1">' + ART.card('R') + '</div><div class="hc2">' + ART.card('L') + '</div><div class="hc3">' + ART.card('B') + '</div>' +
+  return '<div class="hero-cards" aria-hidden="true"><div class="hc1">' + ART.card('R') + '</div><div class="hc2">' + ART.card('L') + '</div><div class="hc3">' + ART.ferryCard() + '</div>' +
     '<div class="hc4">' + ART.ticket(D.tickets.filter(function (t) { return t.a === 'milano' && t.b === 'roma'; })[0] || D.tickets[0]) + '</div></div>';
 }
 function lobbyHTML() {
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<svg width="0" height="0" style="position:absolute" aria-hidden="true">' + ART.DEFS + '</svg><div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
-    '<section class="hero"><div class="hero-txt"><div class="kicker">Carta delle strade ferrate</div><h1>Binari d’Italia</h1><p class="tag">Collega le città d’Italia con le tue linee ferroviarie, da Aosta a Palermo. Raccogli i vagoni del colore giusto, conquista le tratte prima degli altri e completa i biglietti segreti. Da 2 a 5 giocatori, ognuno dal proprio telefono.</p></div>' + heroArt() + '</section>' + inv +
+    '<section class="hero"><div class="hero-txt"><div class="kicker">Carta delle strade ferrate</div><h1>Ticket to Ride <span>Italy</span></h1><p class="tag">Collega le città d’Italia con le tue linee ferroviarie, da Aosta a Palermo e fino ai Paesi confinanti. Raccogli i vagoni del colore giusto, prendi le carte Traghetto per il mare, completa i biglietti segreti e unisci più regioni possibili. Da 2 a 5 giocatori, ognuno dal proprio telefono.</p></div>' + heroArt() + '</section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
@@ -292,7 +294,7 @@ function roomHTML() {
       ((isHost && s.uid !== Net.uid) || (s.uid === Net.uid && !isHost) ? '<button class="x" data-act="kick" data-uid="' + esc(s.uid) + '" aria-label="Togli ' + esc(s.nick) + '">×</button>' : '') + '</div>';
     else seats += '<div class="seat"><div class="ava empty">·</div><div class="sub">Posto libero</div></div>';
   }
-  return '<svg width="0" height="0" style="position:absolute" aria-hidden="true">' + ART.DEFS + '</svg><div class="topbar"><div class="wrap"><span class="brand">Binari d’Italia</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
+  return '<svg width="0" height="0" style="position:absolute" aria-hidden="true">' + ART.DEFS + '</svg><div class="topbar"><div class="wrap"><span class="brand">Ticket to Ride Italy</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 2 a 5 giocatori; i posti mancanti si possono riempire con giocatori automatici.</p></section>' +

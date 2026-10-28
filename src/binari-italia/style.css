@@ -1,4 +1,4 @@
-/* ===== Binari d'Italia — carta ferroviaria d'epoca: blu notte, crema, oro e rosso mattone ===== */
+/* ===== Ticket to Ride Italy — carta ferroviaria d'epoca: blu notte, crema, oro e rosso mattone ===== */
 :root {
   --bg: #102027; --bg-2: #15292f; --panel: #19313a; --panel-2: #213d47; --panel-3: #2b4a55;
   --ink: #f4ead2; --muted: #b9c3bd; --dim: #8a9a98; --gold: #d9b45a; --gold-2: #a8842c; --red: #b23a2a; --good: #8fd18a; --bad: #ff8f7a;
@@ -291,3 +291,27 @@ select.field { color: #1d1710; }
 .ftk.ko { background: rgba(255, 143, 122, .12); border: 1px solid rgba(255, 143, 122, .4); }
 .fr .btn { justify-self: start; }
 @media (prefers-reduced-motion: reduce) { .bd-hl, .bd-city.tk .bd-cring, .banner span, .sheet, .toast, .bd-drop, .bd-flash, .bd-float, .tag-last { animation: none !important; } }
+
+/* ---------- mappa Italia: valichi, regioni, traghetti ---------- */
+.hero h1 span { display: block; font-size: .55em; letter-spacing: .12em; color: var(--gold); margin-top: 4px; }
+.bd-gate-t { font: 800 9px var(--f-body); letter-spacing: .08em; fill: #3b2a1c; pointer-events: none; }
+.bd-gate .bd-cring { stroke-width: 3; }
+.bd-reg { font: 800 10.5px var(--f-body); letter-spacing: .12em; paint-order: stroke; stroke: rgba(246, 236, 210, .95); stroke-width: 3.4px; stroke-linejoin: round; opacity: 0; transition: opacity .25s; pointer-events: none; }
+.show-reg .bd-reg { opacity: 1; }
+.bd-st { transition: fill .25s; }
+.show-reg .bd-city:not(.bd-gate) .bd-st { fill: var(--rc); stroke: #2a2420; }
+.zb.zreg .ic { width: 20px; height: 20px; color: var(--gold); }
+.zb.zreg.on { background: var(--gold); } .zb.zreg.on .ic { color: #2a1c06; }
+.mk-fe { max-width: 64px; }
+.hd-c.hd-fe .bcard { filter: drop-shadow(0 0 4px rgba(120, 200, 230, .6)); }
+.pchip .ps .fe { color: #8fd0ea; }
+.flag, .shield { display: inline-block; vertical-align: -.15em; }
+.intro-art.flags { gap: 10px; } .intro-art.flags .flag { width: 44px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .4)); }
+.wv { display: inline-block; background: #e9f4f8; border-radius: 4px; padding: 0 2px; vertical-align: middle; }
+.nets { display: grid; gap: 8px; }
+.net { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: grid; gap: 6px; background: rgba(244, 234, 210, .04); }
+.net-h { display: flex; gap: 10px; align-items: baseline; } .net-h b { flex: 1; } .net-h .gold { font: 800 20px var(--f-disp); }
+.rgs { display: flex; flex-wrap: wrap; gap: 4px; }
+.rg { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; padding: 1px 7px 1px 4px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--rc) 70%, transparent); background: color-mix(in srgb, var(--rc) 18%, transparent); }
+.rreg td, .rreg th { padding: 3px 6px; font-size: 13px; }
+.sh-route .uc .bcard.ferry, .use .bcard.ferry { filter: drop-shadow(0 0 3px rgba(120, 200, 230, .6)); }

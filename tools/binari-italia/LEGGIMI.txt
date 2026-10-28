@@ -1,4 +1,4 @@
-Dati della mappa di Binari d'Italia
+Dati della mappa di Ticket to Ride Italy (cartella binari-italia)
 1. geo.py      (facoltativo) coste, laghi e fiumi da Natural Earth -> geo.json
                serve il repository natural-earth-vector: NE_GEOJSON=percorso/geojson/ python3 geo.py
 2. design.py   città e tratte -> net.json (lunghezze, colori, doppie, traghetti)

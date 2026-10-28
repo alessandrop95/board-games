@@ -1472,7 +1472,7 @@ var CTArt = (function () {
 /* ===== Catan: il tabellone interattivo =====
    Sotto l'isola dipinta (CTPainter), sopra un livello SVG con porti, numeri, strade, colonie, città e ladro.
    Quando devi scegliere un posto (colonia, strada, città, ladro) i posti validi lampeggiano: tocchi, poi confermi.
-   Si trascina con un dito e si ingrandisce con due, come la mappa di Binari d'Italia. */
+   Si trascina con un dito e si ingrandisce con due, come la mappa di Ticket to Ride Italy. */
 var Board = (function () {
   var D = CTData, A = CTArt, NS = 'http://www.w3.org/2000/svg', V = D.verts, EDG = D.edges, HX = D.hexes;
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3300,7 +3300,7 @@ var Alerts = (function () {
     { p: 'presagio/v1/', path: 'presagio/', n: 'Wizard' },
     { p: 'gattomina/v1/', path: 'gattomina/', n: 'Exploding Kittens' },
     { p: 'campi-acciaio/v1/', path: 'campi-acciaio/', n: 'Scythe' },
-    { p: 'binari-italia/v1/', path: 'binari-italia/', n: 'Binari d’Italia' },
+    { p: 'binari-italia/v1/', path: 'binari-italia/', n: 'Ticket to Ride Italy' },
     { p: 'catan/v1/', path: 'catan/', n: 'Catan' }
   ];
   var KEY = 'pp-alerts', PREFS = 'pp-push-prefs', SUBK = 'pp-push', SEEN = 'pp-alerted', MINE = 'pp-mytables', SYNC = 'pp-push-sync', TTL = 150000;
