@@ -259,3 +259,8 @@ table.sc .small { font-size: 12px; color: var(--muted); display: block; }
   background: radial-gradient(circle at 40% 30%, rgba(124, 92, 255, .95), rgba(30, 22, 70, .96)); border: 1px solid rgba(230, 194, 120, .7); box-shadow: 0 0 22px rgba(124, 92, 255, .7), 0 8px 18px #000a; }
 .reveal small { font: 600 9.5px/1.2 var(--f-label); letter-spacing: .14em; text-transform: uppercase; color: #d9cffc; margin-bottom: 2px; }
 .reveal.hit { border-color: var(--ok); box-shadow: 0 0 22px rgba(90, 220, 150, .7), 0 8px 18px #000a; }
+
+/* barra in alto della sala d'attesa: su schermi stretti i pulsanti vanno a capo (niente scorrimento laterale della pagina) */
+.topbar .wrap { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+.topbar .brand { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html { overflow-x: clip; }

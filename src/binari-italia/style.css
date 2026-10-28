@@ -315,3 +315,8 @@ select.field { color: #1d1710; }
 .rg { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; padding: 1px 7px 1px 4px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--rc) 70%, transparent); background: color-mix(in srgb, var(--rc) 18%, transparent); }
 .rreg td, .rreg th { padding: 3px 6px; font-size: 13px; }
 .sh-route .uc .bcard.ferry, .use .bcard.ferry { filter: drop-shadow(0 0 3px rgba(120, 200, 230, .6)); }
+
+/* barra in alto della sala d'attesa: su schermi stretti i pulsanti vanno a capo (niente scorrimento laterale della pagina) */
+.topbar .wrap { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+.topbar .brand { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html { overflow-x: clip; }

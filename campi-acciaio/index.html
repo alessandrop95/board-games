@@ -343,6 +343,11 @@ select.field { color: #1d1710; }
 
 @media (max-width: 560px) { .score th, .score td { padding: 5px 4px; font-size: 13px; } .score td small { display: none; } .score .pl .portrait { display: none; } }
 
+/* barra in alto della sala d'attesa: su schermi stretti i pulsanti vanno a capo (niente scorrimento laterale della pagina) */
+.topbar .wrap { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+.topbar .brand { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html { overflow-x: clip; }
+
 </style>
 </head>
 <body>

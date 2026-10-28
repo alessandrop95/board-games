@@ -295,3 +295,8 @@ input.field.code { font-family: var(--f-disp); letter-spacing: .3em; text-transf
 @keyframes shake { 15% { transform: translate(-8px, 4px) rotate(-1deg); } 30% { transform: translate(7px, -5px) rotate(1deg); } 45% { transform: translate(-5px, 3px); } 60% { transform: translate(4px, -2px); } 80% { transform: translate(-2px, 1px); } }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--ink); padding: 10px 16px; border-radius: 16px; font-size: 15.5px; font-weight: 500; max-width: min(90vw, 460px); text-align: center; animation: up .3s var(--bounce); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; } }
+
+/* barra in alto della sala d'attesa: su schermi stretti i pulsanti vanno a capo (niente scorrimento laterale della pagina) */
+.topbar .wrap { flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+.topbar .brand { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html { overflow-x: clip; }
