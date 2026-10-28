@@ -1,0 +1,19 @@
+{
+ "id": "./",
+ "name": "Catan",
+ "short_name": "Catan",
+ "description": "Coloni su un’isola da scoprire: risorse, commercio, strade, colonie e città. Da 3 a 4 giocatori.",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#1d1610",
+ "theme_color": "#1d1610",
+ "lang": "it",
+ "icons": [
+  { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+  { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+  { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+  { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+ ]
+}

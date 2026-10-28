@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       giochi:
-        description: 'Giochi da ricostruire, separati da spazi (polvere-e-piombo presagio gattomina campi-acciaio binari-italia)'
+        description: 'Giochi da ricostruire, separati da spazi (polvere-e-piombo presagio gattomina campi-acciaio binari-italia catan)'
         required: true
         default: 'campi-acciaio'
 permissions:
@@ -43,11 +43,11 @@ jobs:
           else
             if git cat-file -e "$BEFORE" 2>/dev/null; then changed=$(git diff --name-only "$BEFORE" HEAD); else changed=$(git diff --name-only HEAD~1 HEAD); fi
             games=""
-            for g in polvere-e-piombo presagio gattomina campi-acciaio binari-italia; do
+            for g in polvere-e-piombo presagio gattomina campi-acciaio binari-italia catan; do
               if echo "$changed" | grep -q "^src/$g/"; then games="$games $g"; fi
             done
             # build.py o le parti condivise: si ricostruiscono tutti i giochi
-            if echo "$changed" | grep -q -e "^src/shared/" -e "^build.py$"; then games="polvere-e-piombo presagio gattomina campi-acciaio binari-italia"; fi
+            if echo "$changed" | grep -q -e "^src/shared/" -e "^build.py$"; then games="polvere-e-piombo presagio gattomina campi-acciaio binari-italia catan"; fi
           fi
           safe=""
           for g in $games; do

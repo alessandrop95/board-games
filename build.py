@@ -76,9 +76,16 @@ def build_bi():
         'Binari d’Italia', 'Gioco di treni e tratte ferroviarie sulla mappa d’Italia: collega le città dei tuoi biglietti. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#102027',
         'family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;0,6..96,800;1,6..96,500&family=Barlow:wght@400;500;600;700;800', r(bi, 'style.css'), bi_js, 'Binari d’Italia'))
 
+def build_ct():
+    ct = 'src/catan/'
+    ct_js = "window.GAME_PREFIX = 'catan/v1/';\n" + '\n'.join(r(ct, f) for f in ['data.js', 'engine.js', 'bot.js', 'painter.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ct, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    open(os.path.join(ROOT, 'catan', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Catan', 'Coloni su un’isola da scoprire: raccogli risorse, commercia, costruisci strade, colonie e città. Da 3 a 4 giocatori, ognuno dal proprio telefono.', '#1d1610',
+        'family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito+Sans:wght@400;600;700;800;900', r(ct, 'style.css'), ct_js, 'Catan'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

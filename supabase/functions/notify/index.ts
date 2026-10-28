@@ -12,7 +12,7 @@ const KEYS = {
   subject: Deno.env.get('VAPID_SUBJECT') || SITE
 };
 const GAMES: Record<string, string> = {
-  'polvere-e-piombo': 'Bang!', 'presagio': 'Wizard', 'gattomina': 'Exploding Kittens', 'campi-acciaio': 'Scythe', 'binari-italia': 'Binari d’Italia'
+  'polvere-e-piombo': 'Bang!', 'presagio': 'Wizard', 'gattomina': 'Exploding Kittens', 'campi-acciaio': 'Scythe', 'binari-italia': 'Binari d’Italia', 'catan': 'Catan'
 };
 const ORIGINS = ['https://alessandrop95.github.io', 'http://localhost:8897'];
 

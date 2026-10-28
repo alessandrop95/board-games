@@ -76,6 +76,20 @@ Gioco di treni e tratte ferroviarie da 2 a 5 giocatori (regole equivalenti a un 
 - Presentazione delle regole alla prima partita, «?» su ogni fase, città dei propri biglietti cerchiate sulla mappa, conteggio finale con biglietti e percorsi evidenziati.
 - Giocatori automatici che pianificano i biglietti con il percorso più economico. Dati della mappa generati con gli script in `tools/binari-italia/`.
 
+## Catan
+
+Gioco di coloni, risorse e commercio da 3 a 4 giocatori, con le regole del gioco base (fondazione, produzione, 7 e ladro, commercio con giocatori, banca e porti, carte sviluppo, Strada più lunga ed Esercito più grande). Grafica originale.
+
+**Gioca:** https://alessandrop95.github.io/board-games/catan/
+
+- Isola di 19 tessere diversa a ogni partita (6 e 8 mai vicini), 9 porti, numeri con i puntini della probabilità. I sei terreni sono dipinti dal codice: foreste di abeti, pascoli con le pecore, campi di grano, colline d’argilla con la fornace, montagne innevate con la miniera, deserto.
+- Fondazione a serpentina, poi a ogni turno: lancio dei dadi, commercio e costruzione nell’ordine che si vuole (variante combinata). I posti validi lampeggiano sull’isola: si tocca e si conferma.
+- Scambi tra giocatori dal proprio telefono: chi è di turno propone a tutti, gli altri accettano o rifiutano, lui sceglie con chi chiudere. Scambi con la banca e i porti (4:1, 3:1, 2:1).
+- Col 7: scarto di metà delle carte per chi ne ha più di 7, poi ladro e furto. Carte sviluppo: Cavaliere, Punto vittoria, Costruzione di strade, Invenzione, Monopolio.
+- Opzioni dell’host: punti per vincere (8, 10 o 12) e «ladro gentile» (non colpisce chi ha 2 punti o meno).
+- Presentazione alla prima partita, «?» su ogni fase, schede delle tessere con la probabilità, conteggio finale dei punti.
+- Giocatori automatici che scelgono gli incroci migliori, commerciano, usano le carte e spostano il ladro sul giocatore in testa.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).
