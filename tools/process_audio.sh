@@ -38,3 +38,6 @@ music $T/src/m3.mp3 $T/m3.mp3
 M=machiavelli/audio
 music $M/src/m1.oga $M/m1.mp3
 music $M/src/m2.mp3 $M/m2.mp3
+K=unlock/audio
+music $K/src/m1.mp3 $K/m1.mp3
+music $K/src/m2.mp3 $K/m2.mp3
