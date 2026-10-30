@@ -238,5 +238,25 @@
   "license": "CC BY 3.0",
   "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
   "file": "m3.mp3"
+ },
+ "machiavelli/m1": {
+  "title": "Bushwick Tarantella (MacLeod, Kevin) (ISRC USUAN1300002).oga",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/b/b6/Bushwick_Tarantella_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1300002%29.oga?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 5226063,
+  "duration": 203.64045351473922,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0 us",
+  "artist": "Kevin MacLeod, USA",
+  "file": "m1.oga"
+ },
+ "machiavelli/m2": {
+  "title": "Achaidh Cheide (ISRC USUAN1100340).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Achaidh_Cheide_%28ISRC_USUAN1100340%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 5475031,
+  "duration": 134.060425,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "Kevin MacLeod",
+  "file": "m2.mp3"
  }
 }
