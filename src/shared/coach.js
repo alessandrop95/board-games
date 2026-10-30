@@ -16,7 +16,7 @@ var Coach = (function () {
   function buttonHTML() {
     if (!cfg || (window.App && App.code)) return '';
     css();
-    return '<div class="cx-start"><span>Non conosci ancora il gioco? Prova una partita contro i bot: ti spiego ogni mossa.</span><button type="button" class="btn small" data-coach="start">🎓 Partita guidata</button></div>';
+    return '<div class="cx-start"><span>' + (cfg.startText || 'Non conosci ancora il gioco? Prova una partita contro i bot: ti spiego ogni mossa.') + '</span><button type="button" class="btn small" data-coach="start">🎓 Partita guidata</button></div>';
   }
   function wait(fn, ms) { return new Promise(function (res, rej) { var t0 = Date.now(), iv = setInterval(function () { if (fn()) { clearInterval(iv); res(); } else if (Date.now() - t0 > ms) { clearInterval(iv); rej('Il tavolo di prova non risponde: riprova.'); } }, 150); }); }
   function start() {

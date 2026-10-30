@@ -1,6 +1,6 @@
 /* Service worker di Board Games: le pagine si caricano dalla rete (così gli aggiornamenti arrivano subito)
    e, se la rete manca, dalla copia salvata. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v18';
+var CACHE = 'board-games-v19';
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js', './src/shared/account.js',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',
   './presagio/', './presagio/manifest.webmanifest', './presagio/icon-192.png',
@@ -8,7 +8,8 @@ var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', '.
   './campi-acciaio/', './campi-acciaio/manifest.webmanifest', './campi-acciaio/icon-192.png',
   './binari-italia/', './binari-italia/manifest.webmanifest', './binari-italia/icon-192.png',
   './catan/', './catan/manifest.webmanifest', './catan/icon-192.png',
-  './machiavelli/', './machiavelli/manifest.webmanifest', './machiavelli/icon-192.png'];
+  './machiavelli/', './machiavelli/manifest.webmanifest', './machiavelli/icon-192.png',
+  './unlock/', './unlock/manifest.webmanifest', './unlock/icon-192.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).catch(function () {}).then(function () { return self.skipWaiting(); }));

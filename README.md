@@ -104,6 +104,18 @@ Il gioco di carte italiano con due mazzi francesi (104 carte, senza jolly), da 2
 - Sul telefono le carte si **trascinano** (o si selezionano a tocchi) dalla mano e dal tavolo: mentre si trascina, le combinazioni dove la carta sta bene si accendono di verde, le mosse sbagliate vengono rifiutate, le combinazioni incomplete restano rosse finché non vanno a posto. «Annulla» rimette tutto com’era; gli altri vedono la bozza in diretta.
 - Carte disegnate da zero (semi, figure e dorso), giocatori automatici che attaccano carte, spezzano scale e prendono in prestito carte libere dal tavolo.
 
+## Unlock!
+
+Escape room cooperativa in carte, da 1 a 6 giocatori, ognuno dal proprio telefono: si gioca tutti insieme contro lo stesso timer.
+
+**Gioca:** https://alessandrop95.github.io/board-games/unlock/
+
+- Le regole sono quelle di Unlock!: carte numerate da scoprire quando il loro numero compare su una carta in tavola (anche nascosto nei disegni), carte **rosse + blu** da unire sommando i numeri, modificatori «+N», macchine (carte verdi) da far funzionare, lucchetti con codici di 4 cifre (carte gialle), carte da scartare, penalità di tempo, indizi e soluzioni per ogni carta, pausa e valutazione da 1 a 5 stelle.
+- Le avventure sono **originali** (storie, enigmi e disegni creati da zero, non quelle delle scatole ufficiali): «La soffitta del nonno» (tutorial, 10 minuti) e «Abisso» (60 minuti, a bordo di un sottomarino in avaria). Il motore è pronto per aggiungerne altre.
+- Carte illustrate e animate (bolle, luci d’emergenza, pesci, polvere), carte che si girano quando escono, unioni che si scontrano, lucchetti che si aprono, schermo rosso per le penalità, timer che batte negli ultimi secondi.
+- Ognuno vede le stesse carte ma può guardarne una diversa: sotto ogni carta compare chi la sta guardando, e con «Segnala» la si fa lampeggiare sugli altri telefoni.
+- Partita guidata: il tutorial da soli, con il passo consigliato sempre a portata di dito.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).

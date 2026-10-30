@@ -10,7 +10,8 @@ var Alerts = (function () {
     { p: 'campi-acciaio/v1/', path: 'campi-acciaio/', n: 'Scythe' },
     { p: 'binari-italia/v1/', path: 'binari-italia/', n: 'Ticket to Ride Italy' },
     { p: 'catan/v1/', path: 'catan/', n: 'Catan' },
-    { p: 'machiavelli/v1/', path: 'machiavelli/', n: 'Machiavelli' }
+    { p: 'machiavelli/v1/', path: 'machiavelli/', n: 'Machiavelli' },
+    { p: 'unlock/v1/', path: 'unlock/', n: 'Unlock!' }
   ];
   var KEY = 'pp-alerts', PREFS = 'pp-push-prefs', SUBK = 'pp-push', SEEN = 'pp-alerted', MINE = 'pp-mytables', SYNC = 'pp-push-sync', TTL = 150000;
   var here = GAMES.filter(function (g) { return location.pathname.indexOf('/' + g.path) >= 0; })[0] || null;
@@ -279,7 +280,7 @@ var Alerts = (function () {
   }
 
   /* --- home: «Continua la partita», i tavoli dove sei seduto in qualsiasi gioco --- */
-  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table' };
+  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table', 'unlock/': 'ul-table' };
   function mountContinue(el) {
     if (!el || typeof Net === 'undefined' || !Net.peekAt) return;
     var box = el.closest('section') || el, cards = {};

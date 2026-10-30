@@ -100,12 +100,12 @@ with sync_playwright() as p:
     Hp.close()
 
     # ---- partita guidata in tutti i giochi ----
-    for path in ['gattomina/', 'presagio/', 'polvere-e-piombo/', 'binari-italia/', 'campi-acciaio/', 'catan/', 'machiavelli/']:
+    for path in ['gattomina/', 'presagio/', 'polvere-e-piombo/', 'binari-italia/', 'campi-acciaio/', 'catan/', 'machiavelli/', 'unlock/']:
         G = ctx(); G.goto('http://localhost:8897/' + path + '?broker=ws://localhost:8897/'); G.wait_for_timeout(1200)
         G.fill('#nick', 'Prova'); G.click('[data-coach=start]')
         try: G.wait_for_function('App.doc && App.doc.practice && App.doc.phase === "play"', timeout=20000)
         except Exception: t(path + ' partita guidata avviata', False, G.evaluate('App.doc && [App.doc.phase, App.doc.seats.length]')); continue
-        t(path + ' partita guidata avviata con i bot', G.evaluate('App.doc.seats.filter(s => s.bot).length') >= 2)
+        t(path + ' partita guidata avviata con i bot', G.evaluate('App.doc.seats.filter(s => s.bot).length') >= (0 if path == 'unlock/' else 2))
         t0 = time.time()
         while time.time() - t0 < 12 and not G.locator('.cx-bar').count():
             G.evaluate("App.sheet && (typeof closeSheet === 'function' ? closeSheet() : (App.sheet = null, renderSheet()))"); G.wait_for_timeout(500)

@@ -1,0 +1,79 @@
+/* ===== Unlock!: le carte ===== */
+.uc { container-type: inline-size; position: relative; --k: #7d8691; --k2: #4c545d; --kt: #fff; }
+.uc-in { position: relative; display: flex; flex-direction: column; border-radius: 5cqw; padding: 2.4cqw; background: linear-gradient(160deg, #20282e, #0b0f12); box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 6px 18px rgba(0,0,0,.5); color: #1d2125; isolation: isolate; box-sizing: border-box; }
+.uc-in::after { content: ""; position: absolute; inset: 1.2cqw; border-radius: 4cqw; border: .8cqw solid var(--k); opacity: .55; pointer-events: none; }
+.uc.k-red { --k: #d43a2e; --k2: #8e1f17; }
+.uc.k-blue { --k: #2f6fd6; --k2: #173f8a; }
+.uc.k-green { --k: #31a654; --k2: #19602f; }
+.uc.k-yellow { --k: #f0c232; --k2: #b0820c; --kt: #2a1f00; }
+.uc.k-grey { --k: #8a939d; --k2: #4c545d; }
+.uc.k-room { --k: #5f7180; --k2: #2f3b45; }
+.uc.k-story { --k: #7b59b8; --k2: #3e2a66; }
+.uc.k-pen { --k: #e0392b; --k2: #3a0c08; }
+.uc.k-end { --k: #f2c94c; --k2: #a5741c; --kt: #2a1f00; }
+.uc-band { position: relative; z-index: 1; display: flex; align-items: center; gap: 2.2cqw; padding: 2cqw 2.6cqw; border-radius: 3.4cqw 3.4cqw 0 0; background: linear-gradient(180deg, var(--k), var(--k2)); color: var(--kt); box-shadow: 0 -1px 0 rgba(255,255,255,.35) inset; min-height: 12cqw; }
+.uc.k-pen .uc-band { background: repeating-linear-gradient(-45deg, #ffd23d 0 3cqw, #111 3cqw 6cqw); }
+.uc.k-pen .uc-band .uc-tt { background: #111; color: #ffd23d; padding: .4cqw 2cqw; border-radius: 2cqw; }
+.uc-num { flex: none; display: grid; place-items: center; width: 11.5cqw; height: 11.5cqw; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffdf6, #efe4c9); color: #14181c; font: 6.2cqw/1 Bungee, sans-serif; box-shadow: 0 0 0 .7cqw rgba(0,0,0,.35), 0 .8cqw 1.6cqw rgba(0,0,0,.35); }
+.uc-num.uc-let { border-radius: 0; clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); width: 13cqw; background: linear-gradient(#f2f5f8, #c9d1d8); }
+.uc-num.uc-go { font-size: 5cqw; background: radial-gradient(circle at 35% 30%, #fff, #e5dcf5); color: #3e2a66; }
+.uc-tt { flex: 1; min-width: 0; font: 900 5.6cqw/1.08 Nunito, system-ui, sans-serif; text-shadow: 0 .3cqw 0 rgba(0,0,0,.25); overflow-wrap: anywhere; }
+.uc.k-yellow .uc-tt, .uc.k-end .uc-tt { text-shadow: 0 .3cqw 0 rgba(255,255,255,.35); }
+.uc-kind { flex: none; font: 800 3cqw/1 Nunito, sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 1cqw 1.8cqw; border-radius: 99px; background: rgba(0,0,0,.22); }
+.uc-art { position: relative; z-index: 1; aspect-ratio: 300 / 220; overflow: hidden; background: #000; box-shadow: 0 0 0 .5cqw rgba(0,0,0,.6) inset; }
+.uc-svg { display: block; width: 100%; height: 100%; }
+.uc-txt { position: relative; z-index: 1; flex: 1; padding: 3cqw 3.8cqw 3.4cqw; border-radius: 0 0 3.4cqw 3.4cqw; background: linear-gradient(180deg, #f8f2e2, #e9dcc0); font: 600 4.35cqw/1.4 Nunito, system-ui, sans-serif; color: #2a2620; }
+.uc.t-sub .uc-txt { background: linear-gradient(180deg, #eef3f6, #d6e0e6); color: #1c2830; }
+.uc-txt b { font-weight: 900; }
+.uc-disc { display: flex; flex-wrap: wrap; gap: 1.6cqw; margin-top: 2.4cqw; }
+.uc-disc span { position: relative; display: grid; place-items: center; width: 8.5cqw; height: 8.5cqw; border-radius: 50%; background: #fff; border: .6cqw solid #333; font: 4cqw/1 Bungee, sans-serif; color: #333; }
+.uc-disc span::after { content: ""; position: absolute; left: -12%; right: -12%; top: 50%; height: .9cqw; background: #d62b1f; transform: rotate(-35deg); border-radius: 1cqw; }
+.uc-mod { margin-top: 2.4cqw; display: inline-grid; place-items: center; min-width: 14cqw; padding: 1.4cqw 2.4cqw; border-radius: 2cqw; background: linear-gradient(#3f86ee, #1b4ea6); color: #fff; font: 5.6cqw/1 Bungee, sans-serif; box-shadow: 0 .6cqw 0 #0f2e66; }
+.uc-modart { position: absolute; right: 3cqw; top: 3cqw; padding: 1.6cqw 2.6cqw; border-radius: 2.4cqw; background: linear-gradient(#3f86ee, #1b4ea6); color: #fff; font: 7cqw/1 Bungee, sans-serif; box-shadow: 0 0 0 .8cqw rgba(255,255,255,.85), 0 1cqw 3cqw rgba(0,0,0,.6); animation: ua-glowbox 2.4s ease-in-out infinite; }
+.uc-spot { position: absolute; z-index: 2; width: 13%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; border: 0; padding: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.uc-spot.uc-hid { width: 9%; }
+.uc-spot.done::after { content: "✓"; position: absolute; inset: 14%; display: grid; place-items: center; border-radius: 50%; background: rgba(32,160,80,.88); color: #fff; font: 900 3.6cqw/1 Nunito, sans-serif; box-shadow: 0 0 0 .5cqw #fff; }
+.uc-spot.uc-hid.done::after { inset: -10%; }
+.uc-spot:focus-visible { outline: 3px solid #ffe9a6; }
+/* dorso */
+.uc-back .uc-in { background: radial-gradient(circle at 50% 40%, #1d3a4f, #08121a 70%); }
+.uc-back.t-attic .uc-in { background: radial-gradient(circle at 50% 40%, #5a3a1e, #1a0f07 70%); }
+.uc-back .ub-in { flex: 1; border-radius: 3.6cqw; border: .8cqw solid rgba(255,233,166,.35); display: grid; place-items: center; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.035) 0 2cqw, transparent 2cqw 4cqw); }
+.uc-back svg { width: 86%; }
+/* animazioni dei disegni */
+.uc-svg .ua-ring { animation: ua-ring 2.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.uc-svg .ua-flick { animation: ua-flick 3.2s steps(1) infinite; }
+.uc-svg .ua-blink { animation: ua-blink 1.6s ease-in-out infinite; }
+.uc-svg .ua-glow { animation: ua-glow 2.2s ease-in-out infinite; }
+.uc-svg .ua-bub { animation: ua-bub 5s linear infinite; }
+.uc-svg .ua-swim { animation: ua-swim 3.4s ease-in-out infinite alternate; }
+.uc-svg .ua-ray { animation: ua-ray 6s ease-in-out infinite alternate; }
+.uc-svg .ua-dust { animation: ua-dust 9s ease-in-out infinite alternate; }
+.uc-svg .ua-spin { animation: ua-spin 3s linear infinite; }
+.uc-svg .ua-wave { animation: ua-wave 3s ease-in-out infinite alternate; }
+.uc-svg .ua-float { animation: ua-float 4s ease-in-out infinite alternate; }
+.uc-svg .ua-note { animation: ua-note 2.4s ease-out infinite; }
+.uc-svg .ua-wob { animation: ua-wob 1.2s linear infinite; transform-box: fill-box; transform-origin: center; }
+.uc-svg .ua-fall { animation: ua-fall 4s linear infinite; }
+.uc-svg .ua-rise { animation: ua-rise 7s ease-in-out infinite alternate; }
+.uc-svg .ua-glint { animation: ua-glow 1.6s ease-in-out infinite; }
+.uc-svg .ua-needle { animation: ua-needle 2.8s ease-in-out infinite alternate; }
+@keyframes ua-ring { 0% { opacity: .9; transform: scale(.75); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes ua-flick { 0%, 100% { opacity: 1; } 7% { opacity: .35; } 9% { opacity: .95; } 52% { opacity: .6; } 54% { opacity: 1; } 80% { opacity: .85; } }
+@keyframes ua-blink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+@keyframes ua-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes ua-bub { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(-170px) translateX(6px); opacity: 0; } }
+@keyframes ua-swim { 0% { translate: -4px 1px; } 100% { translate: 5px -2px; } }
+@keyframes ua-ray { 0% { opacity: .03; } 100% { opacity: .11; } }
+@keyframes ua-dust { 0% { translate: 0 0; } 100% { translate: 14px -18px; } }
+@keyframes ua-spin { to { rotate: 360deg; } }
+@keyframes ua-wave { 0% { translate: -6px 0; } 100% { translate: 6px 0; } }
+@keyframes ua-float { 0% { translate: 0 4px; } 100% { translate: 0 -6px; } }
+@keyframes ua-note { 0% { translate: 0 10px; opacity: 0; } 30% { opacity: 1; } 100% { translate: 8px -26px; opacity: 0; } }
+@keyframes ua-wob { to { rotate: 360deg; } }
+@keyframes ua-fall { 0% { translate: 0 -30px; opacity: 0; } 15% { opacity: 1; } 100% { translate: -20px 150px; opacity: 0; } }
+@keyframes ua-rise { 0% { translate: 0 18px; } 100% { translate: 0 -22px; } }
+@keyframes ua-needle { 0% { rotate: -3deg; } 100% { rotate: 4deg; } }
+@keyframes ua-glowbox { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+.uc.still .uc-svg *, .uc.thumb .uc-svg * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .uc-svg * { animation: none !important; } }

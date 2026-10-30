@@ -105,10 +105,11 @@ with sync_playwright() as p:
     ok('l’host resta Ale', A.evaluate('Net.isHost'))
 
     # 5) gli altri giochi aprono la stessa scelta
-    for path in ['polvere-e-piombo/', 'presagio/', 'campi-acciaio/', 'binari-italia/', 'catan/', 'machiavelli/']:
-        G = page(path); table(G, 'Ale'); G.click('[data-act=addbot]'); G.wait_for_timeout(600)
+    for path in ['polvere-e-piombo/', 'presagio/', 'campi-acciaio/', 'binari-italia/', 'catan/', 'machiavelli/', 'unlock/']:
+        G = page(path); table(G, 'Ale')
+        if path != 'unlock/': G.click('[data-act=addbot]'); G.wait_for_timeout(600)   # Unlock! è cooperativo: niente automatici
         esci(G); s = sheet(G)
-        ok(path + ': scelta all’uscita dell’host', 'solo giocatori automatici' in s, s[:80])
+        ok(path + ': scelta all’uscita dell’host', ('solo giocatori automatici' if path != 'unlock/' else 'unico al tavolo') in s, s[:80])
         G.click('[data-px=close]'); G.wait_for_timeout(1200); ok(path + ': tavolo chiuso', gone(G))
     print('errori pagina:', errs[:5])
     br.close()

@@ -90,9 +90,17 @@ def build_mc():
         'Machiavelli', 'Il gioco di carte italiano in cui il tavolo è di tutti: tris, poker e scale da smontare e rimontare. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#0f2a1f',
         'family=Marcellus&family=Mulish:wght@400;600;700;800;900', r(mc, 'style.css'), mc_js, 'Machiavelli'))
 
+def build_ul():
+    ul = 'src/unlock/'
+    ul_js = "window.GAME_PREFIX = 'unlock/v1/';\n" + '\n'.join(r(ul, f) for f in ['scen.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ul, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'unlock'), exist_ok=True)
+    open(os.path.join(ROOT, 'unlock', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Unlock!', 'Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate i codici e uscite prima che scada il tempo. Da 1 a 6 giocatori, ognuno dal proprio telefono.', '#070d14',
+        'family=Bungee&family=Nunito:wght@400;600;700;800;900&family=Share+Tech+Mono&family=Caveat:wght@600', r(ul, 'cards.css') + '\n' + r(ul, 'style.css'), ul_js, 'Unlock!'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()
