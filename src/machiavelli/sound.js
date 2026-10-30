@@ -4,8 +4,8 @@
   function flick(at, v) { S.hiss({ ft: 'highpass', f: [2600, 5200], q: .7, a: .005, dur: .1, vol: v || .14, at: at || 0 }); }
   function tap(at) { S.hiss({ ft: 'bandpass', f: [900, 500], q: 2, a: .002, dur: .05, vol: .12, at: at || 0 }); S.tone({ f: [220, 150], type: 'triangle', dur: .06, vol: .05, lp: 1200, at: at || 0 }); }
   S.setup({
-    tracks: ['audio/m1.mp3', 'audio/m2.mp3', 'audio/m3.mp3'], musicVol: .16,
-    credit: 'Musica di Kevin MacLeod (incompetech.com, CC BY 3.0). Gli effetti sono sintetizzati nel browser.',
+    tracks: ['audio/m1.mp3', 'audio/m2.mp3'], musicVol: .16,
+    credit: 'Musica: «Bushwick Tarantella» e «Achaidh Cheide» di Kevin MacLeod (incompetech.com, CC BY 3.0). Gli effetti sono sintetizzati nel browser.',
     samples: {},
     synth: {
       pick: function () { flick(0, .1); },
