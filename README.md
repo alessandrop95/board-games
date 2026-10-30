@@ -92,6 +92,18 @@ Gioco di coloni, risorse e commercio da 3 a 4 giocatori, con le regole del gioco
 - Presentazione alla prima partita, «?» su ogni fase, schede delle tessere con la probabilità, conteggio finale dei punti.
 - Giocatori automatici che scelgono gli incroci migliori, commerciano, usano le carte e spostano il ladro sul giocatore in testa.
 
+## Machiavelli
+
+Il gioco di carte italiano con due mazzi francesi (104 carte, senza jolly), da 2 a 5 giocatori.
+
+**Gioca:** https://alessandrop95.github.io/board-games/machiavelli/
+
+- 13 carte a testa (l’host può scegliere 15). Combinazioni: tris e poker (stesso valore, semi diversi) e scale dello stesso seme (asso basso A-2-3 o alto Q-K-A, mai K-A-2).
+- Nel proprio turno o si gioca almeno una carta della mano riorganizzando a piacere tutto il tavolo (alla fine le combinazioni devono essere tutte valide e le carte del tavolo restano sul tavolo), oppure si pesca. Vince chi finisce le carte; a mazzo finito chi non può giocare passa e, se passano tutti, vince chi ha meno carte.
+- Variante «apertura a 36»: la prima giocata solo con carte proprie, per almeno 36 punti.
+- Sul telefono le carte si **trascinano** (o si selezionano a tocchi) dalla mano e dal tavolo: mentre si trascina, le combinazioni dove la carta sta bene si accendono di verde, le mosse sbagliate vengono rifiutate, le combinazioni incomplete restano rosse finché non vanno a posto. «Annulla» rimette tutto com’era; gli altri vedono la bozza in diretta.
+- Carte disegnate da zero (semi, figure e dorso), giocatori automatici che attaccano carte, spezzano scale e prendono in prestito carte libere dal tavolo.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).

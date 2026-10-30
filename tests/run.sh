@@ -20,6 +20,8 @@ step "Regole di Ticket to Ride Italy" node tests/rules/binari.js
 step "Partite intere tra bot (Ticket to Ride Italy)" node tests/rules/binari_bots.js 6
 step "Regole di Catan" node tests/rules/catan.js
 step "Partite intere tra bot (Catan)" node tests/rules/catan_bots.js 20
+step "Regole di Machiavelli" node tests/rules/machiavelli.js
+step "Partite intere tra bot (Machiavelli)" node tests/rules/machiavelli_bots.js 15
 step "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs
 step "Database" python3 tests/db/test_db.py
 step "Funzione notify" node --experimental-strip-types --no-warnings tests/push/notify.mjs

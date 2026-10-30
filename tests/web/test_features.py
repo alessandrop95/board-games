@@ -100,7 +100,7 @@ with sync_playwright() as p:
     Hp.close()
 
     # ---- partita guidata in tutti i giochi ----
-    for path in ['gattomina/', 'presagio/', 'polvere-e-piombo/', 'binari-italia/', 'campi-acciaio/', 'catan/']:
+    for path in ['gattomina/', 'presagio/', 'polvere-e-piombo/', 'binari-italia/', 'campi-acciaio/', 'catan/', 'machiavelli/']:
         G = ctx(); G.goto('http://localhost:8897/' + path + '?broker=ws://localhost:8897/'); G.wait_for_timeout(1200)
         G.fill('#nick', 'Prova'); G.click('[data-coach=start]')
         try: G.wait_for_function('App.doc && App.doc.practice && App.doc.phase === "play"', timeout=20000)

@@ -83,9 +83,16 @@ def build_ct():
         'Catan', 'Coloni su un’isola da scoprire: raccogli risorse, commercia, costruisci strade, colonie e città. Da 3 a 4 giocatori, ognuno dal proprio telefono.', '#1d1610',
         'family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito+Sans:wght@400;600;700;800;900', r(ct, 'style.css'), ct_js, 'Catan'))
 
+def build_mc():
+    mc = 'src/machiavelli/'
+    mc_js = "window.GAME_PREFIX = 'machiavelli/v1/';\n" + '\n'.join(r(mc, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(mc, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    open(os.path.join(ROOT, 'machiavelli', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Machiavelli', 'Il gioco di carte italiano in cui il tavolo è di tutti: tris, poker e scale da smontare e rimontare. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#0f2a1f',
+        'family=Marcellus&family=Mulish:wght@400;600;700;800;900', r(mc, 'style.css'), mc_js, 'Machiavelli'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

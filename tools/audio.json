@@ -29,5 +29,6 @@
   "steam": {"search": "steam locomotive whistle", "maxdur": 20}
  },
   "binari-italia": { "m1": {"search": "Kevin MacLeod Carefree", "maxdur": 400}, "m2": {"search": "Kevin MacLeod Easy Lemon", "maxdur": 400}, "m3": {"search": "Kevin MacLeod Fluffing a Duck", "maxdur": 400} },
-  "catan": { "m1": {"search": "Kevin MacLeod Thatched Villagers", "maxdur": 400}, "m2": {"search": "Kevin MacLeod Pippin the Hunchback", "maxdur": 400}, "m3": {"search": "Kevin MacLeod Minstrel Guild", "maxdur": 400} }
+  "catan": { "m1": {"search": "Kevin MacLeod Thatched Villagers", "maxdur": 400}, "m2": {"search": "Kevin MacLeod Pippin the Hunchback", "maxdur": 400}, "m3": {"search": "Kevin MacLeod Minstrel Guild", "maxdur": 400} },
+  "machiavelli": { "m1": {"search": "Kevin MacLeod Bushwick Tarantella", "maxdur": 400}, "m2": {"search": "Kevin MacLeod Achaidh Cheide", "maxdur": 400}, "m3": {"search": "Kevin MacLeod Pavane", "maxdur": 400} }
 }
