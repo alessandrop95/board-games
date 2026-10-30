@@ -258,5 +258,25 @@
   "license": "CC BY 3.0",
   "artist": "Kevin MacLeod",
   "file": "m2.mp3"
+ },
+ "unlock/m1": {
+  "title": "Lightless Dawn (ISRC USUAN1100655).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/5b/Lightless_Dawn_%28ISRC_USUAN1100655%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 15197957,
+  "duration": 379.846525,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
+  "file": "m1.mp3"
+ },
+ "unlock/m2": {
+  "title": "Unseen Horrors (ISRC USUAN1400043).mp3",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Unseen_Horrors_%28ISRC_USUAN1400043%29.mp3?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+  "size": 8036245,
+  "duration": 251.062875,
+  "mediatype": "AUDIO",
+  "license": "CC BY 3.0",
+  "artist": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Kevin_MacLeod\" class=\"extiw\" title=\"w:en:Kevin MacLeod\"><span title=\"American composer and music producer (born 1972)\">Kevin MacLeod</span></a></bdi>",
+  "file": "m2.mp3"
  }
 }
