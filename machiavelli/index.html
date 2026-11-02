@@ -889,7 +889,37 @@ var Net = (function () {
   }
 
   // «Solo amici» serve l'account (gli amici sono quelli del server): senza, il tavolo resta aperto a tutti.
-  function visOf(v) { return v === 'invite' ? 'invite' : v === 'friends' && window.Account && Account.user() ? 'friends' : 'public'; }
+  function visOf(v) { return v === 'invite' || v === 'direct' ? v : v === 'friends' && window.Account && Account.user() ? 'friends' : 'public'; }
+  /* --- «Invita amico»: tavolo privato. Non compare in nessuna lista; entra solo chi ha un invito personale dell'host.
+     Ogni invito è una chiave casuale nel link (?t=CODICE&k=CHIAVE); nello stato del tavolo c'è solo la sua impronta,
+     e la prima persona che la usa per sedersi se la tiene: per gli altri quel link non vale più. --- */
+  function khash(str) {   // impronta di una chiave (cyrb53)
+    var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (var i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  }
+  var KEYS = 'pp-keys';
+  function keyFor(code) { try { var m = JSON.parse(localStorage.getItem(KEYS) || '{}'); return m[PREFIX + code] || null; } catch (e) { return null; } }
+  (function () {   // chi apre un link d'invito personale: la chiave resta su questo telefono (anche ricaricando la pagina)
+    try {
+      var q = new URLSearchParams(location.search), t = (q.get('t') || '').toUpperCase(), k = q.get('k') || '';
+      if (!/^[A-Z]{4}$/.test(t) || !/^[a-z0-9]{8,24}$/.test(k)) return;
+      var m = JSON.parse(localStorage.getItem(KEYS) || '{}'); m[PREFIX + t] = k;
+      var ks = Object.keys(m); if (ks.length > 30) delete m[ks[0]];
+      localStorage.setItem(KEYS, JSON.stringify(m));
+    } catch (e) {}
+  })();
+  function seatedIn(d, u) { return !!(d && d.seats && d.seats.some(function (s) { return s.uid === u; })); }
+  // Questo telefono può entrare nel tavolo privato? (host, già seduto, oppure con un invito ancora valido per lui)
+  function mayEnter(d, u, k) {
+    if (!d || d.vis !== 'direct' || d.host === u || seatedIn(d, u)) return true;
+    if (!k) return false;
+    var h = khash(String(k));
+    return (d.keys || []).some(function (x) { return x.h === h && (!x.u || x.u === u); });
+  }
+  var PRIVATE = 'Questo tavolo è privato: entri solo con l’invito personale di chi l’ha aperto.';
   function peekAt(prefix, code, ms) {
     return new Promise(function (resolve) {
       var st = prefix + code + '/state', pending = BROKERS.length, done = false, closed = false;
@@ -930,6 +960,7 @@ var Net = (function () {
     var f = await find(code);
     if (f && f.offline) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
+    if (!mayEnter(f.doc, uid, keyFor(code))) { f.c.unsubscribe(topic(code, 'state')); return 'private'; }
     var c = f.c;
     T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], graceUntil: 0, chat: [], chatIds: {},
       seen: {}, upSince: Date.now(), lastHb: 0, resync: false, unpub: false, hostRev: 0 };
@@ -1066,6 +1097,10 @@ var Net = (function () {
   function announce(force) {
     if (!T || !T.isHost || !T.doc || !T.doc.lobbyId || !T.up) return;
     if (T.doc.practice) return;   // partita di prova contro i bot: non compare nella lista
+    if (T.doc.vis === 'direct') {   // tavolo privato: non compare da nessuna parte (e se c'era, sparisce)
+      if (T.lobbySig !== 'direct' && T.c.publish(lobbyTopic(T.doc.lobbyId), '', true)) T.lobbySig = 'direct';
+      return;
+    }
     var d = T.doc, info = lobbyInfo ? lobbyInfo(d) : {}, vis = d.vis === 'invite' || d.vis === 'friends' ? d.vis : 'public';
     var acct = window.Account && Account.user();
     var host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
@@ -1138,8 +1173,13 @@ var Net = (function () {
   // Applica un'operazione allo stato (solo sull'host). Il reducer modifica il documento e restituisce {err, out}.
   function applyLocal(from, op) {
     var work = JSON.parse(JSON.stringify(T.doc));
-    var r = op && op.t === 'quit' ? quit(work, from, op) : op && op.t === 'vis' ? setVis(work, from, op) : op && op.t === 'series' && window.Score ? Score.op(work, from, op) : (reducer(work, from, op) || {});
+    var gate = op && op.t === 'join' && work.vis === 'direct' && work.host !== from && !seatedIn(work, from);
+    if (gate && !mayEnter(work, from, op.k)) return { err: PRIVATE };
+    var r = op && op.t === 'quit' ? quit(work, from, op) : op && op.t === 'vis' ? setVis(work, from, op) : op && op.t === 'addkey' ? addKey(work, from, op) : op && op.t === 'series' && window.Score ? Score.op(work, from, op) : (reducer(work, from, op) || {});
     if (r.err) return r;
+    if (gate && seatedIn(work, from)) {   // l'invito ora è di chi l'ha usato per sedersi
+      var hk = khash(String(op.k)); (work.keys || []).forEach(function (x) { if (x.h === hk) x.u = from; }); r.changed = true;
+    }
     if (r.changed !== false) { T.doc = work; publishState(); }
     return r;
   }
@@ -1169,15 +1209,30 @@ var Net = (function () {
     });
     return {};
   }
+  function addKey(work, from, op) {
+    if (work.host !== from) return { err: 'Solo chi ha aperto il tavolo può invitare.' };
+    var h = String(op.h || ''); if (!/^[a-z0-9]{4,16}$/.test(h)) return { err: 'Invito non valido.' };
+    work.keys = (work.keys || []).filter(function (x) { return x.h !== h; }).slice(-29); work.keys.push({ h: h, u: null, t: Date.now() });
+    return {};
+  }
+  // Nuovo invito personale (solo l'host): restituisce il link da mandare a una persona.
+  function newInvite() {
+    if (!T || !T.doc) return Promise.reject('Non sei a un tavolo.');
+    var k = ''; while (k.length < 14) k += Math.random().toString(36).slice(2);
+    k = k.slice(0, 14);
+    var code = T.code;
+    return send({ t: 'addkey', h: khash(k) }).then(function () { return { key: k, link: location.origin + location.pathname + '?t=' + code + '&k=' + k }; });
+  }
   function setVis(work, from, op) {
     if (work.host !== from) return { err: 'Solo l’host può farlo.' };
     if (work.practice) return { changed: false };
-    var v = op.vis === 'invite' || op.vis === 'friends' ? op.vis : 'public';
+    var v = op.vis === 'invite' || op.vis === 'friends' || op.vis === 'direct' ? op.vis : 'public';
     if (v === 'friends' && !work.seats.some(function (s) { return s.uid === from; })) return { changed: false };
     work.vis = v; return {};
   }
   function send(op) {
     if (!T || !T.doc) return Promise.reject('Non sei collegato a nessun tavolo.');
+    if (op && op.t === 'join' && !op.k && keyFor(T.code)) op = Object.assign({}, op, { k: keyFor(T.code) });
     if (T.isHost) { var r = applyLocal(uid, op); return r.err ? Promise.reject(r.err) : Promise.resolve(r.out || null); }
     var id = uid + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), me = T;
     var msg = JSON.stringify({ id: id, from: uid, op: op });
@@ -1272,7 +1327,7 @@ var Net = (function () {
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
-    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
+    create: create, open: open, send: send, newInvite: newInvite, keyFor: keyFor, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
     sendChat: sendChat, onChat: function (f) { chatCb = f; }, sendReact: sendReact, onReact: function (f) { reactCb = f; }, peekAt: peekAt, get prefix() { return PREFIX; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
     setReducer: function (f) { reducer = f; },
@@ -1734,7 +1789,15 @@ var Lobby = (function () {
   var stop = null, starting = false, list = null, failed = false;
   var css = '.vis-b{display:inline-block;font-size:11.5px;line-height:1;padding:3px 7px;border-radius:999px;border:1px solid currentColor;margin-left:6px;vertical-align:2px;white-space:nowrap;opacity:.85}' +
     '.vis-pick{display:flex;gap:8px;flex-wrap:wrap}.vis-pick label{flex:1;min-width:140px;display:flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid rgba(255,255,255,.16);border-radius:10px;cursor:pointer}' +
-    '.vis-pick input{width:18px;height:18px;margin:0;flex:none;accent-color:#d9a441}.vis-pick label:has(input:checked){border-color:currentColor}.olist{display:grid;gap:8px}';
+    '.vis-pick input{width:18px;height:18px;margin:0;flex:none;accent-color:#d9a441}.vis-pick label:has(input:checked){border-color:currentColor}.olist{display:grid;gap:8px}' +
+    '.pinv{display:grid;gap:8px;padding:12px;border-radius:12px;border:1px dashed rgba(255,255,255,.28);background:rgba(255,255,255,.04)}.pinv p{margin:0;font-size:14px;opacity:.85}' +
+    '.pi-back{position:fixed;inset:0;z-index:97;background:rgba(5,8,12,.62);display:flex;align-items:flex-end;justify-content:center}' +
+    '.pi-sheet{width:100%;max-width:520px;background:#1b2128;color:#f1ece2;border:1px solid rgba(255,255,255,.12);border-bottom:0;border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;font:15px/1.4 system-ui,sans-serif}' +
+    '@media(min-width:640px){.pi-back{align-items:center}.pi-sheet{border-radius:18px;border-bottom:1px solid rgba(255,255,255,.12)}}.pi-sheet h2{margin:0;font-size:20px}.pi-sheet p{margin:0;color:#cfc8ba}' +
+    '.pi-link{font:14px ui-monospace,monospace;padding:10px 12px;border-radius:10px;background:#0e1216;border:1px solid rgba(255,255,255,.14);overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}' +
+    '.pi-row{display:flex;gap:8px;flex-wrap:wrap}.pi-row button{flex:1;min-height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:inherit;font:700 15px system-ui,sans-serif;cursor:pointer}' +
+    '.pi-row button.main{background:linear-gradient(180deg,#f0d58f,#d9b45a);color:#231a06;border-color:transparent}' +
+    '.pi-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:9999;background:#2a2118;color:#f6ead2;border:1px solid rgba(242,193,78,.5);border-radius:12px;padding:10px 14px;font:15px system-ui,sans-serif;max-width:calc(100vw - 24px)}';
   function ensureCss() { if (!document.getElementById('lobby-css')) { var s = document.createElement('style'); s.id = 'lobby-css'; s.textContent = css; document.head.appendChild(s); } }
   function e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
@@ -1786,7 +1849,7 @@ var Lobby = (function () {
     if (failed) return '<p class="lead">Non riesco a caricare la lista dei tavoli. Controlla la connessione; puoi sempre entrare con il codice.</p>';
     if (!list) return '<p class="lead">Cerco i tavoli aperti…</p>';
     if (!list.length) return '<p class="lead">Nessun tavolo aperto in questo momento. Aprine uno tu: comparirà qui per tutti.</p>';
-    var A = window.Account, shown = list.filter(function (t) { return t.vis !== 'friends' || (A && A.friend && A.friend(t.u)); });
+    var A = window.Account, shown = list.filter(function (t) { return t.vis !== 'direct' && (t.vis !== 'friends' || (A && A.friend && A.friend(t.u))); });
     if (!shown.length) return '<p class="lead">Nessun tavolo aperto in questo momento. Aprine uno tu: comparirà qui per tutti.</p>';
     return shown.map(function (t) {
       var full = t.max && t.n >= t.max, pub = t.vis === 'public';
@@ -1809,27 +1872,67 @@ var Lobby = (function () {
   function panelHTML() { ensureCss(); return (window.Account ? Account.chipHTML() : '') + (window.Alerts ? Alerts.controlHTML() : '') + (window.Coach ? Coach.buttonHTML() : '') + '<div id="olist" class="olist">' + rows() + '</div>'; }
   function pickHTML() {
     var fr = window.Account && Account.user(), v0 = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })();
-    var v = v0 === 'invite' ? 'invite' : v0 === 'friends' && fr ? 'friends' : 'public';
+    var v = v0 === 'invite' || v0 === 'direct' ? v0 : v0 === 'friends' && fr ? 'friends' : 'public';
     return '<div class="vis-pick" role="radiogroup" aria-label="Chi può sedersi">' +
       '<label><input type="radio" name="vis" value="public"' + (v === 'public' ? ' checked' : '') + '><span><b>Aperto a tutti</b><br><span class="muted" style="font-size:13px">compare nella lista e chi ha gli avvisi accesi riceve una notifica</span></span></label>' +
       '<label><input type="radio" name="vis" value="invite"' + (v === 'invite' ? ' checked' : '') + '><span><b>Solo su invito</b><br><span class="muted" style="font-size:13px">compare nella lista, ma serve il codice</span></span></label>' +
-      (fr ? '<label><input type="radio" name="vis" value="friends"' + (v === 'friends' ? ' checked' : '') + '><span><b>Solo amici</b><br><span class="muted" style="font-size:13px">lo vedono e ricevono la notifica solo i tuoi amici</span></span></label>' : '') + '</div>';
+      (fr ? '<label><input type="radio" name="vis" value="friends"' + (v === 'friends' ? ' checked' : '') + '><span><b>Solo amici</b><br><span class="muted" style="font-size:13px">lo vedono e ricevono la notifica solo i tuoi amici</span></span></label>' : '') +
+      '<label><input type="radio" name="vis" value="direct"' + (v === 'direct' ? ' checked' : '') + '><span><b>Invita amico</b><br><span class="muted" style="font-size:13px">non lo vede nessuno: entra solo chi inviti tu, con un invito personale</span></span></label></div>';
   }
   function pickedVis() {
-    var el = document.querySelector('input[name="vis"]:checked'), v = el && (el.value === 'invite' || el.value === 'friends') ? el.value : 'public';
+    var el = document.querySelector('input[name="vis"]:checked'), v = el && (el.value === 'invite' || el.value === 'friends' || el.value === 'direct') ? el.value : 'public';
     try { localStorage.setItem('pp-vis', v); } catch (x) {}
     return v;
   }
   function roomHTML(doc, isHost) {
     ensureCss();
-    var v = doc.vis === 'invite' || doc.vis === 'friends' ? doc.vis : 'public', fr = v === 'friends' || (window.Account && Account.user());
+    var v = doc.vis === 'invite' || doc.vis === 'friends' || doc.vis === 'direct' ? doc.vis : 'public', fr = v === 'friends' || (window.Account && Account.user());
     if (doc.practice) return (window.Score ? Score.roomHTML(doc, isHost) : '') + '<p class="muted" style="margin:0;font-size:15px">Partita di prova: il tavolo non compare nella lista.</p>';
     return '<label style="display:grid;gap:6px"><span><b>Chi può sedersi</b><br><span class="muted" style="font-size:15px">' +
-      (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : v === 'friends' ? 'Il tavolo lo vedono solo gli amici dell’host, che possono sedersi con un tocco.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
-      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option>' + (fr ? '<option value="friends"' + (v === 'friends' ? ' selected' : '') + '>Solo amici</option>' : '') + '</select></label>' + (window.Score ? Score.roomHTML(doc, isHost) : '') + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
+      (v === 'public' ? 'Il tavolo compare nella lista di tutti e chiunque può sedersi.' : v === 'direct' ? 'Il tavolo non compare in nessuna lista e nessuno riceve avvisi: entra solo chi riceve da te un invito personale.' : v === 'friends' ? 'Il tavolo lo vedono solo gli amici dell’host, che possono sedersi con un tocco.' : 'Il tavolo compare nella lista, ma per sedersi serve il codice o il link d’invito.') + '</span></span>' +
+      '<select id="opt-vis" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px"><option value="public"' + (v === 'public' ? ' selected' : '') + '>Aperto a tutti</option><option value="invite"' + (v === 'invite' ? ' selected' : '') + '>Solo su invito (con codice)</option>' + (fr ? '<option value="friends"' + (v === 'friends' ? ' selected' : '') + '>Solo amici</option>' : '') + '<option value="direct"' + (v === 'direct' ? ' selected' : '') + '>Invita amico (solo chi inviti tu)</option></select></label>' + (v === 'direct' ? privateHTML(doc, isHost) : '') + (window.Score ? Score.roomHTML(doc, isHost) : '') + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
   }
-  return { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
-    setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget };
+  /* --- «Invita amico»: inviti personali (un link per persona) --- */
+  function privateHTML(doc, isHost) {
+    var ks = doc.keys || [], used = ks.filter(function (k) { return k.u; }).length;
+    return '<div class="pinv"><b>✉ Inviti personali</b><p>' + (isHost ? 'Ogni invito è un link che vale per una sola persona: chi lo apre per primo si siede, poi per gli altri non funziona più.' : 'Al tavolo entra solo chi viene invitato da chi l’ha aperto.') +
+      (ks.length ? ' Inviti creati: ' + ks.length + ', già usati: ' + used + '.' : '') + '</p>' +
+      (isHost ? '<button type="button" class="btn" data-lobby="pinvite">Crea un invito personale</button>' : '') + '</div>';
+  }
+  function toast(t) { ensureCss(); var d = document.createElement('div'); d.className = 'pi-toast'; d.setAttribute('role', 'status'); d.textContent = t; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3600); }
+  var api = null;
+  function personalInvite() {
+    if (!window.Net || !Net.newInvite) return;
+    Net.newInvite().then(function (inv) {
+      api.lastInvite = inv.link; ensureCss();
+      var old = document.querySelector('.pi-back'); if (old) old.remove();
+      var b = document.createElement('div'); b.className = 'pi-back';
+      b.innerHTML = '<div class="pi-sheet" role="dialog" aria-modal="true"><h2>Invito personale</h2><p>Manda questo link a <b>una sola persona</b>: chi lo apre per primo si siede al tavolo e il link non vale più per nessun altro. Per invitare qualcun altro creane uno nuovo.</p>' +
+        '<div class="pi-link">' + e(inv.link) + '</div><div class="pi-row">' + (navigator.share ? '<button type="button" class="main" data-pi="share">Condividi</button>' : '') +
+        '<button type="button"' + (navigator.share ? '' : ' class="main"') + ' data-pi="copy">Copia il link</button></div><div class="pi-row"><button type="button" data-pi="close">Chiudi</button></div></div>';
+      b.addEventListener('click', function (ev) {
+        var x = ev.target.closest('[data-pi]'); if (ev.target === b || (x && x.getAttribute('data-pi') === 'close')) { b.remove(); return; }
+        if (!x) return;
+        if (x.getAttribute('data-pi') === 'share') navigator.share({ title: document.title, text: 'Ti invito al mio tavolo di ' + document.title + ' (invito personale, vale solo per te)', url: inv.link }).catch(function () {});
+        else { try { navigator.clipboard.writeText(inv.link).then(function () { toast('Link personale copiato.'); }, function () { toast('Tieni premuto sul link per copiarlo.'); }); } catch (er) { toast('Tieni premuto sul link per copiarlo.'); } }
+      });
+      document.body.appendChild(b);
+    }, function (er) { toast(String(er || 'Non sono riuscito a creare l’invito: riprova.')); });
+  }
+  // Nel tavolo privato i pulsanti «Invita amici» e «Copia link» dei giochi creano un invito personale.
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-lobby="pinvite"],[data-act="invite"],[data-act="copylink"]'); if (!b) return;
+    var d = window.App && App.doc;
+    if (b.getAttribute('data-lobby') !== 'pinvite' && !(d && d.vis === 'direct' && window.Net && Net.tableCode === d.code)) return;
+    ev.preventDefault(); ev.stopPropagation();
+    if (window.App && App.sheet) { App.sheet = null; if (typeof renderSheet === 'function') renderSheet(); }
+    if (!d || d.host !== Net.uid) { toast('Tavolo privato: solo chi l’ha aperto può invitare.'); return; }
+    personalInvite();
+  }, true);
+
+  api = { start: start, end: end, paint: paint, panelHTML: panelHTML, pickHTML: pickHTML, pickedVis: pickedVis, roomHTML: roomHTML,
+    setRecentKey: function (k) { RKEY = k; }, recentRows: recentRows, forget: forget, personalInvite: personalInvite, lastInvite: null };
+  return api;
 })();
 
 /* ===== Gesto "indietro" (swipe o tasto) dentro il gioco =====
@@ -2536,7 +2639,7 @@ var Alerts = (function () {
     var m = obj(MINE), now = Date.now();
     Object.keys(m).forEach(function (x) { if (now - m[x] > 24 * 3600e3) delete m[x]; });
     m[prefix + code] = now; set(MINE, JSON.stringify(m));
-    if (vis === 'invite' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
+    if (vis === 'invite' || vis === 'direct' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
     if (window.Account && Account.presence) Account.presence();   // gli amici devono sapere subito dove si trova il tavolo
     var g = GAMES.filter(function (x) { return x.p === prefix; })[0]; if (!g) return;
     if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code, vis: vis === 'friends' ? 'friends' : 'public' }).catch(function (e) { console.warn('annuncio', e); });
@@ -2631,7 +2734,7 @@ var Account = (function () {
   function where() {
     var g = A.here ? A.here.path.replace(/\/$/, '') : null, d = window.App && App.doc, code = window.Net && Net.tableCode;
     var seated = d && d.seats && window.Net && d.seats.some(function (x) { return x.uid === Net.uid; });
-    if (!d || !code || d.practice || !(seated || App.screen === 'table')) return { g: g, t: null, v: null, ph: null };
+    if (!d || !code || d.practice || d.vis === 'direct' || !(seated || App.screen === 'table')) return { g: g, t: null, v: null, ph: null };   // tavolo privato: agli amici non si dice dove
     return { g: g, t: code, v: d.vis || 'public', ph: d.phase };
   }
   function presenceTick(force) {
@@ -2803,7 +2906,11 @@ var Account = (function () {
     else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
     else if (k === 'invite') {
       b.disabled = true;
-      notify({ kind: 'invite', to: uname, game: view.x.game, code: view.x.code }).then(function (r) { inviteSent[view.x.code + ':' + uname] = 1; msg = { ok: true, t: r.sent ? 'Invito mandato a ' + uname + '.' : uname + ' non ha le notifiche attive: mandagli il codice ' + view.x.code + '.' }; render(); },
+      // tavolo privato («Invita amico»): ogni amico invitato riceve il suo invito personale
+      var priv = window.App && App.doc && App.doc.vis === 'direct' && window.Net && Net.newInvite;
+      (priv ? Net.newInvite() : Promise.resolve(null)).then(function (inv) {
+        return notify({ kind: 'invite', to: uname, game: view.x.game, code: view.x.code, k: inv ? inv.key : undefined }).then(function (r) { return { r: r, inv: inv }; });
+      }).then(function (x) { inviteSent[view.x.code + ':' + uname] = 1; msg = { ok: true, t: x.r.sent ? 'Invito mandato a ' + uname + '.' : uname + ' non ha le notifiche attive: ' + (x.inv ? 'mandagli questo link personale: ' + x.inv.link : 'mandagli il codice ' + view.x.code + '.') }; render(); },
         function (er) { msg = { t: String(er) }; render(); });
     }
     else if (k === 'accept') addFriend(uname).catch(function (er) { msg = { t: String(er) }; render(); });
@@ -3000,7 +3107,7 @@ async function enterTable(code, nick) {
   }, function () { var sig = Net.connected + ':' + Net.hostAlive() + ':' + Net.isHost + ':' + Net.presenceSig(); if (sig !== App.netSig) { App.netSig = sig; render(); } });
   if (ok !== true) {
     App.screen = 'lobby'; App.code = null; lsSet(KEY_TABLE, null); if (ok === 'closed') Lobby.forget(code); render();
-    throw ok === 'closed' ? 'Il tavolo ' + code + ' è stato chiuso. L’ho tolto dai tuoi tavoli recenti.' : 'Non riesco a raggiungere il tavolo ' + code + '. Se la connessione è lenta, riprova tra poco da «I tuoi tavoli recenti».';
+    throw ok === 'private' ? 'Il tavolo ' + code + ' è privato: entri solo con l’invito personale di chi l’ha aperto.' : ok === 'closed' ? 'Il tavolo ' + code + ' è stato chiuso. L’ho tolto dai tuoi tavoli recenti.' : 'Non riesco a raggiungere il tavolo ' + code + '. Se la connessione è lenta, riprova tra poco da «I tuoi tavoli recenti».';
   }
   lsSet(KEY_TABLE, code); remember(code);
   if (nick) { var out = await Net.send({ t: 'join', nick: nick }); if (out === 'spect' && myIdx() < 0) toast('La partita è già iniziata: la guardi da spettatore.'); }

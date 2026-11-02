@@ -82,7 +82,7 @@ var Account = (function () {
   function where() {
     var g = A.here ? A.here.path.replace(/\/$/, '') : null, d = window.App && App.doc, code = window.Net && Net.tableCode;
     var seated = d && d.seats && window.Net && d.seats.some(function (x) { return x.uid === Net.uid; });
-    if (!d || !code || d.practice || !(seated || App.screen === 'table')) return { g: g, t: null, v: null, ph: null };
+    if (!d || !code || d.practice || d.vis === 'direct' || !(seated || App.screen === 'table')) return { g: g, t: null, v: null, ph: null };   // tavolo privato: agli amici non si dice dove
     return { g: g, t: code, v: d.vis || 'public', ph: d.phase };
   }
   function presenceTick(force) {
@@ -254,7 +254,11 @@ var Account = (function () {
     else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
     else if (k === 'invite') {
       b.disabled = true;
-      notify({ kind: 'invite', to: uname, game: view.x.game, code: view.x.code }).then(function (r) { inviteSent[view.x.code + ':' + uname] = 1; msg = { ok: true, t: r.sent ? 'Invito mandato a ' + uname + '.' : uname + ' non ha le notifiche attive: mandagli il codice ' + view.x.code + '.' }; render(); },
+      // tavolo privato («Invita amico»): ogni amico invitato riceve il suo invito personale
+      var priv = window.App && App.doc && App.doc.vis === 'direct' && window.Net && Net.newInvite;
+      (priv ? Net.newInvite() : Promise.resolve(null)).then(function (inv) {
+        return notify({ kind: 'invite', to: uname, game: view.x.game, code: view.x.code, k: inv ? inv.key : undefined }).then(function (r) { return { r: r, inv: inv }; });
+      }).then(function (x) { inviteSent[view.x.code + ':' + uname] = 1; msg = { ok: true, t: x.r.sent ? 'Invito mandato a ' + uname + '.' : uname + ' non ha le notifiche attive: ' + (x.inv ? 'mandagli questo link personale: ' + x.inv.link : 'mandagli il codice ' + view.x.code + '.') }; render(); },
         function (er) { msg = { t: String(er) }; render(); });
     }
     else if (k === 'accept') addFriend(uname).catch(function (er) { msg = { t: String(er) }; render(); });

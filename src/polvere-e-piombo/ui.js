@@ -194,7 +194,7 @@ async function enterTable(code, nick) {
   });
   if (ok !== true) {
     App.screen = 'lobby'; App.code = null; lsSet('pp-table', null); if (ok === 'closed') Lobby.forget(code); render();
-    throw ok === 'closed' ? 'Il tavolo ' + code + ' è stato chiuso. L’ho tolto dai tuoi tavoli recenti.' : 'Non riesco a raggiungere il tavolo ' + code + '. Se la connessione è lenta, riprova tra poco da «I tuoi tavoli recenti».';
+    throw ok === 'private' ? 'Il tavolo ' + code + ' è privato: entri solo con l’invito personale di chi l’ha aperto.' : ok === 'closed' ? 'Il tavolo ' + code + ' è stato chiuso. L’ho tolto dai tuoi tavoli recenti.' : 'Non riesco a raggiungere il tavolo ' + code + '. Se la connessione è lenta, riprova tra poco da «I tuoi tavoli recenti».';
   }
   lsSet('pp-table', code); remember(code);
   if (nick) {

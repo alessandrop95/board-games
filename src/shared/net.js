@@ -223,7 +223,37 @@ var Net = (function () {
   }
 
   // «Solo amici» serve l'account (gli amici sono quelli del server): senza, il tavolo resta aperto a tutti.
-  function visOf(v) { return v === 'invite' ? 'invite' : v === 'friends' && window.Account && Account.user() ? 'friends' : 'public'; }
+  function visOf(v) { return v === 'invite' || v === 'direct' ? v : v === 'friends' && window.Account && Account.user() ? 'friends' : 'public'; }
+  /* --- «Invita amico»: tavolo privato. Non compare in nessuna lista; entra solo chi ha un invito personale dell'host.
+     Ogni invito è una chiave casuale nel link (?t=CODICE&k=CHIAVE); nello stato del tavolo c'è solo la sua impronta,
+     e la prima persona che la usa per sedersi se la tiene: per gli altri quel link non vale più. --- */
+  function khash(str) {   // impronta di una chiave (cyrb53)
+    var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (var i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  }
+  var KEYS = 'pp-keys';
+  function keyFor(code) { try { var m = JSON.parse(localStorage.getItem(KEYS) || '{}'); return m[PREFIX + code] || null; } catch (e) { return null; } }
+  (function () {   // chi apre un link d'invito personale: la chiave resta su questo telefono (anche ricaricando la pagina)
+    try {
+      var q = new URLSearchParams(location.search), t = (q.get('t') || '').toUpperCase(), k = q.get('k') || '';
+      if (!/^[A-Z]{4}$/.test(t) || !/^[a-z0-9]{8,24}$/.test(k)) return;
+      var m = JSON.parse(localStorage.getItem(KEYS) || '{}'); m[PREFIX + t] = k;
+      var ks = Object.keys(m); if (ks.length > 30) delete m[ks[0]];
+      localStorage.setItem(KEYS, JSON.stringify(m));
+    } catch (e) {}
+  })();
+  function seatedIn(d, u) { return !!(d && d.seats && d.seats.some(function (s) { return s.uid === u; })); }
+  // Questo telefono può entrare nel tavolo privato? (host, già seduto, oppure con un invito ancora valido per lui)
+  function mayEnter(d, u, k) {
+    if (!d || d.vis !== 'direct' || d.host === u || seatedIn(d, u)) return true;
+    if (!k) return false;
+    var h = khash(String(k));
+    return (d.keys || []).some(function (x) { return x.h === h && (!x.u || x.u === u); });
+  }
+  var PRIVATE = 'Questo tavolo è privato: entri solo con l’invito personale di chi l’ha aperto.';
   function peekAt(prefix, code, ms) {
     return new Promise(function (resolve) {
       var st = prefix + code + '/state', pending = BROKERS.length, done = false, closed = false;
@@ -264,6 +294,7 @@ var Net = (function () {
     var f = await find(code);
     if (f && f.offline) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
+    if (!mayEnter(f.doc, uid, keyFor(code))) { f.c.unsubscribe(topic(code, 'state')); return 'private'; }
     var c = f.c;
     T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], graceUntil: 0, chat: [], chatIds: {},
       seen: {}, upSince: Date.now(), lastHb: 0, resync: false, unpub: false, hostRev: 0 };
@@ -400,6 +431,10 @@ var Net = (function () {
   function announce(force) {
     if (!T || !T.isHost || !T.doc || !T.doc.lobbyId || !T.up) return;
     if (T.doc.practice) return;   // partita di prova contro i bot: non compare nella lista
+    if (T.doc.vis === 'direct') {   // tavolo privato: non compare da nessuna parte (e se c'era, sparisce)
+      if (T.lobbySig !== 'direct' && T.c.publish(lobbyTopic(T.doc.lobbyId), '', true)) T.lobbySig = 'direct';
+      return;
+    }
     var d = T.doc, info = lobbyInfo ? lobbyInfo(d) : {}, vis = d.vis === 'invite' || d.vis === 'friends' ? d.vis : 'public';
     var acct = window.Account && Account.user();
     var host = d.seats.filter(function (s) { return s.uid === d.host; })[0];
@@ -472,8 +507,13 @@ var Net = (function () {
   // Applica un'operazione allo stato (solo sull'host). Il reducer modifica il documento e restituisce {err, out}.
   function applyLocal(from, op) {
     var work = JSON.parse(JSON.stringify(T.doc));
-    var r = op && op.t === 'quit' ? quit(work, from, op) : op && op.t === 'vis' ? setVis(work, from, op) : op && op.t === 'series' && window.Score ? Score.op(work, from, op) : (reducer(work, from, op) || {});
+    var gate = op && op.t === 'join' && work.vis === 'direct' && work.host !== from && !seatedIn(work, from);
+    if (gate && !mayEnter(work, from, op.k)) return { err: PRIVATE };
+    var r = op && op.t === 'quit' ? quit(work, from, op) : op && op.t === 'vis' ? setVis(work, from, op) : op && op.t === 'addkey' ? addKey(work, from, op) : op && op.t === 'series' && window.Score ? Score.op(work, from, op) : (reducer(work, from, op) || {});
     if (r.err) return r;
+    if (gate && seatedIn(work, from)) {   // l'invito ora è di chi l'ha usato per sedersi
+      var hk = khash(String(op.k)); (work.keys || []).forEach(function (x) { if (x.h === hk) x.u = from; }); r.changed = true;
+    }
     if (r.changed !== false) { T.doc = work; publishState(); }
     return r;
   }
@@ -503,15 +543,30 @@ var Net = (function () {
     });
     return {};
   }
+  function addKey(work, from, op) {
+    if (work.host !== from) return { err: 'Solo chi ha aperto il tavolo può invitare.' };
+    var h = String(op.h || ''); if (!/^[a-z0-9]{4,16}$/.test(h)) return { err: 'Invito non valido.' };
+    work.keys = (work.keys || []).filter(function (x) { return x.h !== h; }).slice(-29); work.keys.push({ h: h, u: null, t: Date.now() });
+    return {};
+  }
+  // Nuovo invito personale (solo l'host): restituisce il link da mandare a una persona.
+  function newInvite() {
+    if (!T || !T.doc) return Promise.reject('Non sei a un tavolo.');
+    var k = ''; while (k.length < 14) k += Math.random().toString(36).slice(2);
+    k = k.slice(0, 14);
+    var code = T.code;
+    return send({ t: 'addkey', h: khash(k) }).then(function () { return { key: k, link: location.origin + location.pathname + '?t=' + code + '&k=' + k }; });
+  }
   function setVis(work, from, op) {
     if (work.host !== from) return { err: 'Solo l’host può farlo.' };
     if (work.practice) return { changed: false };
-    var v = op.vis === 'invite' || op.vis === 'friends' ? op.vis : 'public';
+    var v = op.vis === 'invite' || op.vis === 'friends' || op.vis === 'direct' ? op.vis : 'public';
     if (v === 'friends' && !work.seats.some(function (s) { return s.uid === from; })) return { changed: false };
     work.vis = v; return {};
   }
   function send(op) {
     if (!T || !T.doc) return Promise.reject('Non sei collegato a nessun tavolo.');
+    if (op && op.t === 'join' && !op.k && keyFor(T.code)) op = Object.assign({}, op, { k: keyFor(T.code) });
     if (T.isHost) { var r = applyLocal(uid, op); return r.err ? Promise.reject(r.err) : Promise.resolve(r.out || null); }
     var id = uid + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), me = T;
     var msg = JSON.stringify({ id: id, from: uid, op: op });
@@ -606,7 +661,7 @@ var Net = (function () {
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
-    create: create, open: open, send: send, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
+    create: create, open: open, send: send, newInvite: newInvite, keyFor: keyFor, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
     sendChat: sendChat, onChat: function (f) { chatCb = f; }, sendReact: sendReact, onReact: function (f) { reactCb = f; }, peekAt: peekAt, get prefix() { return PREFIX; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
     setReducer: function (f) { reducer = f; },

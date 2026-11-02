@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       out.sent = await deliver(r.subs, {
         title: clean(r.from, 18) + ' ti invita a giocare',
         body: 'Tavolo ' + code + ' di ' + GAMES[game] + ': tocca per sederti.',
-        url, tag: 'invite-' + code, kind
+        url: url + (/^[a-z0-9]{8,24}$/.test(String(b.k || '')) ? '&k=' + b.k : ''), tag: 'invite-' + code, kind
       }, 'invite' + code);
       out.to = r.to;
     } else if (kind === 'friend') {

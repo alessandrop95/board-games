@@ -310,7 +310,7 @@ var Alerts = (function () {
     var m = obj(MINE), now = Date.now();
     Object.keys(m).forEach(function (x) { if (now - m[x] > 24 * 3600e3) delete m[x]; });
     m[prefix + code] = now; set(MINE, JSON.stringify(m));
-    if (vis === 'invite' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
+    if (vis === 'invite' || vis === 'direct' || (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search))) return; // niente annunci dai tavoli su invito né dalle prove locali
     if (window.Account && Account.presence) Account.presence();   // gli amici devono sapere subito dove si trova il tavolo
     var g = GAMES.filter(function (x) { return x.p === prefix; })[0]; if (!g) return;
     if (window.Account && Account.user()) Account.notify({ kind: 'table', game: g.path.replace(/\/$/, ''), code: code, vis: vis === 'friends' ? 'friends' : 'public' }).catch(function (e) { console.warn('annuncio', e); });
