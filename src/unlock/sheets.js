@@ -30,17 +30,18 @@ function sheetBody(s) {
   if (s.kind === 'gone') { var gs = E.gone(g); return '<h2>Carte scartate</h2>' + (gs.length ? '<p class="lead">Non servono più, ma puoi rileggerle.</p><div class="tgrid small">' + gs.map(function (id) { return '<button class="tc" data-act="open" data-id="' + id + '">' + Game.thumb(id) + '</button>'; }).join('') + '</div>' : '<p class="lead">Ancora nessuna carta scartata.</p>') + closeBtn(); }
   if (s.kind === 'hints') {
     var ids = Object.keys(g.hints);
-    return '<h2>' + IC('hint') + ' Indizi</h2><p class="lead">Per chiedere un indizio apri una carta e tocca <b>Chiedi un indizio</b>. Non costano tempo, ma tolgono stelle: ' + g.hintN + (g.hintN === 1 ? ' usato' : ' usati') + ' finora.</p>' +
+    return '<h2>' + IC('hint') + ' Indizi</h2><p class="lead">Per chiedere un indizio apri una carta e tocca <b>Chiedi un indizio</b>. ' + (E.costs(g).hint ? 'In questa avventura costano tempo (indizio −' + E.mins(E.costs(g).hint) + ', soluzione −' + E.mins(E.costs(g).sol) + ') e tolgono stelle' : 'Non costano tempo, ma tolgono stelle') + ': ' + g.hintN + (g.hintN === 1 ? ' usato' : ' usati') + ' finora.' + (E.hintsLeft(g) != null ? ' <b>In questa avventura ne avete ' + SCN.get(g.scen).hintMax + ' in tutto: ' + (E.hintsLeft(g) ? 'ne resta' + (E.hintsLeft(g) > 1 ? 'no ' : ' ') + E.hintsLeft(g) : 'li avete finiti') + '.</b>' : '') + '</p>' +
       (ids.length ? '<div class="vw-hints">' + ids.map(function (id) { var c = E.card(g, id); return '<div class="hint h' + g.hints[id] + '"><b>' + esc(id) + ' · ' + esc(c.t) + '</b>' + c.h[0] + (g.hints[id] > 1 ? '<br><i>' + c.h[1] + '</i>' : '') + '</div>'; }).join('') + '</div>' : '') + closeBtn();
   }
   if (s.kind === 'code') return codeBody(g, s);
+  if (s.kind === 'search') return searchBody(g, s);
   if (s.kind === 'mac') return macBody(g, s);
   if (s.kind === 'over' && g.phase === 'over') return overBody(g, me);
   return '';
 }
 
 /* ---------- lucchetti (carte gialle) ---------- */
-function lcd(v, s) { var d = ''; for (var i = 0; i < 4; i++) d += '<span class="' + (i < v.length ? 'on' : '') + '">' + (v.charAt(i) || '•') + '</span>'; return d; }
+function lcd(v, n) { var d = ''; for (var i = 0; i < (n || 4); i++) d += '<span class="' + (i < v.length ? 'on' : '') + '">' + (v.charAt(i) || '•') + '</span>'; return d; }
 function codeBody(g, s) {
   var c = E.card(g, s.id); if (!c || !E.onTable(g, s.id) || E.seen(g, c.code.to)) return '';
   var off = c.code.need && !E.seen(g, c.code.need), err = s.err && Date.now() - s.err < 1500;
@@ -49,10 +50,22 @@ function codeBody(g, s) {
   }).join('');
   return '<div class="kp' + (err ? ' err' : '') + (off ? ' off' : '') + '"><div class="kp-head"><span class="kp-n">' + esc(s.id) + '</span><b>' + esc(c.t) + '</b></div>' +
     '<div class="kp-lcd" id="kp-lcd">' + (off ? '<em>SPENTO</em>' : err ? '<em>ERRORE</em>' : lcd(App.codeIn)) + '</div>' +
-    (off ? '<p class="kp-msg">' + esc(c.code.needMsg || 'Non funziona ancora.') + '</p>' : '<p class="kp-msg">4 cifre · un codice sbagliato costa <b>2 minuti</b></p>') +
+    (off ? '<p class="kp-msg">' + esc(c.code.needMsg || 'Non funziona ancora.') + '</p>' : '<p class="kp-msg">4 cifre · un codice sbagliato costa <b>' + E.mins(E.costs(g).code) + '</b></p>') +
     '<div class="kp-keys">' + keys + '</div></div>' + closeBtn('Chiudi');
 }
-function paintLcd() { var e = document.getElementById('kp-lcd'); if (e) e.innerHTML = lcd(App.codeIn); }
+function paintLcd() { var e = document.getElementById('kp-lcd'); if (e) e.innerHTML = lcd(App.codeIn, App.sheet && App.sheet.kind === 'search' ? 2 : 4); }
+/* ---------- cercare una carta con un numero calcolato ---------- */
+function searchBody(g, s) {
+  var err = s.err && Date.now() - s.err < 1500;
+  var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].map(function (k) {
+    return k === 'del' ? '<button class="kk fn" data-act="kpdel" aria-label="Cancella">⌫</button>' : k === 'ok' ? '<button class="kk go" data-act="srok" aria-label="Cerca">✓</button>' : '<button class="kk" data-act="kp" data-k="' + k + '">' + k + '</button>';
+  }).join('');
+  return '<div class="kp srch' + (err ? ' err' : '') + '"><div class="kp-head"><span class="kp-n s">' + IC('eye') + '</span><b>Cerca una carta</b></div>' +
+    '<p class="kp-msg">Alcuni numeri non sono scritti da nessuna parte: si <b>calcolano</b> o si <b>deducono</b> dagli indizi. Quando pensi di averne trovato uno, cercalo qui.</p>' +
+    '<div class="kp-lcd two" id="kp-lcd">' + (err ? '<em>NIENTE</em>' : lcd(App.codeIn, 2)) + '</div>' +
+    '<p class="kp-msg">Se quella carta non si può ancora trovare: <b>−' + E.mins(E.costs(g).search) + '</b></p>' +
+    '<div class="kp-keys">' + keys + '</div></div>' + closeBtn('Chiudi');
+}
 
 /* ---------- macchine (carte verdi) ---------- */
 function dialSVG(i, v, col) {
@@ -65,7 +78,7 @@ function dialSVG(i, v, col) {
 function macBody(g, s) {
   var c = E.card(g, s.id); if (!c || !E.onTable(g, s.id) || !c.mac) return '';
   var m = c.mac, off = m.need && !E.seen(g, m.need), err = s.err && Date.now() - s.err < 1600, body = '';
-  if (!App.mac || App.mac.id !== s.id) App.mac = { id: s.id, v: m.type === 'dials' ? m.labels.map(function () { return 0; }) : m.type === 'choice' ? null : '' };
+  if (!App.mac || App.mac.id !== s.id) App.mac = { id: s.id, v: m.type === 'dials' ? m.labels.map(function () { return 0; }) : m.type === 'choice' ? null : m.type === 'seq' ? [] : '' };
   var V = App.mac.v;
   if (m.type === 'dials') {
     body = '<div class="dials">' + m.labels.map(function (l, i) { return '<div class="dcol" style="--dc:' + m.cols[i] + '">' + dialSVG(i, V[i], m.cols[i]) + '<div class="drow"><button class="kk sm" data-act="dial" data-i="' + i + '" data-d="-1" aria-label="' + l + ' meno">−</button><b id="dv' + i + '">' + V[i] + '</b><button class="kk sm" data-act="dial" data-i="' + i + '" data-d="1" aria-label="' + l + ' più">+</button></div><span class="dlab">' + l + '</span></div>'; }).join('') + '</div>' +
@@ -75,12 +88,18 @@ function macBody(g, s) {
       '<div class="mz-keys"><button class="kk mz-k" data-act="mz" data-k="." aria-label="Punto">•</button><button class="kk mz-k" data-act="mz" data-k="-" aria-label="Linea">—</button><button class="kk fn" data-act="mz" data-k=" ">fine lettera</button><button class="kk fn" data-act="mzdel" aria-label="Cancella">⌫</button></div>' +
       '<button class="tkey" id="tkey" aria-label="Tasto del telegrafo: tocco breve punto, pressione lunga linea"><span></span></button><p class="kp-msg">Premi i tasti, oppure usa il tasto del telegrafo: <b>breve</b> = punto, <b>lungo</b> = linea. Tra una lettera e l’altra tocca «fine lettera».</p></div>' +
       '<button class="btn block green" data-act="mgo"' + (off ? ' disabled' : '') + '>' + IC('ping') + ' Trasmetti</button>';
+  } else if (m.type === 'seq') {
+    var V2 = App.mac.v;
+    body = '<div class="sq-tape">' + (V2.length ? V2.map(function (k, j) { return '<span class="sq-st"><i>' + (j + 1) + '</i>' + esc(m.opts[k].l) + '</span>'; }).join('') : '<span class="mz-empty">' + esc(m.label || 'premi i comandi nell’ordine giusto') + '</span>') + '</div>' +
+      '<div class="sq-keys">' + m.opts.map(function (o, k) { return '<button class="sq-k" data-act="sq" data-k="' + k + '" style="--sc:' + (o.c || '#c9a24a') + '"' + (V2.length >= (m.len || 4) ? ' disabled' : '') + '>' + (o.ic ? '<span class="sq-ic">' + o.ic + '</span>' : '') + '<b>' + esc(o.l) + '</b>' + (o.s ? '<small>' + esc(o.s) + '</small>' : '') + '</button>'; }).join('') + '</div>' +
+      '<div class="row" style="justify-content:space-between"><button class="btn ghost small" data-act="sqdel">' + IC('back') + ' Ricomincia la sequenza</button><span class="kp-msg">' + V2.length + ' / ' + (m.len || 4) + '</span></div>' +
+      '<button class="btn block green" data-act="mgo"' + (off || V2.length < (m.len || 4) ? ' disabled' : '') + '>' + IC('gear') + ' ' + esc(m.go || 'Esegui') + '</button>';
   } else if (m.type === 'choice') {
     body = '<div class="turn' + (V ? ' spin s' + V : '') + '"><div class="disc"></div></div><div class="chs">' + m.opts.map(function (o) { return '<button class="chb' + (V === o ? ' on' : '') + '" data-act="mopt" data-v="' + o + '"><b>' + o + '</b><span>' + m.unit + '</span></button>'; }).join('') + '</div>' +
       '<p class="kp-msg">' + esc(m.label || '') + '</p><button class="btn block green" data-act="mgo"' + (off || !V ? ' disabled' : '') + '>' + IC('play') + ' Fai partire</button>';
   }
   return '<div class="mac' + (err ? ' err' : '') + (s.ok ? ' ok' : '') + (off ? ' off' : '') + '"><div class="kp-head"><span class="kp-n g">' + esc(s.id) + '</span><b>' + esc(c.t) + '</b></div>' +
-    (off ? '<div class="mac-off">' + esc(m.needMsg || 'Non funziona ancora.') + '</div>' : '') + (err ? '<div class="mac-err">Non succede niente… (−1 min)</div>' : '') + (s.ok ? '<div class="mac-ok">Funziona!</div>' : '') + body + '</div>' + closeBtn('Chiudi');
+    (off ? '<div class="mac-off">' + esc(m.needMsg || 'Non funziona ancora.') + '</div>' : '') + (err ? '<div class="mac-err">Non succede niente… (−' + E.mins(E.costs(g).mac) + ')</div>' : '') + (s.ok ? '<div class="mac-ok">Funziona!</div>' : '') + body + '</div>' + closeBtn('Chiudi');
 }
 function tape(v, m) {
   var tbl = {}; (m.table || []).forEach(function (r) { tbl[r[1]] = r[0]; });
@@ -101,17 +120,24 @@ function mzAdd(k) {
   document.addEventListener('pointerdown', function (e) { if (e.target.closest('#tkey')) { t0 = Date.now(); e.target.closest('#tkey').classList.add('down'); } });
   document.addEventListener('pointerup', function (e) { var k = document.getElementById('tkey'); if (!k || !t0) return; k.classList.remove('down'); var d = Date.now() - t0; t0 = 0; if (App.mac) mzAdd(d < 230 ? '.' : '-'); });
 })();
-function macValue(g, id) { var m = E.card(g, id).mac, V = App.mac.v; return m.type === 'dials' ? V.join('') : m.type === 'morse' ? V.trim() : V; }
+function macValue(g, id) { var m = E.card(g, id).mac, V = App.mac.v; return m.type === 'dials' ? V.join('') : m.type === 'morse' ? V.trim() : m.type === 'seq' ? V.map(function (k) { return m.opts[k].v || m.opts[k].l; }).join(' ') : V; }
 
 /* ---------- fine dell'avventura ---------- */
 function overBody(g, me) {
-  var S = SCN.get(g.scen), used = g.endEl, rem = g.limit * 1000 - g.endEl - g.pen * 1000, st = '';
+  var S = SCN.get(g.scen), used = g.endEl, rem = g.limit * 1000 - g.endEl - g.pen * 1000, st = '', isHost = App.doc.host === Net.uid;
+  var errs = g.tries.miss + g.tries.code + g.tries.mac + (g.tries.search || 0);
+  if (g.lost) {
+    var f = g.found || { seen: Object.keys(g.st).length, tot: Object.keys(S.cards).length };
+    return '<div class="over lost"><div class="ov-card lost">' + ART.card(g.scen, 'start', { text: false }) + '<span class="ov-lock">' + IC('key') + '</span></div>' +
+      '<div class="kicker">' + esc(S.name) + '</div><h2>Tempo scaduto!</h2><p class="lead">Siete rimasti chiusi dentro. L’avventura va ricominciata <b>da capo</b>: tutte le carte tornano coperte e il timer riparte da ' + S.min + ' minuti.</p>' +
+      '<div class="ostats"><span><b>' + f.seen + ' / ' + f.tot + '</b>carte scoperte</span><span><b>' + Game.mmss(g.pen) + '</b>penalità</span><span><b>' + g.hintN + '</b>indizi</span><span><b>' + errs + '</b>tentativi a vuoto</span></div>' +
+      Score.endHTML(App.doc) + (isHost ? '<button class="btn block" data-act="restart">' + IC('back') + ' Ricomincia da capo</button><button class="btn ghost block" data-act="rematch">Scegli un’altra avventura</button>' : '<p class="lead">L’host può farvi ripartire da capo o scegliere un’altra avventura.</p>') + closeBtn('Guarda il tavolo') + '</div>';
+  }
   for (var i = 0; i < 5; i++) st += '<span class="st' + (i < g.stars ? ' on' : '') + '" style="animation-delay:' + (.5 + i * .35) + 's">' + IC('star') + '</span>';
-  var errs = g.tries.miss + g.tries.code + g.tries.mac;
   return '<div class="over"><div class="ov-card">' + ART.card(g.scen, Object.keys(S.cards).filter(function (k) { return S.cards[k].k === 'end'; })[0], { text: false }) + '</div>' +
-    '<div class="kicker">' + esc(S.name) + '</div><h2>' + (rem >= 0 ? 'Ce l’avete fatta!' : 'Usciti… fuori tempo!') + '</h2><div class="stars">' + st + '</div>' +
-    '<div class="ostats"><span><b>' + Game.mmss(Math.round(used / 1000)) + '</b>tempo di gioco</span><span><b>' + (rem >= 0 ? Game.fmt(rem) : Game.fmt(rem)) + '</b>' + (rem >= 0 ? 'tempo avanzato' : 'oltre il limite') + '</span><span><b>' + Game.mmss(g.pen) + '</b>penalità</span><span><b>' + g.hintN + '</b>indizi</span><span><b>' + errs + '</b>tentativi a vuoto</span></div>' +
-    Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Scegli un’altra avventura</button>' : '<p class="lead">L’host può scegliere la prossima avventura.</p>') + closeBtn('Guarda il tavolo') + '</div>';
+    '<div class="kicker">' + esc(S.name) + '</div><h2>Ce l’avete fatta!</h2><div class="stars">' + st + '</div>' +
+    '<div class="ostats"><span><b>' + Game.mmss(Math.round(used / 1000)) + '</b>tempo di gioco</span><span><b>' + Game.fmt(rem) + '</b>tempo avanzato</span><span><b>' + Game.mmss(g.pen) + '</b>penalità</span><span><b>' + g.hintN + '</b>indizi</span><span><b>' + errs + '</b>tentativi a vuoto</span></div>' +
+    Score.endHTML(App.doc) + (isHost ? '<button class="btn block" data-act="rematch">Scegli un’altra avventura</button>' : '<p class="lead">L’host può scegliere la prossima avventura.</p>') + closeBtn('Guarda il tavolo') + '</div>';
 }
 function introBody(s) {
   var pages = [
@@ -191,7 +217,12 @@ document.addEventListener('click', function (ev) {
     case 'hint': App.hintAsk = null; act({ a: 'hint', id: id, lvl: +el.getAttribute('data-l') }); break;
     // lucchetti
     case 'code': App.codeIn = ''; App.sheet = { kind: 'code', id: id }; renderSheet(); break;
-    case 'kp': if (App.codeIn.length < 4) { App.codeIn += el.getAttribute('data-k'); Sound.play('key'); if (s.err) { s.err = 0; renderSheet(); } else paintLcd(); } break;
+    case 'search': if (!g || g.phase !== 'play' || me < 0) return; App.codeIn = ''; App.sheet = { kind: 'search' }; renderSheet(); break;
+    case 'srok': if (!App.codeIn) { toast('Scrivi il numero della carta.'); Sound.play('error'); break; } act({ a: 'search', id: App.codeIn }); break;
+    case 'restart': App.sheet = null; App.sheetKey = null; App.view = null; App.sel = null; send({ t: 'restart' }); break;
+    case 'sq': { var mq = E.card(g, s.id).mac; if (App.mac.v.length < (mq.len || 4)) { App.mac.v.push(+el.getAttribute('data-k')); Sound.play('seq', { k: +el.getAttribute('data-k') }); renderSheet(); } break; }
+    case 'sqdel': App.mac.v = []; Sound.play('dial'); renderSheet(); break;
+    case 'kp': if (App.codeIn.length < (s && s.kind === 'search' ? 2 : 4)) { App.codeIn += el.getAttribute('data-k'); Sound.play('key'); if (s.err) { s.err = 0; renderSheet(); } else paintLcd(); } break;
     case 'kpdel': App.codeIn = App.codeIn.slice(0, -1); Sound.play('key'); paintLcd(); break;
     case 'kpok': if (App.codeIn.length !== 4) { toast('Servono 4 cifre.'); Sound.play('error'); break; } act({ a: 'code', id: s.id, v: App.codeIn }); break;
     // macchine
@@ -218,10 +249,12 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);
   if (e.key === 'Escape') { if (App.sheet && App.sheet.kind !== 'intro') { App.sheet = null; renderSheet(); } else if (App.view) Game.closeView(); else if (App.sel) { App.sel = null; Game.render(); } }
   var s = App.sheet;
-  if (s && s.kind === 'code' && !/INPUT|TEXTAREA/.test((e.target && e.target.tagName) || '')) {
-    if (/^\d$/.test(e.key) && App.codeIn.length < 4) { App.codeIn += e.key; Sound.play('key'); paintLcd(); }
+  if (s && (s.kind === 'code' || s.kind === 'search') && !/INPUT|TEXTAREA/.test((e.target && e.target.tagName) || '')) {
+    var mx = s.kind === 'search' ? 2 : 4;
+    if (/^\d$/.test(e.key) && App.codeIn.length < mx) { App.codeIn += e.key; Sound.play('key'); paintLcd(); }
     else if (e.key === 'Backspace') { App.codeIn = App.codeIn.slice(0, -1); paintLcd(); }
-    else if (e.key === 'Enter' && App.codeIn.length === 4) act({ a: 'code', id: s.id, v: App.codeIn });
+    else if (e.key === 'Enter' && s.kind === 'code' && App.codeIn.length === 4) act({ a: 'code', id: s.id, v: App.codeIn });
+    else if (e.key === 'Enter' && s.kind === 'search' && App.codeIn) act({ a: 'search', id: App.codeIn });
   }
   if (App.view && !App.sheet && G()) { if (e.key === 'ArrowLeft') Game.step(-1); if (e.key === 'ArrowRight') Game.step(1); }
 });

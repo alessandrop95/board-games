@@ -111,15 +111,34 @@ Escape room cooperativa in carte, da 1 a 6 giocatori, ognuno dal proprio telefon
 **Gioca:** https://alessandrop95.github.io/board-games/unlock/
 
 - Le regole sono quelle di Unlock!: carte numerate da scoprire quando il loro numero compare su una carta in tavola (anche nascosto nei disegni), carte **rosse + blu** da unire sommando i numeri, modificatori «+N», macchine (carte verdi) da far funzionare, lucchetti con codici di 4 cifre (carte gialle), carte da scartare, penalità di tempo, indizi e soluzioni per ogni carta, pausa e valutazione da 1 a 5 stelle.
-- Le avventure sono **originali** (storie, enigmi e disegni creati da zero, non quelle delle scatole ufficiali): «La soffitta del nonno» (tutorial, 10 minuti) e «Abisso» (60 minuti, a bordo di un sottomarino in avaria). Il motore è pronto per aggiungerne altre.
+- Le avventure sono **originali** (storie, enigmi e disegni creati da zero, non quelle delle scatole ufficiali), con difficoltà da 1 a 4:
+  - «La soffitta del nonno» (1/4, tutorial, 10 minuti);
+  - «Abisso» (2/4, 60 minuti, a bordo di un sottomarino in avaria);
+  - «Espresso di Mezzanotte» (3/4, 60 minuti): un treno del 1928 lanciato verso un viadotto crollato. Indizi da incrociare tra più carte (registro, biglietto, porte), un’incisione da leggere allo specchio, comandi in tedesco da tradurre; **solo 2 indizi** in tutta l’avventura, che costano anche tempo;
+  - «La tomba di Neferka» (4/4, **estremo**, 60 minuti): sepolti in una tomba egizia. Numeri egizi da decifrare, il nome del re da scrivere in geroglifici, stelle da allineare, trappole; **un solo indizio**, errori e ricerche a vuoto che costano 2–4 minuti.
+- **Numeri da calcolare** (livelli 3 e 4): alcune carte non hanno un numero da toccare, si deduce dagli indizi e si cerca con **Cerca**. Una ricerca a vuoto costa tempo.
+- **Tempo scaduto = avventura persa**: allo zero (anche per colpa di una penalità) il gioco si ferma per tutti e l’host fa **ricominciare da capo**, con tutte le carte di nuovo coperte e il timer pieno.
 - Carte illustrate e animate (bolle, luci d’emergenza, pesci, polvere), carte che si girano quando escono, unioni che si scontrano, lucchetti che si aprono, schermo rosso per le penalità, timer che batte negli ultimi secondi.
 - Ognuno vede le stesse carte ma può guardarne una diversa: sotto ogni carta compare chi la sta guardando, e con «Segnala» la si fa lampeggiare sugli altri telefoni.
 - Partita guidata: il tutorial da soli, con il passo consigliato sempre a portata di dito.
+
+## Skyjo
+
+Il gioco di carte delle griglie, da 2 a 8 giocatori, con le regole ufficiali. Grafica originale.
+
+**Gioca:** https://alessandrop95.github.io/board-games/skyjo/
+
+- 150 carte da −2 a 12, colorate per fasce (notte, nuvole, colline, sole, temporale). Ognuno ha 12 carte coperte in 3 righe × 4 colonne e all’inizio di ogni manche ne scopre 2 (tutti insieme); nella prima manche comincia chi ha la somma più alta, poi chi ha chiuso la manche prima.
+- Nel turno: prendi la carta degli scarti e mettila al posto di una tua, oppure pesca dal mazzo e tienila o scartala scoprendo una carta coperta. Tre carte scoperte uguali in colonna spariscono.
+- Chi scopre tutte le carte chiude: gli altri giocano un ultimo turno. Se chi ha chiuso non ha il punteggio più basso (da solo), i suoi punti positivi raddoppiano. La partita finisce a 100 punti (l’host può scegliere 50 o 150): vince il totale più basso.
+- Tavolo animato: carte che volano dal mazzo e dagli scarti e si girano in 3D, colonne che brillano ed esplodono verso gli scarti, il cielo che cambia a ogni manche (alba, giorno, tramonto, notte), punti della manche con il timbro del raddoppio, podio e segnapunti a fine partita.
+- Presentazione alla prima partita, «?» su ogni fase, regole complete con esempi, giocatori automatici che inseguono le colonne ed evitano di chiudere quando rischiano il raddoppio.
 
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).
 - Il pulsante con l'altoparlante accende o spegne separatamente musica ed effetti; la scelta resta salvata sul telefono.
+- Skyjo usa per ora tre brani già presenti nel sito («Carefree», «Fluffing a Duck», «Enchanted Valley»).
 - Musica di Kevin MacLeod (incompetech.com, CC BY 3.0) e «Maple Leaf Rag» suonata da Scott Joplin (1916, pubblico dominio); suoni registrati da Wikimedia Commons (pubblico dominio, CC0, CC BY-SA); gli altri effetti sono sintetizzati nel browser. Originali in `*/audio/src/`, conversione con `tools/process_audio.sh`.
 
 ## Installare i giochi sul telefono

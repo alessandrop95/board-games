@@ -105,7 +105,7 @@ with sync_playwright() as p:
     ok('l’host resta Ale', A.evaluate('Net.isHost'))
 
     # 5) gli altri giochi aprono la stessa scelta
-    for path in ['polvere-e-piombo/', 'presagio/', 'campi-acciaio/', 'binari-italia/', 'catan/', 'machiavelli/', 'unlock/']:
+    for path in ['polvere-e-piombo/', 'presagio/', 'campi-acciaio/', 'binari-italia/', 'catan/', 'machiavelli/', 'unlock/', 'skyjo/']:
         G = page(path); table(G, 'Ale')
         if path != 'unlock/': G.click('[data-act=addbot]'); G.wait_for_timeout(600)   # Unlock! è cooperativo: niente automatici
         esci(G); s = sheet(G)

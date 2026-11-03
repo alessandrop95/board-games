@@ -27,6 +27,8 @@
       tick: function () { click(0); },
       beat: function () { S.tone({ f: [70, 45], type: 'sine', dur: .14, vol: .3 }); S.tone({ f: [70, 45], type: 'sine', dur: .14, vol: .22, at: .2 }); },
       pause: function () { S.tone({ f: [N.C5, N.G4], type: 'triangle', dur: .3, vol: .1 }); },
+      timeout: function () { for (var i = 0; i < 6; i++) S.tone({ f: [660, 440], type: 'square', dur: .28, vol: .08, lp: 1800, at: i * .34 }); clunk(0, .4); clunk(.9, .4); S.tone({ f: [110, 40], type: 'sawtooth', dur: 2.2, vol: .12, lp: 500, at: .3 }); S.duck && S.duck(3500); },
+      seq: function (o) { click(0); S.tone({ f: [300 + ((o && o.k) || 0) * 90, 260 + ((o && o.k) || 0) * 90], type: 'triangle', dur: .1, vol: .08 }); },
       win: function () { S.arp([N.C5, N.E5, N.G5, N.C6, N.E6], { type: 'triangle', step: .12, dur: .6, vol: .15 }); S.arp([N.C6, N.G6, N.C7], { bell: true, step: .18, dur: 1.6, vol: .08, at: .7 }); },
       star: function (o) { S.bell({ f: [N.C6, N.D6, N.E6, N.G6, N.C7][Math.min(4, (o && o.i) || 0)], dur: .9, vol: .1 }); }
     }

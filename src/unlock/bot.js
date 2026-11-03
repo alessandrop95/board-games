@@ -3,7 +3,7 @@
 var UBot = (function () {
   var E = typeof UEngine !== 'undefined' ? UEngine : require('./engine.js');
   function result(g, s) {
-    if (s.a === 'reveal') return s.id;
+    if (s.a === 'reveal' || s.a === 'search') return s.id;
     if (s.a === 'combine') { var m = E.combo(g, s.r, s.b); return m && m.to; }
     var c = E.card(g, s.id); return s.a === 'code' ? c.code.to : c.mac.to;
   }
@@ -22,6 +22,7 @@ var UBot = (function () {
     var s = next(g); if (!s) return null;
     if (s.a === 'reveal') { var src = E.table(g).filter(function (t) { var c = E.card(g, t); return (c.refs || []).indexOf(s.id) >= 0 || (c.hid || []).indexOf(s.id) >= 0; })[0]; return { step: s, card: src || s.id }; }
     if (s.a === 'combine') return { step: s, card: s.r };
+    if (s.a === 'search') { var cc = E.table(g).filter(function (t) { return (E.card(g, t).calc || []).indexOf(s.id) >= 0; })[0]; return { step: s, card: cc || 'start' }; }
     return { step: s, card: s.id };
   }
   return { decide: decide, next: next, focus: focus, result: result };

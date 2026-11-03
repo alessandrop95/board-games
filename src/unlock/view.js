@@ -4,7 +4,7 @@ var Game = (function () {
   function el(id) { return document.getElementById(id); }
   function setHTML(id, h) { var e = el(id); if (e && e._h !== h) { e.innerHTML = h; e._h = h; } }
   function sid() { return G().scen; }
-  function fmt(ms) { var neg = ms < 0, s = neg ? Math.floor(-ms / 1000) : Math.ceil(ms / 1000), m = Math.floor(s / 60); return (neg ? '+' : '') + (m < 10 ? '0' : '') + m + ':' + ('0' + s % 60).slice(-2); }
+  function fmt(ms) { if (ms < 0) ms = 0; var neg = ms < 0, s = neg ? Math.floor(-ms / 1000) : Math.ceil(ms / 1000), m = Math.floor(s / 60); return (neg ? '+' : '') + (m < 10 ? '0' : '') + m + ':' + ('0' + s % 60).slice(-2); }
   function mmss(sec) { var m = Math.floor(sec / 60); return m + ':' + ('0' + Math.round(sec % 60)).slice(-2); }
   function card(id) { return E.card(G(), id); }
   function order(g) {
@@ -49,7 +49,7 @@ var Game = (function () {
     return '<div class="timer" id="timer"><span class="t-ic">' + IC('clock') + '</span><b id="tdig">--:--</b>' + (g.paused ? '<span class="t-p">IN PAUSA</span>' : '') + '</div>' +
       '<div class="hud-pen' + (g.pen ? '' : ' zero') + '" title="Penalità">−' + mmss(g.pen) + '</div>' +
       '<div class="team">' + team + '</div>' +
-      '<button class="hbtn" data-act="hints" aria-label="Indizi usati">' + IC('hint') + '<b>' + g.hintN + '</b></button>' +
+      (E.hintsLeft(g) == null ? '<button class="hbtn" data-act="hints" aria-label="Indizi usati">' + IC('hint') + '<b>' + g.hintN + '</b></button>' : '<button class="hbtn' + (E.hintsLeft(g) ? '' : ' none') + '" data-act="hints" aria-label="Indizi rimasti">' + IC('hint') + '<b>' + E.hintsLeft(g) + '/' + SCN.get(g.scen).hintMax + '</b></button>') +
       (g.phase === 'play' && me >= 0 ? '<button class="hbtn" data-act="pause" aria-label="' + (g.paused ? 'Riprendi' : 'Pausa') + '">' + IC(g.paused ? 'play' : 'pause') + '</button>' : '');
   }
   function tick() {
@@ -63,7 +63,7 @@ var Game = (function () {
       lastSec = sec;
       if (sec > 0 && sec <= 60) Sound.play(sec <= 10 ? 'beat' : 'tick');
       var key = App.code + (App.doc.gid || '');
-      [[600, 'Mancano 10 minuti!'], [300, 'Mancano 5 minuti!'], [60, 'Ultimo minuto!'], [0, 'Tempo scaduto! Continuate: si può ancora uscire.']].forEach(function (w) {
+      [[600, 'Mancano 10 minuti!'], [300, 'Mancano 5 minuti!'], [60, 'Ultimo minuto!']].forEach(function (w) {
         if (g.limit > w[0] && sec <= w[0] && sec > w[0] - 3 && !warned[key + w[0]]) { warned[key + w[0]] = 1; banner(w[1], w[0] ? 'warn' : 'bad'); Sound.play('beat'); }
         if (sec <= w[0] - 3) warned[key + w[0]] = 1;
       });
@@ -103,9 +103,9 @@ var Game = (function () {
       return '<div class="comb"><div class="comb-row">' + slot(g, 'r') + '<span class="op">+</span>' + slot(g, 'b') + '<span class="op">=</span><span class="slot res">' + (ok ? '<b>' + (+App.sel.r + +String(App.sel.b).replace('+', '')) + '</b>' : '<i>?</i>') + '</span></div>' +
         (mods.length ? '<div class="comb-mods">Modificatori: ' + mods.map(function (m) { return '<button class="modchip' + (App.sel.b === '+' + m.v ? ' on' : '') + '" data-act="modsel" data-v="+' + m.v + '">+' + m.v + '</button>'; }).join('') + '</div>' : '') +
         '<div class="comb-acts"><button class="ab" data-act="combx">' + IC('x') + '<span>Annulla</span></button><button class="ab pri' + (ok ? '' : ' off') + '" data-act="combgo"' + (ok ? '' : ' aria-disabled="true"') + '>' + IC('combine') + '<span>Unisci!</span></button></div>' +
-        '<p class="comb-tip">' + (ok ? 'Una unione che non porta a nulla costa 1 minuto.' : 'Tocca una carta <b class="cr">rossa</b> e una <b class="cb">blu</b> sul tavolo.') + '</p></div>';
+        '<p class="comb-tip">' + (ok ? 'Una unione che non porta a nulla costa ' + E.mins(E.costs(g).miss) + '.' : 'Tocca una carta <b class="cr">rossa</b> e una <b class="cb">blu</b> sul tavolo.') + '</p></div>';
     }
-    return '<button class="ab pri" data-act="comb">' + IC('combine') + '<span>Unisci</span></button><button class="ab" data-act="gone">' + IC('trash') + '<span>Scartate</span></button><button class="ab" data-act="log">' + IC('log') + '<span>Racconto</span></button>';
+    return '<button class="ab pri" data-act="comb">' + IC('combine') + '<span>Unisci</span></button>' + (SCN.get(g.scen).search ? '<button class="ab" data-act="search">' + IC('eye') + '<span>Cerca</span></button>' : '') + '<button class="ab" data-act="gone">' + IC('trash') + '<span>Scartate</span></button><button class="ab" data-act="log">' + IC('log') + '<span>Racconto</span></button>';
   }
 
   /* ---------- la carta in grande ---------- */
@@ -160,7 +160,8 @@ var Game = (function () {
     if (c.h && !gone) {
       var lv = g.hints[id] || 0;
       h += '<div class="vw-hints">' + (lv >= 1 ? '<div class="hint h1"><b>' + IC('hint') + ' Indizio</b>' + c.h[0] + '</div>' : '') + (lv >= 2 ? '<div class="hint h2"><b>' + IC('key') + ' Soluzione</b>' + c.h[1] + '</div>' : '') +
-        (mine && lv < 2 ? (App.hintAsk === id + ':' + (lv + 1) ? '<button class="btn small yellow" data-act="hint" data-id="' + id + '" data-l="' + (lv + 1) + '">Sicuro? ' + (lv ? 'Mostra la soluzione' : 'Mostra l’indizio') + ' (toglie stelle)</button>' : '<button class="btn ghost small" data-act="hintask" data-id="' + id + '" data-l="' + (lv + 1) + '">' + IC('hint') + (lv ? ' Mostra la soluzione' : ' Chiedi un indizio') + '</button>') : '') + '</div>';
+        (mine && lv < 2 && E.hintsLeft(g) === 0 ? '<button class="btn ghost small" disabled>' + IC('hint') + ' Indizi finiti</button>' : '') +
+        (mine && lv < 2 && E.hintsLeft(g) !== 0 ? (App.hintAsk === id + ':' + (lv + 1) ? '<button class="btn small yellow" data-act="hint" data-id="' + id + '" data-l="' + (lv + 1) + '">Sicuro? ' + (lv ? 'Mostra la soluzione' : 'Mostra l’indizio') + ' (' + (function () { var hc = lv ? E.costs(g).sol : E.costs(g).hint; return hc ? '−' + E.mins(hc) + ' e meno stelle' : 'toglie stelle'; })() + ')</button>' : '<button class="btn ghost small" data-act="hintask" data-id="' + id + '" data-l="' + (lv + 1) + '">' + IC('hint') + (lv ? ' Mostra la soluzione' : ' Chiedi un indizio') + '</button>') : '') + '</div>';
     }
     var lk = looksOn(g, id, me());
     if (lk.length) h += '<p class="vw-look">' + lk.map(function (q) { return pname(g, q); }).join(', ') + (lk.length > 1 ? ' stanno' : ' sta') + ' guardando questa carta.</p>';
@@ -211,6 +212,7 @@ var Game = (function () {
   }
   function revealAnim(g, e, mine) {
     var id = e.id, c = E.card(g, id);
+    if (Q.length > 3 && c.k !== 'end') return;   // tante carte insieme: niente coda infinita di animazioni
     enqueue(function (done) {
       overlay('ov-rev k-' + c.k, '<div class="rv-burst"></div><div class="rv-flip"><div class="rv-face rv-b">' + ART.back(g.scen) + '</div><div class="rv-face rv-f">' + ART.card(g.scen, id, {}) + '</div></div>' +
         '<div class="rv-cap">' + (c.k === 'room' ? 'Nuova stanza!' : c.k === 'end' ? 'Ce l’avete fatta!' : 'Nuova carta!') + '<small>tocca per continuare</small></div>', c.k === 'end' ? 2600 : Q.length ? 1000 : 1900, done,
@@ -235,31 +237,37 @@ var Game = (function () {
         }
         case 'combo': {
           Sound.play('combo');
-          if (by) enqueue(function (done) {
+          if (by && Q.length <= 3) enqueue(function (done) {
             var b = e.b.charAt(0) === '+' ? '<span class="cb-mod">' + e.b + '</span>' : '<span class="cb-c">' + thumb(e.b) + '</span>';
             overlay('ov-comb', '<div class="cb-row"><span class="cb-c l">' + thumb(e.r) + '</span><span class="cb-plus">+</span>' + b.replace('cb-c', 'cb-c r') + '</div><div class="cb-eq">' + e.r + ' + ' + e.b.replace('+', '') + ' = <b>' + e.to + '</b></div>', 1100, done);
           });
           break;
         }
-        case 'miss': Sound.play('miss'); floatPen(e.s); toast((by ? 'Non succede niente' : who + ' ha provato a unire <b>' + e.r + '</b> e <b>' + e.b + '</b>: niente') + ' (−1 min).', 'bad'); if (by) { var bb = el('gv-bar'); if (bb) { bb.classList.remove('shake'); void bb.offsetWidth; bb.classList.add('shake'); } } break;
+        case 'miss': Sound.play('miss'); floatPen(e.s); toast((by ? 'Non succede niente' : who + ' ha provato a unire <b>' + e.r + '</b> e <b>' + e.b + '</b>: niente') + ' (−' + E.mins(e.s) + ').', 'bad'); if (by) { var bb = el('gv-bar'); if (bb) { bb.classList.remove('shake'); void bb.offsetWidth; bb.classList.add('shake'); } } break;
         case 'unlock':
           Sound.play('unlock');
-          if (by) { App.sheet = null; renderSheet(); enqueue(function (done) { overlay('ov-lock', lockSVG() + '<div class="rv-cap">Aperto!</div>', 900, done); }); }
+          if (by) { App.sheet = null; renderSheet(); if (Q.length <= 3) enqueue(function (done) { overlay('ov-lock', lockSVG() + '<div class="rv-cap">Aperto!</div>', 900, done); }); }
           else mini(g, e.id, who + ' ha aperto il lucchetto <b>' + esc(e.id) + '</b>!');
           break;
-        case 'wrong': Sound.play('wrong'); floatPen(e.s); if (by && App.sheet && App.sheet.kind === 'code') { App.sheet.err = Date.now(); App.codeIn = ''; renderSheet(); } else toast(who + ' ha provato un codice sbagliato su <b>' + e.id + '</b> (−2 min).', 'bad'); break;
+        case 'wrong': Sound.play('wrong'); floatPen(e.s); if (by && App.sheet && App.sheet.kind === 'code') { App.sheet.err = Date.now(); App.codeIn = ''; renderSheet(); } else toast(who + ' ha provato un codice sbagliato su <b>' + e.id + '</b> (−' + E.mins(e.s) + ').', 'bad'); break;
         case 'mac':
           Sound.play('mac');
           if (by && App.sheet && App.sheet.kind === 'mac') { App.sheet.ok = true; renderSheet(); enqueue(function (done) { setTimeout(function () { if (App.sheet && App.sheet.kind === 'mac') { App.sheet = null; renderSheet(); } done(); }, 900); }); }
           else if (!by) mini(g, e.id, who + ' ha fatto funzionare <b>' + esc(E.card(g, e.id).t) + '</b>!');
           break;
-        case 'macno': Sound.play('macno'); floatPen(e.s); if (by && App.sheet && App.sheet.kind === 'mac') { App.sheet.err = Date.now(); renderSheet(); } else toast(who + ' ha provato la macchina <b>' + e.id + '</b>: niente (−1 min).', 'bad'); break;
+        case 'macno': Sound.play('macno'); floatPen(e.s); if (by && App.sheet && App.sheet.kind === 'mac') { App.sheet.err = Date.now(); renderSheet(); } else toast(who + ' ha provato la macchina <b>' + e.id + '</b>: niente (−' + E.mins(e.s) + ').', 'bad'); break;
         case 'pen': {
           Sound.play('pen'); floatPen(e.m * 60);
           enqueue(function (done) { overlay('ov-pen', '<div class="pen-flash"></div><div class="pen-card">' + ART.card(g.scen, e.id, {}) + '</div><div class="pen-big">−' + e.m + ':00</div>', 2800, done); });
           break;
         }
-        case 'hint': Sound.play('hint'); if (!by) toast(who + (e.lvl === 2 ? ' ha guardato la soluzione per ' : ' ha chiesto un indizio per ') + '<b>' + esc(e.id) + '</b>.'); break;
+        case 'found': Sound.play('unlock'); if (by) { App.sheet = null; renderSheet(); } else mini(g, e.id, who + ' ha trovato la carta <b>' + esc(e.id) + '</b> cercandola!'); break;
+        case 'nosearch': Sound.play('miss'); floatPen(e.s); if (by && App.sheet && App.sheet.kind === 'search') { App.sheet.err = Date.now(); App.codeIn = ''; renderSheet(); } else toast(who + ' ha cercato la carta <b>' + esc(e.id) + '</b>: non esiste o non si può ancora trovare (−' + E.mins(e.s) + ').', 'bad'); break;
+        case 'timeout':
+          Sound.play('timeout'); App.view = null; App.sel = null; App.sheet = null; renderSheet();
+          enqueue(function (done) { overlay('ov-time', '<div class="tm-flash"></div><div class="tm-clock">00:00</div><div class="tm-big">Tempo scaduto!</div><div class="tm-sub">Siete rimasti chiusi dentro. Si ricomincia da capo.</div>', 3400, done, function () { App.sheet = { kind: 'over' }; renderSheet(); }); });
+          break;
+        case 'hint': Sound.play('hint'); if (e.s) floatPen(e.s); if (!by) toast(who + (e.lvl === 2 ? ' ha guardato la soluzione per ' : ' ha chiesto un indizio per ') + '<b>' + esc(e.id) + '</b>.'); break;
         case 'pause': Sound.play('pause'); toast(who + (e.on ? ' ha messo in pausa il tempo.' : ' ha fatto ripartire il tempo.')); break;
         case 'ping':
           if (!by) { Sound.play('ping'); pings[e.id] = { p: g.players[e.p].col, until: Date.now() + 6000 }; mini(g, e.id, who + ': «Guardate la carta <b>' + esc(e.id) + '</b>!»'); setTimeout(function () { if (App.screen === 'table') render(); }, 6100); }

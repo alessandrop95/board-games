@@ -590,6 +590,12 @@ var UArt = (function () {
     };
     return '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (I[n] || '') + '</svg>';
   }
-  return { defs: defs, art: art, card: card, back: back, icon: icon, KIND: KIND, scenes: SC, lanternfish: lanternfish, star: star, gauge: gauge, wheel: wheel, keypad: keypad };
+  // strumenti di disegno, per le avventure scritte in altri file (art2.js)
+  var K = { G: G, R: R, C: C, E: E, P: P, L: L, T: T, f: f, rnd: rnd, uid: uid, anim: anim, tag: tag, hid: hid, vig: vig, lamp: lamp, led: led, screw: screw, gauge: gauge, wheel: wheel, key: key, plaque: plaque, hazard: hazard, crack: crack, keypad: keypad, star: star, MONO: MONO, HAND: HAND, SANS: SANS };
+  var extraDefs = [];
+  function addDefs(s) { extraDefs.push(s); }
+  var baseDefs = defs;
+  defs = function () { return baseDefs() + (extraDefs.length ? '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>' + extraDefs.join('') + '</defs></svg>' : ''); };
+  return { defs: function () { return defs(); }, art: art, card: card, back: back, icon: icon, KIND: KIND, scenes: SC, lanternfish: lanternfish, star: star, gauge: gauge, wheel: wheel, keypad: keypad, K: K, addDefs: addDefs, lg: lg, rg: rg };
 })();
 if (typeof module !== 'undefined') module.exports = UArt;

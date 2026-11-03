@@ -106,4 +106,5 @@ o, e = q("select _game_ok('presagio')"); t('funzioni interne vietate all’app',
 o = admin("select _game_ok('catan'), _game_ok('scacchi')"); t('Catan è tra i giochi riconosciuti', o == 't|f', o)
 o = admin("select _game_ok('machiavelli')"); t('Machiavelli è tra i giochi riconosciuti', o == 't', o)
 o = admin("select _game_ok('unlock')"); t('Unlock! è tra i giochi riconosciuti', o == 't', o)
+o = admin("select _game_ok('skyjo')"); t('Skyjo è tra i giochi riconosciuti', o == 't', o)
 done()

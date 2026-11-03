@@ -92,15 +92,23 @@ def build_mc():
 
 def build_ul():
     ul = 'src/unlock/'
-    ul_js = "window.GAME_PREFIX = 'unlock/v1/';\n" + '\n'.join(r(ul, f) for f in ['scen.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ul, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    ul_js = "window.GAME_PREFIX = 'unlock/v1/';\n" + '\n'.join(r(ul, f) for f in ['scen.js', 'engine.js', 'bot.js', 'art.js', 'art2.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ul, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'unlock'), exist_ok=True)
     open(os.path.join(ROOT, 'unlock', 'index.html'), 'w', encoding='utf-8').write(page(
         'Unlock!', 'Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate i codici e uscite prima che scada il tempo. Da 1 a 6 giocatori, ognuno dal proprio telefono.', '#070d14',
         'family=Bungee&family=Nunito:wght@400;600;700;800;900&family=Share+Tech+Mono&family=Caveat:wght@600', r(ul, 'cards.css') + '\n' + r(ul, 'style.css'), ul_js, 'Unlock!'))
 
+def build_sk():
+    sk = 'src/skyjo/'
+    sk_js = "window.GAME_PREFIX = 'skyjo/v1/';\n" + '\n'.join(r(sk, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(sk, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'skyjo'), exist_ok=True)
+    open(os.path.join(ROOT, 'skyjo', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Skyjo', 'Il gioco di carte delle griglie: scambia, scopri, fai sparire le colonne uguali e chiudi la manche con meno punti di tutti. Da 2 a 8 giocatori, ognuno dal proprio telefono.', '#1c4ea8',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(sk, 'style.css'), sk_js, 'Skyjo'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

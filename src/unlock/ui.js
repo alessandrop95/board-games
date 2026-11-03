@@ -78,6 +78,13 @@ function tableReducer(doc, from, op) {
       doc.game = E.newGame(doc.seats.slice(), o, Date.now()); doc.game.hostId = Net.uid; doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
+    case 'restart': {   // tempo scaduto: stessa avventura, di nuovo da capo, con tutte le carte coperte
+      if (!isHost) return hostOnly;
+      if (!doc.game || doc.phase !== 'over') return { changed: false };
+      var ro = clone(doc.opts || {}); ro.scen = doc.game.scen;
+      var keep = doc.game.players.map(function (P) { return { uid: P.uid, nick: P.nick }; });
+      doc.game = E.newGame(keep, ro, Date.now()); doc.game.hostId = Net.uid; doc.phase = 'play'; doc.gid = null; return {};
+    }
     case 'act': {
       var g = doc.game; if (!g) return { err: 'La partita non è più disponibile.' };
       var p = -1; g.players.forEach(function (P, k) { if (P.uid === from) p = k; });
@@ -108,6 +115,12 @@ Net.setBeforePublish(function (doc) {
   Score.beforePublish(doc); doc.turnKey = null;
   if (doc.game && doc.phase === 'play') { Clock.adopt(doc.game); E.tick(doc.game, Date.now()); }
 });
+// tempo scaduto: lo decide l'host (ogni mezzo secondo controlla il suo orologio)
+setInterval(function () {
+  var d = App.doc; if (!Net.isHost || !d || !d.game || d.phase !== 'play' || d.game.paused) return;
+  if (E.remaining(d.game, Date.now()) > 0) return;
+  Net.hostApply(function (cur) { if (!cur || !cur.game || cur.phase !== 'play') return false; Clock.adopt(cur.game); if (!E.expire(cur.game, Date.now())) return false; cur.phase = 'over'; return true; });
+}, 500);
 // l'host ripubblica lo stato ogni tanto: chi è appena arrivato allinea il suo orologio a quello del tavolo
 setInterval(function () { var d = App.doc; if (Net.isHost && Net.connected && d && d.game && d.phase === 'play' && !d.game.paused) Net.hostApply(function (cur) { return !!(cur && cur.game && cur.phase === 'play'); }); }, 20000);
 Net.setLobbyInfo(function (d) { var S = SCN.get(scenOf(d)); return { max: MAXP, note: S.name + ' · ' + S.min + ' min' }; });
@@ -198,6 +211,7 @@ function onDoc() {
   var g = G(), me = myIdx();
   if (App.screen !== 'table') { Turns.watch(App.doc); paintCur(); return; }
   if (g) {
+    if (g.id && App.gameId !== g.id) { if (App.gameId) { App.view = null; App.sel = null; App.mac = null; App.sheet = null; Object.keys(Game.opened).forEach(function (k) { delete Game.opened[k]; }); App.lastFxN = 0; } App.gameId = g.id; }
     if (g.phase === 'over' && App.sheetKey !== 'over' + App.code + (App.doc.gid || '')) { App.sheetKey = 'over' + App.code + (App.doc.gid || ''); App.overAt = Date.now() + (App.seenFirstDoc ? 2600 : 0); }
     if (me >= 0 && !App.introShown) { App.introShown = true; if (!lsGet('ul-intro-done')) App.sheet = { kind: 'intro', page: 0 }; }
     Game.fx(g, me);
@@ -232,7 +246,7 @@ function scenRow(sid, on, pick) {
   var S = SCN.S[sid];
   return '<' + (pick ? 'button data-act="scen" data-s="' + sid + '"' : 'div') + ' class="scn' + (on ? ' on' : '') + '">' +
     '<span class="scn-art">' + ART.card(sid, 'start', { text: false, cls: 'thumb' }) + '</span>' +
-    '<span class="scn-txt"><span class="kicker">' + S.kicker + '</span><b>' + S.name + '</b><span class="scn-meta">' + IC('clock') + S.min + ' minuti · difficoltà ' + '<i class="lv">' + [1, 2, 3].map(function (k) { return '<em class="' + (k <= S.level ? 'on' : '') + '"></em>'; }).join('') + '</i></span><span class="scn-bl">' + S.blurb + '</span></span>' +
+    '<span class="scn-txt"><span class="kicker">' + S.kicker + '</span><b>' + S.name + '</b><span class="scn-meta">' + IC('clock') + S.min + ' minuti · difficoltà ' + '<i class="lv' + (S.level >= 4 ? ' x' : '') + '">' + [1, 2, 3, 4].map(function (k) { return '<em class="' + (k <= S.level ? 'on' : '') + '"></em>'; }).join('') + '</i> ' + S.level + '/4' + (S.level >= 4 ? ' <span class="lvx">estremo</span>' : '') + '</span><span class="scn-bl">' + S.blurb + '</span></span>' +
     (on ? '<span class="scn-ok">' + IC('star') + '</span>' : '') + '</' + (pick ? 'button' : 'div') + '>';
 }
 function lobbyHTML() {
@@ -245,7 +259,7 @@ function lobbyHTML() {
     (App.inviteCode ? '<button class="btn ghost small" data-act="noinvite">Apri invece un tavolo tuo</button>' : '') + '</section>' +
     '<section class="panel" style="order:-1"><h2>Tavoli aperti</h2>' + Lobby.panelHTML() + '<h3 class="muted" style="font-size:16px;margin:6px 0 0">I tuoi tavoli recenti</h3><div id="tlist" class="tables" style="display:grid;gap:8px">' + Lobby.recentRows() + '</div>' +
     '<div class="row"><button class="btn ghost small" data-act="rules">Regole</button>' + PWA.buttonHTML('btn ghost small') + '</div></section></div>' +
-    '<section class="panel"><h2>Le avventure</h2><div class="scns">' + SCN.ORDER.map(function (s) { return scenRow(s, false, false); }).join('') + '</div><p class="lead">Altre avventure arriveranno con i prossimi aggiornamenti.</p></section>' +
+    '<section class="panel"><h2>Le avventure</h2><div class="scns">' + SCN.ORDER.map(function (s) { return scenRow(s, false, false); }).join('') + '</div><p class="lead">Difficoltà da 1 a 4: più si sale, più gli enigmi sono intrecciati e più costano gli errori e gli indizi. Se il tempo finisce si ricomincia da capo.</p></section>' +
     '<section class="panel"><h2>Come si gioca, in 30 secondi</h2>' + RU.section('goal') + RU.section('combine') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';
 }
 Lobby.setRecentKey(KEY_RECENT);

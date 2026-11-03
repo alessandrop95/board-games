@@ -22,7 +22,7 @@ with sync_playwright() as p:
     def settle(P): idle(P); js(P, 'Game.closeView()'); P.wait_for_timeout(250)
 
     A = phone('Ale'); A.goto(U); A.wait_for_timeout(1000)
-    t('home del gioco', 'Unlock!' in A.inner_text('h1') and A.locator('.scn').count() == 2)
+    t('home del gioco', 'Unlock!' in A.inner_text('h1') and A.locator('.scn').count() == 4)
     A.click('[data-act=create]'); A.wait_for_function('App.doc && App.doc.code', timeout=15000); code = js(A, 'App.code')
     B = phone('Bea'); B.goto(U + '&t=' + code); B.wait_for_function('App.doc && App.doc.seats.length === 2', timeout=15000)
     A.wait_for_function('App.doc.seats.length === 2', timeout=10000)

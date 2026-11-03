@@ -15,7 +15,7 @@ SC.ORDER.forEach(function (sid) {
     var c = C[id];
     t(sid + ' ' + id + ': tipo valido', ['story', 'room', 'red', 'blue', 'green', 'yellow', 'grey', 'pen', 'end'].indexOf(c.k) >= 0, c.k);
     t(sid + ' ' + id + ': titolo e testo', c.t && c.x);
-    (c.refs || []).concat(c.hid || [], c.disc || []).forEach(function (r) { t(sid + ' ' + id + ': rimanda a una carta esistente (' + r + ')', !!C[r]); });
+    (c.refs || []).concat(c.hid || [], c.disc || [], c.calc || []).forEach(function (r) { t(sid + ' ' + id + ': rimanda a una carta esistente (' + r + ')', !!C[r]); });
     if (c.code) t(sid + ' ' + id + ': lucchetto giallo da 4 cifre verso una carta che esiste', c.k === 'yellow' && /^\d{4}$/.test(c.code.ans) && C[c.code.to] && (!c.code.need || C[c.code.need]));
     if (c.mac) t(sid + ' ' + id + ': macchina verde verso una carta che esiste', c.k === 'green' && C[c.mac.to] && (!c.mac.need || C[c.mac.need]));
     if (c.k === 'pen') t(sid + ' ' + id + ': penalità in minuti', c.pen > 0);
@@ -29,7 +29,7 @@ SC.ORDER.forEach(function (sid) {
   });
   // ogni carta può uscire in qualche modo
   var reach = {}; reach.start = 1;
-  ids.forEach(function (id) { var c = C[id]; (c.refs || []).concat(c.hid || []).forEach(function (r) { reach[r] = 1; }); if (c.code) reach[c.code.to] = 1; if (c.mac) reach[c.mac.to] = 1; });
+  ids.forEach(function (id) { var c = C[id]; (c.refs || []).concat(c.hid || [], c.calc || []).forEach(function (r) { reach[r] = 1; }); if (c.code) reach[c.code.to] = 1; if (c.mac) reach[c.mac.to] = 1; });
   S.combos.forEach(function (m) { reach[m.to] = 1; });
   t(sid + ': tutte le carte si possono scoprire', ids.every(function (i) { return reach[i]; }), ids.filter(function (i) { return !reach[i]; }));
   // numeri unici: nessuna carta ha due ruoli
@@ -43,6 +43,10 @@ SC.ORDER.forEach(function (sid) {
   t(sid + ': la soluzione arriva in fondo', g.phase === 'over' && g.won, [g.phase, B.next(g)]);
   t(sid + ': senza penalità né indizi: 5 stelle', g.pen === 0 && g.stars === (n * 20 > (S.min * 60 - S.min * 10) ? 4 : 5), [g.pen, g.stars, n]);
   t(sid + ': ogni passo usato davvero', n === S.solution.length, [n, S.solution.length]);
+  t(sid + ': livello da 1 a 4', S.level >= 1 && S.level <= 4);
+  // i numeri da calcolare non devono essere anche visibili (altrimenti non c'è niente da dedurre)
+  ids.forEach(function (id) { (C[id].calc || []).forEach(function (n) { t(sid + ' ' + n + ': numero da calcolare non scritto su nessuna carta', !ids.some(function (j) { return (C[j].refs || []).concat(C[j].hid || []).indexOf(n) >= 0; })); }); });
+  if (S.search) t(sid + ': c’è almeno un numero da cercare', ids.some(function (i) { return (C[i].calc || []).length; }));
 });
 
 // --- regole del motore sull'avventura Abisso ---
@@ -88,14 +92,47 @@ t('guardare una carta: niente effetti', (function () { var n = g.fxN; return A({
 function st(el, pen, h) { return E.stars({ limit: 3600, el: el * 60e3, pen: pen * 60, hintN: h }); }
 t('stelle: veloce e senza indizi 5', st(30, 0, 0) === 5);
 t('stelle: meno di 10 minuti rimasti 4', st(52, 0, 0) === 4 && st(45, 6, 0) === 4);
-t('stelle: oltre il tempo 2, molto oltre 1', st(65, 0, 0) === 2 && st(75, 0, 0) === 1);
-t('stelle: indizi tolgono stelle', st(30, 0, 3) === 4 && st(30, 0, 6) === 3 && st(75, 0, 9) === 1);
-// a tempo scaduto si continua
+t('stelle: indizi tolgono stelle', st(30, 0, 3) === 4 && st(30, 0, 6) === 3 && st(55, 0, 9) === 2);
+// a tempo scaduto si perde e si ricomincia da capo
 var g2 = E.newGame(seats(1), { scen: 'soffitta' }, T0);
 t('tutorial da 10 minuti', g2.limit === 600);
-E.act(g2, 0, { a: 'reveal', id: 'A' }, T0 + 700000);
-t('oltre lo zero si continua a giocare', E.remaining(g2, T0 + 700000) < 0 && g2.phase === 'play');
-t('dopo la fine niente azioni', (function () { g2.phase = 'over'; return E.act(g2, 0, { a: 'reveal', id: '11' }, T0 + 800000) !== null; })());
+t('prima dello zero si gioca', E.act(g2, 0, { a: 'reveal', id: 'A' }, T0 + 500000) === null && g2.phase === 'play');
+t('allo zero l’host chiude l’avventura: persa', E.expire(g2, T0 + 600001) && g2.phase === 'over' && g2.lost && !g2.won && g2.fx[g2.fx.length - 1].k === 'timeout');
+t('dopo la fine niente azioni', E.act(g2, 0, { a: 'reveal', id: '11' }, T0 + 800000) !== null);
+var g3 = E.newGame(seats(1), { scen: 'soffitta' }, T0);
+t('un’azione dopo lo zero non passa e chiude l’avventura', E.act(g3, 0, { a: 'reveal', id: 'A' }, T0 + 610000) !== null && g3.lost);
+var g4 = E.newGame(seats(1), { scen: 'soffitta' }, T0); E.act(g4, 0, { a: 'reveal', id: 'A' }, T0 + 1000); E.act(g4, 0, { a: 'reveal', id: '11' }, T0 + 2000); E.act(g4, 0, { a: 'reveal', id: '4' }, T0 + 3000); E.act(g4, 0, { a: 'reveal', id: '23' }, T0 + 4000);
+t('una penalità che porta a zero fa perdere subito', E.act(g4, 0, { a: 'combine', r: '23', b: '4' }, T0 + 9 * 60e3 + 30000) === null && g4.lost);
+t('in pausa il tempo non scade', (function () { var x = E.newGame(seats(1), { scen: 'soffitta' }, T0); E.act(x, 0, { a: 'pause', on: true }, T0 + 1000); return !E.expire(x, T0 + 3600e3) && x.phase === 'play'; })());
+t('ogni partita ha il suo numero (per ripartire da capo)', E.newGame(seats(1), { scen: 'soffitta' }, T0).id !== E.newGame(seats(1), { scen: 'soffitta' }, T0).id);
+
+// avventure difficili: costi più alti, numeri da cercare, indizi contati
+var tr = E.newGame(seats(2), { scen: 'treno' }, T0), nt = T0;
+function TA(a) { nt += 1000; return E.act(tr, 0, a, nt); }
+t('treno: livello 3, indizi contati (2)', SC.S.treno.level === 3 && SC.S.treno.hintMax === 2 && E.hintsLeft(tr) === 2);
+t('tomba: livello 4, un solo indizio', SC.S.tomba.level === 4 && SC.S.tomba.hintMax === 1 && E.hintsLeft(E.newGame(seats(1), { scen: 'tomba' }, T0)) === 1);
+t('le avventure facili non hanno limite di indizi', E.hintsLeft(g) === null);
+TA({ a: 'reveal', id: 'A' }); TA({ a: 'reveal', id: '21' });
+t('cerca: un numero visibile esce', TA({ a: 'search', id: '7' }) === null && E.onTable(tr, '7'));
+var p0 = tr.pen;
+t('cerca: la cabina senza il biglietto non si trova (−2 min)', TA({ a: 'search', id: '68' }) === null && !E.seen(tr, '68') && tr.pen === p0 + 120 && tr.tries.search === 1);
+TA({ a: 'reveal', id: '5' }); p0 = tr.pen;
+t('cerca: una cabina sbagliata costa tempo', TA({ a: 'search', id: '66' }) === null && tr.pen === p0 + 120);
+t('cerca: con il biglietto la cabina 68 esce', TA({ a: 'search', id: '68' }) === null && E.onTable(tr, '68'));
+t('cerca: numero non valido', TA({ a: 'search', id: 'abc' }) !== null && TA({ a: 'search', id: '120' }) !== null);
+p0 = tr.pen;
+TA({ a: 'reveal', id: '12' }); TA({ a: 'reveal', id: '4' }); p0 = tr.pen;
+t('treno: carta penalità −2 min', TA({ a: 'combine', r: '12', b: '4' }) === null && tr.st['16'] === 'gone' && tr.pen === p0 + 120);
+TA({ a: 'reveal', id: '23' }); p0 = tr.pen; t('treno: unione a vuoto −1 min', TA({ a: 'combine', r: '23', b: '7' }) === null && tr.pen === p0 + 60);
+p0 = tr.pen; TA({ a: 'reveal', id: '43' });
+t('treno: codice sbagliato −3 min', TA({ a: 'code', id: '43', v: '8162' }) === null && tr.pen === p0 + 180);
+p0 = tr.pen;
+t('treno: un indizio costa 1 minuto', TA({ a: 'hint', id: '43', lvl: 1 }) === null && tr.pen === p0 + 60 && E.hintsLeft(tr) === 1);
+t('treno: la soluzione costa 2 minuti e consuma il secondo indizio', TA({ a: 'hint', id: '43', lvl: 2 }) === null && tr.pen === p0 + 180 && E.hintsLeft(tr) === 0);
+t('treno: indizi finiti, niente più indizi', TA({ a: 'hint', id: '21', lvl: 1 }) !== null && !tr.hints['21'] && E.hintsLeft(tr) === 0);
+var tb = E.newGame(seats(1), { scen: 'tomba' }, T0); E.act(tb, 0, { a: 'reveal', id: 'A' }, T0 + 1000);
+t('tomba: il primo indizio costa 2 minuti', E.act(tb, 0, { a: 'hint', id: 'A', lvl: 1 }, T0 + 2000) === null && tb.pen === 120);
+t('tomba: dopo un indizio, basta', E.act(tb, 0, { a: 'hint', id: 'A', lvl: 2 }, T0 + 3000) !== null && tb.pen === 120 && tb.hints.A === 1);
 
 console.log('Unlock: ' + ok + ' prove superate, ' + ko + ' fallite');
 process.exit(ko ? 1 : 0);
