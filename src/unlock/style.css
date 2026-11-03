@@ -409,3 +409,22 @@ body[data-th="tomb"] { background: radial-gradient(120% 70% at 50% -10%, #5a3a14
 .sq-k:disabled { opacity: .45; cursor: default; transform: none; }
 .sq-k small { font: 700 10.5px var(--f-body); opacity: .85; letter-spacing: 0; }
 .mac.off .sq-keys { opacity: .35; filter: grayscale(.8); pointer-events: none; }
+/* scelte semplici (lucchetto delle carte, selettore della pista) */
+.chs.pl { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; width: 100%; }
+.chp { appearance: none; cursor: pointer; display: grid; justify-items: center; gap: 6px; padding: 10px 6px; border-radius: 14px; border: 2px solid var(--line-2); background: linear-gradient(#1c2a35, #0f1820); color: #fff; font: 800 13.5px var(--f-body); box-shadow: 0 4px 0 rgba(0, 0, 0, .45); transition: transform .15s var(--ease); }
+.chp:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .45); }
+.chp.on { border-color: var(--gold); background: linear-gradient(#3a3016, #1d180a); box-shadow: 0 0 0 1px var(--gold), 0 0 18px rgba(255, 207, 90, .35); }
+.chp .ch-ic { width: 46px; height: 60px; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .5)); }
+.chp.on .ch-ic { animation: pop .3s var(--ease); }
+.mac.off .chs.pl { opacity: .35; filter: grayscale(.8); pointer-events: none; }
+/* temi del teatro e della stazione polare */
+body[data-th="theatre"] { background: radial-gradient(120% 70% at 50% -10%, #5a0f1c, #120408 62%) fixed, #120408; }
+body[data-th="ice"] { background: radial-gradient(120% 70% at 50% -10%, #12385a, #030a14 62%) fixed, #030a14; }
+.gv.th-theatre { background: radial-gradient(100% 60% at 50% 0%, #6a1222, #120408 65%); }
+.gv.th-ice { background: radial-gradient(100% 60% at 50% 0%, #164266, #030a14 65%); }
+.gv.th-theatre::after { background: radial-gradient(50% 40% at 50% 0%, rgba(255, 230, 160, .2), transparent 70%); animation-name: torch; }
+.gv.th-ice::after { background: linear-gradient(170deg, transparent 10%, rgba(93, 255, 176, .1) 30%, rgba(123, 200, 255, .08) 45%, transparent 60%); animation: aurora 9s ease-in-out infinite alternate; }
+@keyframes aurora { 0% { opacity: .5; transform: translateX(-4%); } 100% { opacity: 1; transform: translateX(4%); } }
+.amb-theatre i { border: 0; width: calc(3px * var(--s)); height: calc(3px * var(--s)); background: rgba(255, 220, 140, .75); box-shadow: 0 0 6px rgba(255, 210, 120, .9); animation-name: amb-dust; }
+.amb-ice i { border: 0; width: calc(4px * var(--s)); height: calc(4px * var(--s)); background: rgba(255, 255, 255, .9); box-shadow: 0 0 6px #cde9fb; animation-name: amb-snow; }
+.chs.pl.n4 { grid-template-columns: repeat(2, 1fr); }

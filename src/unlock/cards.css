@@ -102,3 +102,11 @@
 @keyframes ua-sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
 .ua-pass { animation: ua-pass 2.2s linear infinite; }
 @keyframes ua-pass { from { transform: translateX(140px); } to { transform: translateX(-160px); } }
+.uc.t-theatre .uc-txt { background: linear-gradient(180deg, #fbf1e2, #ecd6b8); color: #2a1410; }
+.uc.t-ice .uc-txt { background: linear-gradient(180deg, #f2f8fc, #d6e6f0); color: #10202e; }
+.uc-back.t-theatre .uc-in { background: radial-gradient(circle at 50% 40%, #8a1424, #1c0408 70%); }
+.uc-back.t-ice .uc-in { background: radial-gradient(circle at 50% 40%, #1d4a6a, #030a14 70%); }
+.uc-txt .mono { font-family: 'Share Tech Mono', monospace; letter-spacing: .04em; }
+.uc-txt .nw { white-space: nowrap; }
+.uc-txt .mtab { display: grid; grid-template-columns: repeat(4, auto); gap: 1px 10px; justify-content: start; margin-top: 3px; font-family: 'Share Tech Mono', monospace; font-size: .95em; }
+.uc-txt .mtab span { white-space: nowrap; } .uc-txt .mtab b { color: #7a1a1a; }

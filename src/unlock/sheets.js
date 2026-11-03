@@ -82,7 +82,7 @@ function macBody(g, s) {
   var V = App.mac.v;
   if (m.type === 'dials') {
     body = '<div class="dials">' + m.labels.map(function (l, i) { return '<div class="dcol" style="--dc:' + m.cols[i] + '">' + dialSVG(i, V[i], m.cols[i]) + '<div class="drow"><button class="kk sm" data-act="dial" data-i="' + i + '" data-d="-1" aria-label="' + l + ' meno">−</button><b id="dv' + i + '">' + V[i] + '</b><button class="kk sm" data-act="dial" data-i="' + i + '" data-d="1" aria-label="' + l + ' più">+</button></div><span class="dlab">' + l + '</span></div>'; }).join('') + '</div>' +
-      '<p class="kp-msg">Gira i volantini (tocca la ruota o i tasti) fino alla pressione giusta, poi avvia.</p><button class="btn block green" data-act="mgo"' + (off ? ' disabled' : '') + '>' + IC('gear') + ' Avvia</button>';
+      '<p class="kp-msg">' + esc(m.tip || 'Gira i volantini (tocca la ruota o i tasti) fino alla pressione giusta, poi avvia.') + '</p><button class="btn block green" data-act="mgo"' + (off ? ' disabled' : '') + '>' + IC(m.go ? 'ping' : 'gear') + ' ' + esc(m.go || 'Avvia') + '</button>';
   } else if (m.type === 'morse') {
     body = '<div class="mz"><div class="mz-tape" id="mz-tape">' + tape(V, m) + '</div>' +
       '<div class="mz-keys"><button class="kk mz-k" data-act="mz" data-k="." aria-label="Punto">•</button><button class="kk mz-k" data-act="mz" data-k="-" aria-label="Linea">—</button><button class="kk fn" data-act="mz" data-k=" ">fine lettera</button><button class="kk fn" data-act="mzdel" aria-label="Cancella">⌫</button></div>' +
@@ -94,12 +94,27 @@ function macBody(g, s) {
       '<div class="sq-keys">' + m.opts.map(function (o, k) { return '<button class="sq-k" data-act="sq" data-k="' + k + '" style="--sc:' + (o.c || '#c9a24a') + '"' + (V2.length >= (m.len || 4) ? ' disabled' : '') + '>' + (o.ic ? '<span class="sq-ic">' + o.ic + '</span>' : '') + '<b>' + esc(o.l) + '</b>' + (o.s ? '<small>' + esc(o.s) + '</small>' : '') + '</button>'; }).join('') + '</div>' +
       '<div class="row" style="justify-content:space-between"><button class="btn ghost small" data-act="sqdel">' + IC('back') + ' Ricomincia la sequenza</button><span class="kp-msg">' + V2.length + ' / ' + (m.len || 4) + '</span></div>' +
       '<button class="btn block green" data-act="mgo"' + (off || V2.length < (m.len || 4) ? ' disabled' : '') + '>' + IC('gear') + ' ' + esc(m.go || 'Esegui') + '</button>';
+  } else if (m.type === 'choice' && m.plain) {
+    body = '<div class="chs pl' + (m.opts.length === 4 ? ' n4' : '') + '">' + m.opts.map(function (o, i) { return '<button class="chp' + (V === o ? ' on' : '') + '" data-act="mopt" data-v="' + esc(o) + '">' + chIcon(m, i) + '<b>' + esc(o) + '</b></button>'; }).join('') + '</div>' +
+      '<p class="kp-msg">' + esc(m.label || '') + '</p><button class="btn block green" data-act="mgo"' + (off || !V ? ' disabled' : '') + '>' + IC('play') + ' ' + esc(m.go || 'Conferma') + '</button>';
   } else if (m.type === 'choice') {
     body = '<div class="turn' + (V ? ' spin s' + V : '') + '"><div class="disc"></div></div><div class="chs">' + m.opts.map(function (o) { return '<button class="chb' + (V === o ? ' on' : '') + '" data-act="mopt" data-v="' + o + '"><b>' + o + '</b><span>' + m.unit + '</span></button>'; }).join('') + '</div>' +
       '<p class="kp-msg">' + esc(m.label || '') + '</p><button class="btn block green" data-act="mgo"' + (off || !V ? ' disabled' : '') + '>' + IC('play') + ' Fai partire</button>';
   }
   return '<div class="mac' + (err ? ' err' : '') + (s.ok ? ' ok' : '') + (off ? ' off' : '') + '"><div class="kp-head"><span class="kp-n g">' + esc(s.id) + '</span><b>' + esc(c.t) + '</b></div>' +
     (off ? '<div class="mac-off">' + esc(m.needMsg || 'Non funziona ancora.') + '</div>' : '') + (err ? '<div class="mac-err">Non succede niente… (−' + E.mins(E.costs(g).mac) + ')</div>' : '') + (s.ok ? '<div class="mac-ok">Funziona!</div>' : '') + body + '</div>' + closeBtn('Chiudi');
+}
+// icone delle scelte: carte da gioco in miniatura o testate della pista con la freccia
+function chIcon(m, i) {
+  var v = m.ic && m.ic[i]; if (v == null) return '';
+  if (m.icon === 'card') {
+    var r = String(v).slice(0, -1), su = String(v).slice(-1), red = su === '♥' || su === '♦';
+    return '<svg class="ch-ic" viewBox="0 0 40 56" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="53" rx="4" fill="#fbf7ec" stroke="#2a2a2a" stroke-width="1.5"/><g fill="' + (red ? '#c8261c' : '#1b1b1b') + '" font-family="Georgia,serif" font-weight="700"><text x="5" y="14" font-size="11">' + r + '</text><text x="5" y="24" font-size="10">' + su + '</text><text x="20" y="40" font-size="22" text-anchor="middle">' + su + '</text><text x="35" y="50" font-size="11" text-anchor="end">' + r + '</text></g></svg>';
+  }
+  if (m.icon === 'rwy') {
+    return '<svg class="ch-ic" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26" fill="#0d1a24" stroke="#5f7d92" stroke-width="1.5"/><text x="28" y="9" font-size="7" fill="#9fd3ff" text-anchor="middle" font-family="monospace" font-weight="700">N</text><g transform="rotate(' + v + ' 28 28)"><rect x="24" y="12" width="8" height="32" rx="1.5" fill="#3a4a56"/><path d="M28 6L35 17H21Z" fill="#ffd27a"/><g fill="#fff">' + [16, 22, 28, 34, 40].map(function (y) { return '<rect x="27.3" y="' + y + '" width="1.4" height="3"/>'; }).join('') + '</g></g></svg>';
+  }
+  return '';
 }
 function tape(v, m) {
   var tbl = {}; (m.table || []).forEach(function (r) { tbl[r[1]] = r[0]; });

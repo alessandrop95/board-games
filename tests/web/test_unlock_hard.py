@@ -21,7 +21,7 @@ with sync_playwright() as p:
     def act(P, a): js(P, "Net.send({t:'act',a:%s})" % json.dumps(a)); P.wait_for_timeout(250)
 
     A = phone('Ale'); A.goto(U); A.wait_for_timeout(1000)
-    t('quattro avventure, difficoltà su 4', A.locator('.scn').count() == 4 and '4/4' in A.inner_text('.scns') and 'estremo' in A.inner_text('.scns').lower())
+    t('sei avventure, difficoltà su 4', A.locator('.scn').count() == 6 and '4/4' in A.inner_text('.scns') and 'estremo' in A.inner_text('.scns').lower())
     A.click('[data-act=create]'); A.wait_for_function('App.doc && App.doc.code', timeout=15000); code = js(A, 'App.code')
     B = phone('Bea'); B.goto(U + '&t=' + code); B.wait_for_function('App.doc && App.doc.seats.length === 2', timeout=15000)
     click(A, '[data-act=scen][data-s=treno]'); B.wait_for_function("App.doc.opts.scen === 'treno'", timeout=10000)

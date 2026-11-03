@@ -41,7 +41,9 @@ var URules = (function () {
     adventures: ['Le avventure',
       '<p>La difficoltà va da <b>1 a 4</b>:</p><ul><li><b>La soffitta del nonno</b> (1/4, tutorial, 10 minuti) insegna tutte le regole in pochi passi.</li><li><b>Abisso</b> (2/4, 60 minuti): un sottomarino in avaria.</li>' +
       '<li><b>Espresso di Mezzanotte</b> (3/4, 60 minuti): un treno del 1928 lanciato verso un ponte crollato. Enigmi da incrociare tra più carte, numeri da calcolare, errori e indizi che costano di più.</li>' +
-      '<li><b>La tomba di Neferka</b> (4/4, estremo, 60 minuti): sepolti vivi in una tomba egizia. Geroglifici, numeri egizi, stelle e trappole; ogni errore costa caro.</li></ul>' +
+      '<li><b>Il teatro dell’illusionista</b> (3/4, 60 minuti): Milano 1908, un mago chiuso in una cassa che si riempie d’acqua. Carte segnate, luci di scena, un cifrario segreto e due numeri da trovare con Cerca.</li>' +
+      '<li><b>La tomba di Neferka</b> (4/4, estremo, 60 minuti): sepolti vivi in una tomba egizia. Geroglifici, numeri egizi, stelle e trappole; ogni errore costa caro.</li>' +
+      '<li><b>Stazione Polare</b> (4/4, estremo, 60 minuti): Svalbard 1958, un aereo nella tormenta che non vede la pista. Morse, una mappa che inganna, dati falsi, carburanti da non confondere e il vento da leggere.</li></ul>' +
       '<p class="muted">Le avventure di questa app sono originali: usano le regole del gioco Unlock!, ma storie, enigmi e disegni sono stati creati apposta.</p>']
   };
   var ORDER = ['goal', 'cards', 'reveal', 'combine', 'discard', 'mod', 'machine', 'code', 'search', 'pen', 'hint', 'time', 'team', 'adventures'];

@@ -92,7 +92,7 @@ def build_mc():
 
 def build_ul():
     ul = 'src/unlock/'
-    ul_js = "window.GAME_PREFIX = 'unlock/v1/';\n" + '\n'.join(r(ul, f) for f in ['scen.js', 'engine.js', 'bot.js', 'art.js', 'art2.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ul, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    ul_js = "window.GAME_PREFIX = 'unlock/v1/';\n" + '\n'.join(r(ul, f) for f in ['scen.js', 'engine.js', 'bot.js', 'art.js', 'art2.js', 'art3.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ul, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'unlock'), exist_ok=True)
     open(os.path.join(ROOT, 'unlock', 'index.html'), 'w', encoding='utf-8').write(page(
         'Unlock!', 'Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate i codici e uscite prima che scada il tempo. Da 1 a 6 giocatori, ognuno dal proprio telefono.', '#070d14',
