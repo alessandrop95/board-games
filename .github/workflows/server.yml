@@ -32,9 +32,10 @@ jobs:
           [ -n "$REF" ] || missing="$missing SUPABASE_PROJECT_REF"
           [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
           if [ -n "$missing" ]; then echo "::error::Mancano i segreti del repository:$missing. Vedi il README, sezione «Configurare il server»."; exit 1; fi
+      # versione fissa: la 3.0 (novembre 2026) ha cambiato i comandi (db push vuole --remote, conferme con --yes)
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
