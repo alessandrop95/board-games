@@ -106,9 +106,17 @@ def build_sk():
         'Skyjo', 'Il gioco di carte delle griglie: scambia, scopri, fai sparire le colonne uguali e chiudi la manche con meno punti di tutti. Da 2 a 8 giocatori, ognuno dal proprio telefono.', '#1c4ea8',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(sk, 'style.css'), sk_js, 'Skyjo'))
 
+def build_f7():
+    f7 = 'src/flip7/'
+    f7_js = "window.GAME_PREFIX = 'flip7/v1/';\n" + '\n'.join(r(f7, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(f7, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'flip7'), exist_ok=True)
+    open(os.path.join(ROOT, 'flip7', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Flip 7', 'Il gioco di carte dove si tenta la fortuna: pesca, fermati prima del doppione e prova a mettere in fila sette numeri diversi. Da 2 a 8 giocatori, ognuno dal proprio telefono.', '#24104f',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(f7, 'style.css'), f7_js, 'Flip 7'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

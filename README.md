@@ -136,6 +136,19 @@ Il gioco di carte delle griglie, da 2 a 8 giocatori, con le regole ufficiali. Gr
 - Tavolo animato: carte che volano dal mazzo e dagli scarti e si girano in 3D, colonne che brillano ed esplodono verso gli scarti, il cielo che cambia a ogni manche (alba, giorno, tramonto, notte), punti della manche con il timbro del raddoppio, podio e segnapunti a fine partita.
 - Presentazione alla prima partita, «?» su ogni fase, regole complete con esempi, giocatori automatici che inseguono le colonne ed evitano di chiudere quando rischiano il raddoppio.
 
+## Flip 7
+
+Il gioco di carte dove si tenta la fortuna, da 2 a 8 giocatori (dà il meglio da 3 in su), con le regole ufficiali. Grafica originale: un luna park di notte.
+
+**Gioca:** https://alessandrop95.github.io/board-games/flip7/
+
+- 94 carte: un solo 0 e tante copie quanto il valore da 1 a 12 (i puntini sotto il numero ricordano quante sono), i modificatori +2 +4 +6 +8 +10 e ×2, e tre copie di ognuna delle azioni Congela, Flip Three e Seconda possibilità.
+- A ogni manche il mazziere dà una carta scoperta a testa, poi a turno si sceglie PESCA o STOP. Un numero doppio fa sballare (zero punti), a meno di avere la Seconda possibilità. Sette numeri diversi: Flip 7, la manche finisce subito e valgono 15 punti in più. Le azioni si danno a chi si vuole tra chi è in gioco (Flip Three a catena, con le azioni pescate nel mezzo usate dopo).
+- Punti: somma dei numeri, ×2 sui numeri, poi i modificatori, poi +15 per il Flip 7. Le carte giocate non tornano nel mazzo finché non finisce. Si gioca fino a 200 punti (l’host può scegliere 100 o 300); a pari merito in testa si gioca un’altra manche.
+- Tavolo animato: ruota panoramica, lucine e fari sullo sfondo; carte che volano dal mazzo e si girano, le azioni che si fermano sotto il faretto e poi volano dal giocatore scelto, la fila che trema e il timbro «SBALLATO!», il ghiaccio di Congela, i fuochi d’artificio del Flip 7, i punti della manche che contano da zero, podio e segnapunti.
+- Indicatore del rischio di sballare (dalle carte rimaste nel mazzo), presentazione alla prima partita, «?» su ogni momento, regole complete con esempi, giocatori automatici che contano le carte e scelgono con cura a chi dare le azioni.
+- Flip 7 usa per ora tre brani già presenti nel sito.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).
