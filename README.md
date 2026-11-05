@@ -149,6 +149,20 @@ Il gioco di carte dove si tenta la fortuna, da 2 a 8 giocatori (dà il meglio da
 - Indicatore del rischio di sballare (dalle carte rimaste nel mazzo), presentazione alla prima partita, «?» su ogni momento, regole complete con esempi, giocatori automatici che contano le carte e scelgono con cura a chi dare le azioni.
 - Flip 7 usa per ora tre brani già presenti nel sito.
 
+## Citadels
+
+Il gioco dei personaggi segreti, da 4 a 7 giocatori (se siete in meno, i posti mancanti li prendono i giocatori automatici), con le regole ufficiali dell’edizione 2016. Grafica originale: una città medievale di notte, carte e ritratti disegnati da zero.
+
+**Gioca:** https://alessandrop95.github.io/board-games/citadels/
+
+- 8 personaggi (Assassino, Ladro, Mago, Re, Vescovo, Mercante, Architetto, Condottiero) e 68 quartieri: 54 base in quattro colori (nobili, religiosi, commerciali, militari) e 14 quartieri unici viola con il loro effetto (Porta del Drago, Fabbrica, Quartiere Infestato, Tesoro Imperiale, Mastio, Laboratorio, Biblioteca, Sala delle Mappe, Cava, Scuola di Magia, Fucina, Statua, Covo dei Ladri, Pozzo dei Desideri).
+- Ogni round: scelta segreta dei personaggi a giro (comincia chi ha la corona; scarti scoperti con 4 e 5 giocatori, uno coperto sempre, il Re mai scoperto, il settimo giocatore può prendere quello coperto), poi chiamata dall’1 all’8. Nel turno: 2 oro oppure 2 carte (se ne tiene una), un quartiere da costruire (tre per l’Architetto), il potere del personaggio e l’oro dei quartieri del suo colore.
+- Fine partita al round in cui una città arriva a 7 quartieri. Punti: costo dei quartieri, +3 per i cinque colori, +4 a chi completa per primo e +2 agli altri, bonus degli unici; a pari merito vince il personaggio più alto.
+- Istruzioni sempre chiare: la riga «Adesso» spiega cosa succede e cosa fare, con i passi del turno (① Risorse ② Costruisci ③ Potere) che si spuntano; la corte in alto mostra gli 8 personaggi con chi è di turno, chi ha già giocato, chi è stato scartato, ucciso o derubato; il registro delle ultime mosse; il «?» apre la regola giusta per ogni momento; la finestra di scelta del personaggio dice quanto oro renderebbe ciascuno con la propria città; avviso se si chiude il turno senza costruire.
+- Tavolo animato: la grande rivelazione del personaggio chiamato («Si chiama il 6… è Bea!»), il pugnale dell’Assassino, il sacco del Ladro, le monete che volano dal tesoro, le carte dal mazzo, i quartieri che si costruiscono nella città, l’esplosione del Condottiero, la corona che passa, i fuochi della città completa, la classifica con i punti voce per voce.
+- Presentazione alla prima partita, regole complete, giocatori automatici che scelgono il personaggio più utile, mirano Assassino e Ladro su chi è in testa e usano il Condottiero contro chi sta per completare la città.
+- Citadels usa per ora tre brani già presenti nel sito.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).

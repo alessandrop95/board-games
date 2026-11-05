@@ -108,4 +108,5 @@ o = admin("select _game_ok('machiavelli')"); t('Machiavelli è tra i giochi rico
 o = admin("select _game_ok('unlock')"); t('Unlock! è tra i giochi riconosciuti', o == 't', o)
 o = admin("select _game_ok('skyjo')"); t('Skyjo è tra i giochi riconosciuti', o == 't', o)
 o = admin("select _game_ok('flip7')"); t('Flip 7 è tra i giochi riconosciuti', o == 't', o)
+o = admin("select _game_ok('citadels')"); t('Citadels è tra i giochi riconosciuti', o == 't', o)
 done()

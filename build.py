@@ -114,9 +114,17 @@ def build_f7():
         'Flip 7', 'Il gioco di carte dove si tenta la fortuna: pesca, fermati prima del doppione e prova a mettere in fila sette numeri diversi. Da 2 a 8 giocatori, ognuno dal proprio telefono.', '#24104f',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(f7, 'style.css'), f7_js, 'Flip 7'))
 
+def build_cd():
+    cd = 'src/citadels/'
+    cd_js = "window.GAME_PREFIX = 'citadels/v1/';\n" + '\n'.join(r(cd, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(cd, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'citadels'), exist_ok=True)
+    open(os.path.join(ROOT, 'citadels', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Citadels', 'Il gioco dei personaggi segreti: ogni round scegli chi essere (Assassino, Ladro, Re, Mercante…), raccogli oro e costruisci la città più ricca. Da 4 a 7 giocatori, ognuno dal proprio telefono.', '#1a1232',
+        'family=Cinzel:wght@700;800;900&family=Nunito:wght@400;600;700;800;900', r(cd, 'style.css'), cd_js, 'Citadels'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()
