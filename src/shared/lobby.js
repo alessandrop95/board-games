@@ -1,6 +1,6 @@
 /* ===== Lista dei tavoli aperti (condivisa tra i giochi) ===== */
 var Lobby = (function () {
-  var stop = null, starting = false, list = null, failed = false;
+  var stop = null, starting = false, list = null, failed = false, wanted = false, retryT = null;
   var css = '.vis-b{display:inline-block;font-size:11.5px;line-height:1;padding:3px 7px;border-radius:999px;border:1px solid currentColor;margin-left:6px;vertical-align:2px;white-space:nowrap;opacity:.85}' +
     '.vis-pick{display:flex;gap:8px;flex-wrap:wrap}.vis-pick label{flex:1;min-width:140px;display:flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid rgba(255,255,255,.16);border-radius:10px;cursor:pointer}' +
     '.vis-pick input{width:18px;height:18px;margin:0;flex:none;accent-color:#d9a441}.vis-pick label:has(input:checked){border-color:currentColor}.olist{display:grid;gap:8px}' +
@@ -52,12 +52,24 @@ var Lobby = (function () {
 
   function start() {
     ensureCss();
+    wanted = true;
     checkRecent();
     if (stop || starting) return;
-    starting = true; failed = false;
-    Net.watchLobby(function (l) { list = l; paint(); }).then(function (s) { starting = false; stop = s; }).catch(function () { starting = false; failed = true; paint(); });
+    starting = true;
+    clearTimeout(retryT); retryT = null;
+    Net.watchLobby(function (l) { list = l; failed = false; paint(); }).then(function (s) {
+      starting = false;
+      if (!wanted) { s(); return; }   // nel frattempo si è lasciata la home del gioco
+      stop = s; failed = false; paint();
+    }).catch(function () {
+      starting = false; failed = true; paint();
+      // senza rete: si riprova da soli ogni pochi secondi finché si resta sulla lista
+      if (wanted) retryT = setTimeout(function () { retryT = null; if (wanted) start(); }, 5000);
+    });
   }
-  function end() { if (stop) { stop(); stop = null; } list = null; }
+  function end() { wanted = false; clearTimeout(retryT); retryT = null; if (stop) { stop(); stop = null; } list = null; }
+  // ritorno in primo piano: si ricontrollano subito anche i tavoli recenti
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && wanted) { checkRecent(); if (failed && !starting) start(); } });
   function paint() { var el = document.getElementById('olist'); if (el) el.innerHTML = rows(); }
   function rows() {
     if (failed) return '<p class="lead">Non riesco a caricare la lista dei tavoli. Controlla la connessione; puoi sempre entrare con il codice.</p>';

@@ -9,6 +9,7 @@ var NETQ = new URLSearchParams(location.search);
 var NET_PING_MS = +(NETQ.get('ping') || 10000);     // ogni quanto si interroga il server
 var NET_DEAD_MS = +(NETQ.get('dead') || 15000);     // silenzio oltre il quale si verifica la connessione
 var NET_PROBE_MS = 5000;                            // attesa della risposta alla verifica
+var NET_STALE_MS = +(NETQ.get('stale') || 70000);   // oltre questo silenzio la connessione è morta di sicuro (keepalive 45 s × 1,5)
 
 /* ---------- client MQTT 3.1.1 minimo ---------- */
 function MQ(url) {
@@ -74,6 +75,8 @@ MQ.prototype.probe = function () {
 // Da chiamare quando la pagina torna visibile o la rete torna disponibile.
 MQ.prototype.wake = function () {
   if (this.closed) return;
+  // dopo un lungo sonno (app in background) il server ci ha già scollegati: inutile aspettare la verifica, si riparte subito
+  if (this.connected && Date.now() - this.lastRx > NET_STALE_MS) { this._drop(); return; }
   if (this.connected) { this.probe(); return; }
   if (!this.ws) { this.backoff = 800; this._open(); }
 };
@@ -115,6 +118,8 @@ MQ.prototype._sub = function (topics) {
   topics.forEach(function (t) { body = body.concat(MQ.str(t), [0]); });
   this._raw(MQ.packet(0x82, body));
 };
+// Richiede di nuovo un argomento già seguito: il server rimanda i messaggi conservati (per esempio la lista dei tavoli).
+MQ.prototype.resub = function (topic) { if (!this.connected || !this.subs[topic]) return false; this._sub([topic]); return true; };
 MQ.prototype.subscribe = function (topic) { this.subs[topic] = true; if (this.connected) this._sub([topic]); };
 MQ.prototype.unsubscribe = function (topic) {
   if (!this.subs[topic]) return; delete this.subs[topic];
@@ -147,6 +152,8 @@ var Net = (function () {
   var clients = {}, reducer = null, beforePublish = null, onTakeover = null, lobbyInfo = null;
   var LOBBY_BEAT = +(qs.get('lobbyBeat') || 20000);   // ogni quanto l'host conferma che il tavolo è vivo
   var LOBBY_TTL = +(qs.get('lobbyTtl') || 150000);    // oltre questo silenzio il tavolo sparisce dalla lista
+  var LOBBY_REFRESH = +(qs.get('lobbyRefresh') || 5000); // ogni quanto la lista dei tavoli si richiede al server
+  var LOBBY_SWEEP = +(qs.get('lobbySweep') || 3000);     // attesa delle risposte prima di togliere i tavoli spariti
   var FIND_MS = +(qs.get('findMs') || 4500);          // attesa massima della risposta quando si cerca un tavolo
   var PRES_MS = +(qs.get('presMs') || 35000);       // oltre questo silenzio un giocatore risulta offline
   function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
@@ -453,15 +460,18 @@ var Net = (function () {
   }
   // Lista dal vivo dei tavoli di questo gioco. cb(lista) a ogni cambiamento; restituisce la funzione per smettere.
   // Ascolta tutti i server raggiungibili e unisce le liste (un tavolo può stare su un server diverso dal mio).
+  /* Lista dei tavoli aperti. Oltre ai messaggi in arrivo, ogni pochi secondi (e appena l'app torna in primo piano)
+     la lista si richiede al server: così si vedono i tavoli aperti mentre il telefono dormiva e spariscono quelli chiusi. */
   async function watchLobby(cb) {
-    var base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false, attached = [], reached = 0, failed = 0;
+    var base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false, att = [], reached = 0, failed = 0;
     function alive(e) { var now = Date.now(); return (e.rx && now - e.rx < LOBBY_TTL) || now - e.t < LOBBY_TTL; }
     function emit() {
       if (stopped) return;
       cb(Object.keys(items).map(function (k) { return items[k]; }).filter(function (e) { return alive(e) && (e.phase === 'lobby' || e.phase === 'play'); })
         .sort(function (a, b) { return (a.phase === 'lobby' ? 0 : 1) - (b.phase === 'lobby' ? 0 : 1) || b.t - a.t; }));
     }
-    function attach(c) {
+    function attach(i, c) {
+      if (att[i]) return;
       function h(t, p, retained) {
         if (t.indexOf(base) !== 0) return;
         var id = t.slice(base.length);
@@ -472,20 +482,47 @@ var Net = (function () {
         e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
         if (retained && e.t > Date.now()) e.t = Date.now(); // orologio dell'host avanti: il tavolo non resta in lista più del dovuto
         var old = items[id];
-        if (old && old.t > e.t) return;
+        if (old && old.t > e.t) { old.seen = Date.now(); return; }
         e.rx = retained ? (old && old.rx) : Date.now(); // conferma arrivata adesso: vale anche se gli orologi dei telefoni non coincidono
+        e.seen = Date.now();
         items[id] = e; emit();
       }
-      c.onMessage(h); c.subscribe(filt); attached.push({ c: c, h: h });
+      c.onMessage(h); c.subscribe(filt); att[i] = { c: c, h: h };
     }
     await new Promise(function (resolve) {
       BROKERS.forEach(function (_, i) {
-        client(i).then(function (c) { reached++; if (!stopped) attach(c); resolve(); }, function () { if (++failed === BROKERS.length) resolve(); });
+        client(i).then(function (c) { reached++; if (!stopped) attach(i, c); resolve(); }, function () { if (++failed === BROKERS.length) resolve(); });
       });
     });
     if (!reached) throw new Error('offline');
-    var iv = setInterval(emit, 10000);
-    return function () { stopped = true; clearInterval(iv); attached.forEach(function (a) { a.c.handlers = a.c.handlers.filter(function (x) { return x !== a.h; }); a.c.unsubscribe(filt); }); };
+    // richiesta periodica: chi è collegato richiede la lista; chi non lo era ci riprova
+    var sweepT = null;
+    function refresh() {
+      if (stopped) return;
+      var t0 = Date.now(), all = true;
+      BROKERS.forEach(function (_, i) {
+        if (!att[i]) { all = false; client(i).then(function (c) { if (!stopped) { attach(i, c); emit(); } }, function () {}); return; }
+        if (!att[i].c.resub(filt)) all = false;
+      });
+      emit();
+      // tavoli che nessun server ha più rimandato: chiusi mentre non ascoltavamo
+      clearTimeout(sweepT);
+      if (all) sweepT = setTimeout(function () {
+        if (stopped || !att.every(function (a) { return a && a.c.connected; }) || att.length < BROKERS.length) return;
+        var gone = false; Object.keys(items).forEach(function (id) { if ((items[id].seen || 0) < t0) { delete items[id]; gone = true; } });
+        if (gone) emit();
+      }, LOBBY_SWEEP);
+    }
+    function onVis() { if (document.visibilityState === 'visible') setTimeout(refresh, 400); }
+    document.addEventListener('visibilitychange', onVis); window.addEventListener('focus', onVis); window.addEventListener('online', onVis);
+    var iv = setInterval(refresh, LOBBY_REFRESH);
+    var stop = function () {
+      stopped = true; clearInterval(iv); clearTimeout(sweepT);
+      document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); window.removeEventListener('online', onVis);
+      att.forEach(function (a) { if (!a) return; a.c.handlers = a.c.handlers.filter(function (x) { return x !== a.h; }); a.c.unsubscribe(filt); });
+    };
+    stop.refresh = refresh;
+    return stop;
   }
   // L'host applica sempre la modifica sul suo telefono; la pubblica solo se è collegato e sincronizzato.
   // Se non può (offline o appena ricollegato), la tiene da parte: endResync decide poi se pubblicarla o scartarla.

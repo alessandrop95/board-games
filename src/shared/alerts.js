@@ -33,13 +33,32 @@ var Alerts = (function () {
   function alive(t) { var now = Date.now(); return (t.rx && now - t.rx < TTL) || now - t.t < TTL; }
 
   /* --- ascolto delle liste dei tavoli di tutti i giochi --- */
+  var FILT = '+/v1/lobby/+', att = [], sweepT = null;
   function start() {
     if (started || typeof Net === 'undefined' || !Net._client) return;
     started = true;
-    for (var i = 0; i < Net.brokers; i++) Net._client(i).then(attach, function () {});
-    setInterval(paintHome, 10000);
+    for (var i = 0; i < Net.brokers; i++) (function (i) { Net._client(i).then(function (c) { attach(i, c); }, function () {}); })(i);
+    setInterval(refresh, 5000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(refresh, 400); });
+    window.addEventListener('focus', function () { setTimeout(refresh, 400); });
   }
-  function attach(c) {
+  // ogni 5 secondi (e al ritorno in primo piano) la lista si richiede ai server: tavoli nuovi subito, quelli chiusi spariscono
+  function refresh() {
+    var t0 = Date.now(), all = true;
+    for (var i = 0; i < Net.brokers; i++) (function (i) {
+      if (!att[i]) { all = false; Net._client(i).then(function (c) { attach(i, c); paintHome(); }, function () {}); return; }
+      if (!att[i].resub(FILT)) all = false;
+    })(i);
+    paintHome();
+    clearTimeout(sweepT);
+    if (all) sweepT = setTimeout(function () {
+      if (att.length < Net.brokers || !att.every(function (c) { return c && c.connected; })) return;
+      var gone = false; Object.keys(tables).forEach(function (k) { if ((tables[k].seen || 0) < t0) { delete tables[k]; gone = true; } });
+      if (gone) paintHome();
+    }, 3000);
+  }
+  function attach(i, c) {
+    if (att[i]) return; att[i] = c;
     c.onMessage(function (topic, p, retained) {
       var g = gameOf(topic); if (!g) return;
       var id = topic.slice((g.p + 'lobby/').length), k = g.p + id;
@@ -47,12 +66,12 @@ var Alerts = (function () {
       var e; try { e = JSON.parse(p); } catch (x) { return; }
       if (!e || e.id !== id || typeof e.t !== 'number') return;
       var old = tables[k];
-      if (old && old.e.t > e.t) return;
-      tables[k] = { e: e, g: g, rx: retained ? (old ? old.rx : 0) : Date.now(), t: retained ? Math.min(e.t, Date.now()) : e.t };
+      if (old && old.e.t > e.t) { old.seen = Date.now(); return; }
+      tables[k] = { e: e, g: g, rx: retained ? (old ? old.rx : 0) : Date.now(), t: retained ? Math.min(e.t, Date.now()) : e.t, seen: Date.now() };
       paintHome();
       if (!retained) maybeAlert(k, tables[k]);
     });
-    c.subscribe('+/v1/lobby/+');
+    c.subscribe(FILT);
   }
   function list() {
     return Object.keys(tables).map(function (k) { return tables[k]; }).filter(function (t) { return alive(t) && (t.e.phase === 'lobby' || t.e.phase === 'play'); })
