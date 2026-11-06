@@ -4,7 +4,7 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
 var $ = function (s) { return document.querySelector(s); };
-var App = { screen: 'lobby', code: null, doc: null, sheet: null, busy: false, botKeys: {}, sheetKey: null, introShown: false, lastFxN: null, mode: null, hide: {} };
+var App = { screen: 'lobby', code: null, doc: null, sheet: null, busy: false, botKeys: {}, sheetKey: null, introShown: false, lastFxN: null, mode: null, hide: {}, tgt: null, pickC: null };
 var BOTNAMES = ['Aurora', 'Zefiro', 'Nuvola', 'Icaro', 'Brezza', 'Stella', 'Cirro', 'Libeccio', 'Iride', 'Austro'];
 var PCOL = ['#ff7a45', '#3d8bfd', '#2fb36d', '#f2b705', '#a35cf0', '#ef4f8b', '#16b5c4', '#8a6b3f'];
 var MAXP = 8, KEY_TABLE = 'sk-table', KEY_RECENT = 'sk-recent';
@@ -26,7 +26,7 @@ function tableReducer(doc, from, op) {
   switch (op.t) {
     case 'join': {
       var nick = String(op.nick || '').trim().slice(0, 18) || 'Giocatore';
-      doc.opts = doc.opts || {}; if (doc.opts.timer == null) doc.opts.timer = 60; if (doc.opts.target == null) doc.opts.target = 100;
+      doc.opts = doc.opts || {}; if (doc.opts.timer == null) doc.opts.timer = 60; if (doc.opts.target == null) doc.opts.target = 100; if (doc.opts.action == null) doc.opts.action = false; if (doc.opts.elim == null) doc.opts.elim = false;
       if (seat) { if (doc.phase === 'lobby' && seat.nick !== nick) { seat.nick = uniqueNick(doc.seats.filter(function (s) { return s !== seat; }), nick); return {}; } return { changed: false, out: 'seated' }; }
       if (doc.phase !== 'lobby') return { changed: false, out: 'spect' };
       if (doc.seats.length >= MAXP) return { err: 'Il tavolo è pieno (' + MAXP + ' giocatori).' };
@@ -54,6 +54,8 @@ function tableReducer(doc, from, op) {
       doc.opts = doc.opts || {};
       if (op.timer != null) doc.opts.timer = Math.max(0, Math.min(600, +op.timer || 0));
       if (op.target != null && [50, 100, 150].indexOf(+op.target) >= 0) doc.opts.target = +op.target;
+      if (op.action != null) doc.opts.action = !!op.action;
+      if (op.elim != null) doc.opts.elim = !!op.elim;
       return {};
     }
     case 'back': {
@@ -87,8 +89,8 @@ function tableReducer(doc, from, op) {
 }
 Net.setReducer(tableReducer);
 function needsMe(g, me) {
-  if (me < 0 || !g) return false;
-  if (g.phase === 'reveal') return E.flips(g.players[me]) < 2;
+  if (me < 0 || !g || g.players[me].out) return false;
+  if (g.phase === 'reveal') return E.flips(g.players[me]) < 2 || !!g.players[me].bonus;
   if (g.phase === 'play') return g.turn === me;
   if (g.phase === 'scores') return !g.players[me].ready;
   return false;
@@ -97,14 +99,20 @@ Coach.setup({ bots: 2,
   myTurn: function (g, me) { return needsMe(g, me); },
   tip: function (g, me, mine) {
     var P = g.players[me]; if (!P) return null;
+    if (P.out) return 'Sei stato eliminato: ora guardi la partita fino alla fine.';
+    if (mine && P.bonus) return 'Hai trovato una <b>stella</b>! Tocca una carta <b>Azione</b> della fila (o il mazzo delle Azioni) per prenderla, oppure rinuncia: ogni Azione che ti resta in mano a fine manche vale <b>+10</b>.';
+    if (mine && g.pick) return 'Hai pescato tre carte: tocca quella che vuoi tenere e poi la carta della griglia da sostituire. Se non ti serve nessuna, tocca <b>Nessuna</b> e scopri una carta coperta.';
+    if (mine && g.chain) return 'Gioca la carta ' + ART.ANAME[g.chain.k] + ': scegli i bersagli nella finestra.';
     if (g.phase === 'reveal') return mine ? 'Tocca <b>2 carte coperte</b> della tua griglia per scoprirle. Conviene sceglierle in colonne diverse.' : 'Aspetta che anche gli altri scoprano le loro due carte.';
     if (g.phase === 'scores') return 'Manche finita: guarda i punti e tocca <b>Prossima manche</b>.';
     if (!mine) return null;
     var top = g.disc[g.disc.length - 1];
+    if (!g.drawn && g.opts.action && P.acts.length && g.ender == null) return 'Tocca a te! Puoi giocare una delle tue <b>carte Azione</b> (toccala qui sotto) invece di pescare. Oppure prendi dagli <b>scarti</b> o pesca dal <b>mazzo</b>.';
     if (!g.drawn) return 'Tocca a te! Sugli scarti c’è un <b>' + E.sv(top) + '</b>: se ti conviene, tocca gli <b>scarti</b> e poi la carta da sostituire. Altrimenti tocca il <b>mazzo</b> per pescare.' + (g.ender != null ? ' <b>È il tuo ultimo turno!</b>' : '');
     return 'Hai pescato un <b>' + E.sv(g.drawn.v) + '</b>. Se è basso tocca una tua carta alta (o coperta) per sostituirla; se è alto tocca <b>Scarta</b> e scopri una carta coperta.';
   } });
 Score.setup({ game: 'skyjo', result: function (g) {
+  if (g.final && g.final.place) return g.players.map(function (P, i) { return { won: (g.winners || []).indexOf(i) >= 0, place: g.final.place[i], score: P.total }; });
   var tot = g.players.map(function (P) { return P.total; });
   return g.players.map(function (P, i) { var place = 1 + tot.filter(function (t) { return t < tot[i]; }).length; return { won: (g.winners || []).indexOf(i) >= 0, place: place, score: P.total }; });
 } });
@@ -112,7 +120,7 @@ Turns.setup({
   decider: function (g) { return E.decider(g); },
   onTimeout: function (cur, d) { var g = cur.game; g.players[d].bot = true; g.players[d].away = true; Turns.awayLog(g, d); return true; }
 });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.target && o.target !== 100) notes.push('fino a ' + o.target + ' punti'); if (o.timer === 0) notes.push('senza timer'); return { max: MAXP, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; if (o.action) notes.push('Skyjo Action'); if (o.elim) notes.push('eliminazione'); if (o.target && o.target !== 100) notes.push('fino a ' + o.target + ' punti'); if (o.timer === 0) notes.push('senza timer'); return { max: MAXP, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo e muovi i giocatori automatici.'); render(); });
 
 /* ---------- connessione al tavolo ---------- */
@@ -140,7 +148,7 @@ async function enterTable(code, nick) {
       if (Net.isHost && !d0.seats.some(function (s) { return !s.bot && s.uid !== Net.uid; })) Net.clearTable(); else Net.send({ t: 'leave' }).catch(function () {});
     }
   }
-  App.code = code; App.doc = null; App.gidSeen = false; App.sheet = null; App.mode = null; App.hide = {}; App.botKeys = {}; App.sheetKey = null; App.introShown = false; App.lastFxN = null; App.seenFirstDoc = false;
+  App.code = code; App.doc = null; App.gidSeen = false; App.sheet = null; App.mode = null; App.tgt = null; App.pickC = null; App.hide = {}; App.botKeys = {}; App.sheetKey = null; App.introShown = false; App.lastFxN = null; App.seenFirstDoc = false;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
     if (!doc) { Lobby.forget(code); if (App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
@@ -213,9 +221,9 @@ function driveBots() {
   var doc = App.doc;
   if (!doc || !Net.isHost || doc.phase !== 'play' || !doc.game) return;
   var g = doc.game;
-  if (g.phase === 'reveal') g.players.forEach(function (P, p) { if (P.bot && E.flips(P) < 2) botStep(p, 700 + Math.random() * 900 + p * 120); });
-  else if (g.phase === 'play' && g.players[g.turn].bot) botStep(g.turn, (g.drawn ? 1100 : 1300) + Math.random() * 600);
-  else if (g.phase === 'scores' && g.players.every(function (P) { return P.ready || P.bot; })) {
+  if (g.phase === 'reveal') g.players.forEach(function (P, p) { if (P.bot && !P.out && (E.flips(P) < 2 || P.bonus)) botStep(p, 700 + Math.random() * 900 + p * 120); });
+  else if (g.phase === 'play' && g.players[g.turn].bot) botStep(g.turn, (g.drawn || g.pick || g.chain || g.players[g.turn].bonus ? 1100 : 1300) + Math.random() * 600);
+  else if (g.phase === 'scores' && g.players.every(function (P) { return P.ready || P.bot || P.out; })) {
     var key = App.code + ':next:' + g.round; if (App.botKeys.next === key) return; App.botKeys.next = key;
     setTimeout(function () { Net.hostApply(function (cur) { return !!(cur && cur.game && cur.game.round === g.round && E.forceNext(cur.game)); }); }, 5000);
   }
@@ -225,7 +233,7 @@ function driveBots() {
 function onDoc() {
   var g = G(), me = myIdx();
   // partita nuova sullo stesso tavolo (rivincita con le stesse persone): fogli, animazioni e suoni ripartono da zero
-  if (App.gidSeen && App.doc.gid !== App.gid) { App.sheetKey = null; App.sheet = null; App.lastFxN = 0; App.hide = {}; App.mode = null; }
+  if (App.gidSeen && App.doc.gid !== App.gid) { App.sheetKey = null; App.sheet = null; App.lastFxN = 0; App.hide = {}; App.mode = null; App.tgt = null; App.pickC = null; }
   App.gid = App.doc.gid; App.gidSeen = true;
   // il tavolo è tornato in sala d'attesa (nuova partita con le stesse persone): i contatori degli effetti ripartono da zero
   if (!g && App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
@@ -234,6 +242,12 @@ function onDoc() {
     if (me >= 0 && !App.introShown) { App.introShown = true; if (!lsGet('sk-intro-done')) App.sheet = { kind: 'intro', page: 0 }; }
     if (!needsMe(g, me) || g.phase !== 'play') App.mode = null;
     if (g.phase === 'play' && g.drawn && App.mode === 'take') App.mode = null;
+    var myTurn = g.phase === 'play' && g.turn === me;
+    if (!myTurn || !g.pick) App.pickC = null;
+    // bersagli di una carta Azione: si chiudono se il turno è cambiato o la carta è già stata giocata
+    if (App.tgt && (!myTurn || g.drawn || g.pick || (App.tgt.via === 'chain' ? !g.chain : (g.chain || !g.players[me].acts[App.tgt.j] || g.players[me].acts[App.tgt.j].k !== App.tgt.k)))) { App.tgt = null; if (App.sheet && App.sheet.kind === 'tgt') App.sheet = null; }
+    if (myTurn && g.chain && !App.tgt && !g.players[me].bonus) { App.tgt = { k: g.chain.k, via: 'chain', sel: [], picks: {}, dir: 'col' }; App.sheet = { kind: 'tgt' }; }
+    if (App.sheet && App.sheet.kind === 'acard' && !myTurn && App.sheet.own) App.sheet = null;
     if (App.sheet && App.sheet.kind === 'round' && g.phase !== 'scores' && g.phase !== 'over') App.sheet = null;
   } else App.mode = null;
   render(); if (g) Game.fx(g, me); driveBots(); Turns.watch(App.doc);
@@ -265,7 +279,7 @@ function heroArt() {
 function lobbyHTML() {
   var inv = App.inviteCode ? '<div class="notice">Sei stato invitato al tavolo <b>' + esc(App.inviteCode) + '</b>. Scrivi il tuo nome e tocca Siediti.</div>' : '';
   return '<div class="wrap lobby"><div class="row" style="justify-content:space-between"><a class="back-link" href="../">← Tutti i giochi</a>' + Sound.buttonHTML() + '</div>' + curTableHTML() +
-    '<section class="hero"><div class="hero-txt"><div class="kicker">Il gioco di carte più leggero del cielo</div><h1>Skyjo</h1><p class="tag">Dodici carte coperte davanti a te: scambiale, scoprile, fai sparire le colonne uguali e chiudi la manche con meno punti di tutti. Da 2 a 8 giocatori, ognuno dal proprio telefono.</p></div>' + heroArt() + '</section>' + inv +
+    '<section class="hero"><div class="hero-txt"><div class="kicker">Il gioco di carte più leggero del cielo</div><h1>Skyjo</h1><p class="tag">Dodici carte coperte davanti a te: scambiale, scoprile, fai sparire le colonne uguali e chiudi la manche con meno punti di tutti. Da 2 a 8 giocatori, ognuno dal proprio telefono. Si può giocare anche nella variante <b>Skyjo Action</b>, con stelle e carte Azione, e <b>a eliminazione</b>.</p></div>' + heroArt() + '</section>' + inv +
     '<div class="grid2"><section class="panel"><h2>Il tuo nome</h2><label class="lead" for="nick">Come ti vedranno gli altri al tavolo</label><input id="nick" class="field" maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(myNick()) + '">' +
     (App.inviteCode ? '' : Lobby.pickHTML() + '<button class="btn block" data-act="create"' + (App.busy ? ' disabled' : '') + '>Apri un tavolo</button>') +
     '<div class="row" style="flex-wrap:nowrap"><input id="joincode" class="field code" maxlength="4" placeholder="CODICE" aria-label="Codice del tavolo" autocapitalize="characters" value="' + esc(App.inviteCode || '') + '"><button class="btn' + (App.inviteCode ? '' : ' ghost') + '" data-act="join" style="flex:none"' + (App.busy ? ' disabled' : '') + '>Siediti</button></div>' +
@@ -277,10 +291,16 @@ function lobbyHTML() {
 Lobby.setRecentKey(KEY_RECENT);
 function optionsHTML(d, isHost) {
   var o = d.opts || {}, t = o.target || 100;
-  if (!isHost) return '<p class="lead">Si gioca fino a <b>' + t + ' punti</b>.</p>';
-  return '<div class="tt-opt row"><label for="opt-target" style="flex:1;min-width:160px"><b>Fine della partita</b><br><span class="muted" style="font-size:14px">Quando qualcuno arriva a questi punti vince chi ne ha meno.</span></label><select id="opt-target" class="field" style="max-width:200px">' +
-    [[50, '50 punti (veloce)'], [100, '100 punti (classico)'], [150, '150 punti (lunga)']].map(function (k) { return '<option value="' + k[0] + '"' + (k[0] === t ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select></div>';
+  if (!isHost) return '<p class="lead">' + (o.action ? 'Si gioca a <b>Skyjo Action</b> (con le carte Azione e le stelle)' : 'Si gioca a Skyjo <b>classico</b>') + (o.elim ? ', <b>a eliminazione</b>: chi arriva a ' + t + ' punti esce, vince l’ultimo rimasto.' : ', fino a <b>' + t + ' punti</b>.') + '</p>';
+  function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:220px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
+  return '<div class="tt-opt row"><label for="opt-variant" style="flex:1;min-width:160px"><b>Variante</b><br><span class="muted" style="font-size:14px">' + (o.action ? 'Stelle jolly, righe da 4 e 27 carte Azione da giocare al posto del turno.' : 'Le regole di sempre.') + '</span></label>' +
+    sel('opt-variant', o.action ? 'action' : 'classic', [['classic', 'Classica'], ['action', 'Skyjo Action']]) + '</div>' +
+    '<div class="tt-opt row"><label for="opt-elim" style="flex:1;min-width:160px"><b>Fine della partita</b><br><span class="muted" style="font-size:14px">' + (o.elim ? 'Chi arriva alla soglia è eliminato; si continua finché ne resta uno solo, che vince.' : 'Quando qualcuno arriva alla soglia vince chi ha meno punti.') + '</span></label>' +
+    sel('opt-elim', o.elim ? 1 : 0, [[0, 'Vince il più basso'], [1, 'Eliminazione']]) + '</div>' +
+    '<div class="tt-opt row"><label for="opt-target" style="flex:1;min-width:160px"><b>Soglia</b><br><span class="muted" style="font-size:14px">I punti che fanno finire la partita' + (o.elim ? ' (o eliminano)' : '') + '.</span></label>' +
+    sel('opt-target', t, [[50, '50 punti (veloce)'], [100, '100 punti (classico)'], [150, '150 punti (lunga)']]) + '</div>';
 }
+function dur(d, n, a, b) { var o = d.opts || {}; return Math.round((n * a + b) * (o.target || 100) / 100 * (o.elim ? Math.min(2.2, 1 + n * .2) : 1) * (o.action ? 1.15 : 1)); }
 function roomHTML() {
   var d = App.doc, isHost = d.host === Net.uid, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), n = d.seats.length, seats = '';
   for (var i = 0; i < MAXP; i++) {
@@ -294,8 +314,8 @@ function roomHTML() {
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Da 2 a 8 giocatori; i posti mancanti si possono riempire con giocatori automatici.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/' + MAXP + ')</h2><div class="seats">' + seats + '</div>' + Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) + optionsHTML(d, isHost) +
-    (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= MAXP ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 2 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 2 ? '<p class="lead">Manca almeno un altro giocatore.</p>' : '<p class="lead">Una partita a ' + ((d.opts && d.opts.target) || 100) + ' punti dura circa ' + Math.round((n * 3 + 12) * ((d.opts && d.opts.target) || 100) / 100) + '–' + Math.round((n * 5 + 20) * ((d.opts && d.opts.target) || 100) / 100) + ' minuti.</p>')
+    (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= MAXP ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 2 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 2 ? '<p class="lead">Manca almeno un altro giocatore.</p>' : '<p class="lead">Una partita a ' + ((d.opts && d.opts.target) || 100) + ' punti dura circa ' + dur(d, n, 3, 12) + '–' + dur(d, n, 5, 20) + ' minuti.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
     (isHost ? '<button class="btn ghost small" data-act="closetable" style="justify-self:start">Chiudi il tavolo</button>' : '') + '</section>' +
-    '<section class="panel"><h2>Prima di cominciare</h2>' + RU.section('goal') + RU.section('end') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';
+    '<section class="panel"><h2>Prima di cominciare</h2>' + RU.section('goal') + RU.section('end') + (d.opts && d.opts.action ? RU.section('action') : '') + (d.opts && d.opts.elim ? RU.section('elim') : '') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';
 }

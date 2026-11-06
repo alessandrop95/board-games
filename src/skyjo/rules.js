@@ -39,6 +39,22 @@ var SKRules = (function () {
       '<li><b>Scarti</b>: toccali per prendere la carta in cima (si illumina), poi tocca la carta della griglia da sostituire. Ritocca gli scarti per cambiare idea.</li>' +
       '<li>In alto vedi le griglie degli altri: toccane una per vederla in grande.</li>' +
       '<li>Accanto a ogni nome: punti delle carte scoperte e totale della partita.</li></ul>'],
+    action: ['Variante Skyjo Action',
+      '<p>Si gioca con <b>120 carte</b> (4 da −2, 6 da −1, 6 da 0, 8 per ogni valore da 1 a 12) più <b>8 stelle</b>, e con <b>27 carte Azione</b> (9 tipi, 3 per tipo). Quattro carte Azione stanno <b>scoperte in fila</b> accanto al loro mazzo.</p>' +
+      '<div class="rrow">' + A.flat('*') + '<span class="muted" style="align-self:center;margin-left:8px">La <b>stella</b> vale <b>0</b> e fa da <b>jolly</b>: conta come qualsiasi valore per completare colonne e righe.</span></div>' +
+      '<ul><li>Quando <b>peschi</b> una stella dal mazzo, la <b>prendi dagli scarti</b> o la <b>scopri</b> (anche all’inizio), puoi prendere una carta Azione: una della fila o quella in cima al mazzo delle Azioni.</li>' +
+      '<li>Nel tuo turno, invece di pescare o prendere dagli scarti, puoi <b>prendere una carta Azione</b> oppure <b>giocarne una</b> che hai in mano (non quella presa nello stesso turno). Puoi anche scartarla senza effetto.</li>' +
+      '<li>Oltre alle colonne di 3, se ne vanno anche le <b>righe di 4 carte uguali</b>. Colonna di sole stelle: <b>−10</b> punti; riga di sole stelle: <b>−15</b>.</li>' +
+      '<li>Quando qualcuno ha chiuso la manche non si giocano e non si prendono più carte Azione.</li></ul>' +
+      '<p class="rbox">Ogni carta Azione che hai ancora in mano a fine manche vale <b>+10 punti</b>: giocale (o scartale) prima che sia tardi!</p>' +
+      '<p class="muted" style="font-size:14px">La divisione delle carte numerate e delle Azioni è una nostra versione bilanciata: le regole ufficiali non indicano quante carte ci sono di ciascun tipo.</p>'],
+    acards: ['Le carte Azione',
+      '<div class="alist">' + ['exch', 'swap2', 'draw3', 'look', 'rmall', 'two', 'prot', 'redo', 'steal'].map(function (k) { return '<div class="ali">' + A.acard(k) + '<span><b>' + A.ANAME[k] + '</b><small>' + SKEngine.ACTS[k][1] + '</small></span></div>'; }).join('') + '</div>' +
+      '<p class="rbox">Lo <b>Scudo</b> ti protegge da solo: se qualcuno ti prende di mira con Scambio, Spazzata o Furto, lo Scudo si scarta e la sua azione non ti tocca.</p>'],
+    elim: ['Variante a eliminazione',
+      '<p>Chi, alla fine di una manche, arriva alla soglia (<b>100 punti</b> o quella scelta dall’host) è <b>eliminato</b>: la partita continua senza di lui.</p>' +
+      '<p>Si va avanti manche dopo manche finché resta <b>un solo giocatore</b>: è lui a vincere. Se gli ultimi rimasti vengono eliminati tutti nella stessa manche, vince chi ha il totale più basso.</p>' +
+      '<p class="rbox">Chi è eliminato resta al tavolo a guardare: vede le griglie degli altri ma non gioca più.</p>'],
     tips: ['Consigli',
       '<ul><li>All’inizio scopri carte in colonne diverse: avrai più informazioni.</li>' +
       '<li>Le carte da 0 e quelle negative sono preziose: se le vedi sugli scarti, prendile.</li>' +
@@ -46,7 +62,7 @@ var SKRules = (function () {
       '<li>Una colonna con due carte alte uguali può valere la pena: se esce la terza, le tre spariscono.</li>' +
       '<li>Occhio a cosa scarti: potrebbe completare la colonna del giocatore dopo di te.</li></ul>']
   };
-  var ORDER = ['goal', 'cards', 'setup', 'turn', 'columns', 'end', 'game', 'phone', 'tips'];
+  var ORDER = ['goal', 'cards', 'setup', 'turn', 'columns', 'end', 'game', 'phone', 'tips', 'action', 'acards', 'elim'];
   function section(k) { var s = S[k]; return s ? '<section class="rsec" id="r-' + k + '"><h3>' + s[0] + '</h3>' + s[1] + '</section>' : ''; }
   function html() { return '<div class="rules">' + ORDER.map(section).join('') + '</div>'; }
   function toc() { return '<nav class="rtoc">' + ORDER.map(function (k) { return '<button class="chip" data-act="rulego" data-r="' + k + '">' + S[k][0] + '</button>'; }).join('') + '</nav>'; }
