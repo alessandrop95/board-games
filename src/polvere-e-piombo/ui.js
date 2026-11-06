@@ -89,7 +89,7 @@ function tableReducer(doc, from, op) {
       if (doc.seats.length > maxSeats(doc)) return { err: 'In 8 si gioca solo con Dodge City: attivala o togli un giocatore.' };
       var seats = doc.seats.slice();
       for (var i = seats.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = seats[i]; seats[i] = seats[j]; seats[j] = t; }
-      doc.game = E.newGame(seats, expOf(doc)); doc.phase = 'play';
+      doc.gid = (doc.gid || 0) + 1; doc.game = E.newGame(seats, expOf(doc)); doc.phase = 'play';
       return {};
     }
     case 'rematch': if (!isHost) return hostOnly(); doc.phase = 'lobby'; doc.game = null; return {};
@@ -204,7 +204,7 @@ async function enterTable(code, nick) {
       if (Net.isHost && !d0.seats.some(function (s) { return !s.bot && s.uid !== Net.uid; })) Net.clearTable(); else Net.send({ t: 'leave' }).catch(function () {});
     }
   }
-  App.code = code; App.doc = null; App.flashInit = false; App.mode = 'idle'; App.sheet = null; App.botKey = null;
+  App.code = code; App.doc = null; App.gidSeen = false; App.flashInit = false; App.mode = 'idle'; App.sheet = null; App.botKey = null;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
     if (!doc) { Lobby.forget(code); if (App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
@@ -302,6 +302,9 @@ function myIdx() { var g = App.doc && App.doc.game; if (!g) return -1; for (var 
 
 function onDoc() {
   var g = App.doc.game;
+  // partita nuova sullo stesso tavolo (rivincita con le stesse persone): fogli, animazioni e suoni ripartono da zero
+  if (App.gidSeen && App.doc.gid !== App.gid) { App.sheet = null; App.mode = 'idle'; App.sel = null; App.pend = null; App.picks = []; App.overShown = null; }
+  App.gid = App.doc.gid; App.gidSeen = true;
   if (g && !App.flashInit) { App.lastFlash = g.flash ? g.flash.n : 0; App.flashInit = true; }
   if (!g) App.flashInit = false;
   // apri automaticamente il foglio di decisione quando tocca a me rispondere

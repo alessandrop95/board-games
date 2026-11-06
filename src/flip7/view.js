@@ -192,6 +192,8 @@ var Game = (function () {
   }
 
   function fx(g, me) {
+    // partita nuova sullo stesso tavolo (anche se la sala d'attesa non si è vista): i contatori ripartono da zero
+    if (App.lastFxN && g.fxN < App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
     if (App.lastFxN == null || !App.seenFirstDoc) {
       App.lastFxN = g.fxN;
       if (g.phase === 'scores' && !App.sheet) { App.sheet = { kind: 'round' }; renderSheet(); }

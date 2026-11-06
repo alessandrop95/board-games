@@ -69,7 +69,7 @@ function tableReducer(doc, from, op) {
       if (!doc.seats.length) return { err: 'Non c’è nessuno al tavolo.' };
       var used2 = doc.seats.map(function (s) { return s.nick; });
       while (doc.seats.length < MINP) { var nb = BOTNAMES.filter(function (b) { return used2.indexOf(b) < 0; })[0] || 'Cavaliere ' + doc.seats.length; used2.push(nb); doc.seats.push({ uid: 'bot-' + Math.random().toString(36).slice(2, 8), nick: nb, bot: true }); }
-      doc.game = E.newGame(doc.seats.slice(), doc.opts || {}); doc.phase = 'play'; return {};
+      doc.gid = (doc.gid || 0) + 1; doc.game = E.newGame(doc.seats.slice(), doc.opts || {}); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
     case 'auto': if (!isHost) return hostOnly; if (!doc.game || !doc.game.players[op.p]) return { changed: false }; doc.game.players[op.p].bot = !!op.on; if (!op.on) doc.game.players[op.p].away = false; return {};
@@ -142,7 +142,7 @@ async function enterTable(code, nick) {
       if (Net.isHost && !d0.seats.some(function (s) { return !s.bot && s.uid !== Net.uid; })) Net.clearTable(); else Net.send({ t: 'leave' }).catch(function () {});
     }
   }
-  App.code = code; App.doc = null; App.sheet = null; App.mode = null; App.hide = {}; App.botKeys = {}; App.sheetKey = null; App.introShown = false; App.lastFxN = null; App.seenFirstDoc = false;
+  App.code = code; App.doc = null; App.gidSeen = false; App.sheet = null; App.mode = null; App.hide = {}; App.botKeys = {}; App.sheetKey = null; App.introShown = false; App.lastFxN = null; App.seenFirstDoc = false;
   App.screen = 'table'; render();
   var ok = await Net.open(code, function (doc) {
     if (!doc) { Lobby.forget(code); if (App.code === code) { toast(App.closing ? 'Hai chiuso il tavolo ' + code + '.' : 'Il tavolo ' + code + ' è stato chiuso dall’host.'); App.closing = false; leaveTable(true); } return; }
@@ -226,6 +226,11 @@ function driveBots() {
 /* ---------- stato in arrivo ---------- */
 function onDoc() {
   var g = G(), me = myIdx();
+  // partita nuova sullo stesso tavolo (rivincita con le stesse persone): fogli, animazioni e suoni ripartono da zero
+  if (App.gidSeen && App.doc.gid !== App.gid) { App.sheetKey = null; App.sheet = null; App.lastFxN = 0; App.hide = {}; App.mode = null; }
+  App.gid = App.doc.gid; App.gidSeen = true;
+  // il tavolo è tornato in sala d'attesa (nuova partita con le stesse persone): i contatori degli effetti ripartono da zero
+  if (!g && App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
   if (App.screen !== 'table') { driveBots(); Turns.watch(App.doc); paintCur(); return; }
   if (g) {
     if (me >= 0 && !App.introShown) { App.introShown = true; if (!lsGet('cd-intro-done')) App.sheet = { kind: 'intro', page: 0 }; }

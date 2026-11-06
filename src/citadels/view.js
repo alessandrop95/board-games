@@ -341,6 +341,8 @@ var Game = (function () {
   function openKeep() { var g = G(), me = myIdx(); if (g && g.turn && g.turn.p === me && g.turn.drawn && (!App.sheet || App.sheet.kind !== 'intro')) { App.sheet = { kind: 'keep' }; renderSheet(); } }
 
   function fx(g, me) {
+    // partita nuova sullo stesso tavolo (anche se la sala d'attesa non si è vista): i contatori ripartono da zero
+    if (App.lastFxN && g.fxN < App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
     if (App.lastFxN == null || !App.seenFirstDoc) {
       App.lastFxN = g.fxN;
       if (g.phase === 'over' && !App.sheet) { App.sheet = { kind: 'over' }; renderSheet(); }

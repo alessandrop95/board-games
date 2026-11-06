@@ -284,7 +284,9 @@ var TV = (function () {
   function handPoint(c) { var r = st.handRects[c]; return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : seatPoint(myIdx()); }
 
   function effects(g, me, prev) {
-    var f = g.flash; if (!f || f.n <= st.lastFx) return;
+    var f = g.flash;
+    if (f && f.n < st.lastFx) st.lastFx = 0; // partita nuova sullo stesso tavolo: il contatore riparte da zero
+    if (!f || f.n <= st.lastFx) return;
     st.lastFx = f.n;
     var mine = f.p === me;
     switch (f.kind) {
