@@ -67,9 +67,15 @@ def card(key, box=(0, 0, 1, 1), inside=True, **kw):
     im = crop_inside(im, box, ART[0] / ART[1]) if inside else crop_ratio(im, box, ART[0] / ART[1])
     save(im, 'c-%s.jpg' % key, ART)
 
-def object_card(key, box=(0, 0, 1, 1), rotate=0, fill=0.86, **kw):
+def paperize(im, lo=200):
+    """Fondo bianco o grigio chiaro delle foto d'oggetto → colore carta, con passaggio morbido."""
+    a = np.asarray(im, dtype=np.float32); m = ((a.min(axis=2) - lo) / (255 - lo)).clip(0, 1)[..., None]
+    return Image.fromarray((a * (1 - m) + np.array(PAPER, dtype=np.float32) * m).clip(0, 255).astype(np.uint8), 'RGB')
+
+def object_card(key, box=(0, 0, 1, 1), rotate=0, fill=0.86, paper=0, **kw):
     """Oggetti (armi da catalogo): l'incisione intera su carta, eventualmente inclinata."""
     im = treat(load('c-' + key), **kw)
+    if paper: im = paperize(im, paper)
     W, H = im.size; im = im.crop((int(box[0] * W), int(box[1] * H), int(box[2] * W), int(box[3] * H)))
     if rotate:
         mask = Image.new('L', im.size, 255)
@@ -80,15 +86,66 @@ def object_card(key, box=(0, 0, 1, 1), rotate=0, fill=0.86, **kw):
     save(canvas, 'c-%s.jpg' % key, ART)
 
 TALL = (500, 700)  # personaggi e ruoli: carta intera
-def tall(src, out, box, face=None, **kw):
-    im = crop_ratio(treat(load(src), **kw), box, TALL[0] / TALL[1]).resize(TALL, Image.LANCZOS)
+def tall(src, out, box, face=None, inside=False, **kw):
+    t = treat(load(src), **kw)
+    im = (crop_inside(t, box, TALL[0] / TALL[1]) if inside else crop_ratio(t, box, TALL[0] / TALL[1])).resize(TALL, Image.LANCZOS)
     save(im, out + '.jpg', TALL)
     if face:  # miniatura del volto per le schede dei giocatori (coordinate sulla carta finita)
         fx, fy, fs = face; W, H = im.size; s = fs * W
         f = crop_ratio(im, ((fx * W - s / 2) / W, (fy * H - s / 2) / H, (fx * W + s / 2) / W, (fy * H + s / 2) / H), 1.0)
         save(f, 'f-' + out[2:] + '.jpg', (180, 180), 78)
 
+def dodge_city(faces=True):
+    """Dodge City: 22 carte nuove e 15 personaggi."""
+    card('pugno', (.03, .03, .97, .97))
+    card('tuffo', (.05, .06, .95, .86))
+    card('ragtime', (.04, .0, .96, .74))
+    card('rissa')
+    object_card('springfield', rotate=18, fill=.96)
+    card('tequila', (0, .04, 1, .86))
+    object_card('liquore', fill=.9)
+    card('binocolo', (0, .1, 1, .9))
+    card('rifugio', (0, .12, 1, 1))
+    card('bibbia', (0, .06, .93, .94))
+    card('cappello')
+    card('placca', (.04, .08, .96, .92))
+    object_card('sombrero', (0, .22, 1, .78), fill=.95)
+    object_card('pugnale', (0, 0, 1, .62), rotate=14, fill=.95)
+    object_card('derringer', fill=.9, paper=200)
+    card('borraccia', (0, 0, .66, 1))
+    card('cancan', (0, 0, 1, .6))
+    card('conestoga', (0, .08, 1, .92))
+    card('fucile', (0, .08, 1, .9))
+    card('ponyexpress', (0, .04, 1, .8))
+    object_card('pepperbox', fill=.9, paper=165)
+    card('howitzer')
+    F = FACES if faces else {}
+    tall('p-apache', 'p-apache', (.3, .1, .95, .86), F.get('apache'))
+    tall('p-belle', 'p-belle', (.32, .04, 1, .645), F.get('belle'), inside=True)
+    tall('p-bill', 'p-bill', (0, .11, .576, .65), F.get('bill'), inside=True)
+    tall('p-chuck', 'p-chuck', (.1, .12, .64, .8), F.get('chuck'), inside=True)
+    tall('p-docholy', 'p-docholy', (.3, .27, .95, .92), F.get('docholy'), inside=True)
+    tall('p-elena', 'p-elena', (0, .04, 1, .76), F.get('elena'), inside=True)
+    tall('p-greg', 'p-greg', (.14, .24, .86, .7), F.get('greg'), inside=True)
+    tall('p-herb', 'p-herb', (0, .06, 1, .78), F.get('herb'), inside=True)
+    tall('p-jose', 'p-jose', (.04, 0, .96, 1), F.get('jose'))
+    tall('p-molly', 'p-molly', (.04, 0, .96, 1), F.get('molly'))
+    tall('p-pat', 'p-pat', (.16, .04, 1, .76), F.get('pat'), inside=True)
+    tall('p-pixie', 'p-pixie', (.08, 0, .92, .76), F.get('pixie'), inside=True)
+    tall('p-sean', 'p-sean', (.45, .218, .95, .705), F.get('sean'), inside=True)
+    tall('p-tequilajoe', 'p-tequilajoe', (.45, .16, 1, .694), F.get('tequilajoe'), inside=True)
+    tall('p-vera', 'p-vera', (0, 0, 1, 1), F.get('vera'), inside=True)
+
+# volti delle miniature (x, y del centro e lato, in frazioni della carta finita 500x700)
+FACES = {
+    'apache': (0.33, 0.27, 0.24), 'belle': (0.4, 0.2, 0.3), 'bill': (0.43, 0.24, 0.34), 'chuck': (0.56, 0.12, 0.26), 'docholy': (0.42, 0.42, 0.5),
+    'elena': (0.33, 0.28, 0.26), 'greg': (0.6, 0.47, 0.3), 'herb': (0.71, 0.33, 0.24), 'jose': (0.5, 0.5, 0.56), 'molly': (0.5, 0.53, 0.5),
+    'pat': (0.5, 0.24, 0.24), 'pixie': (0.53, 0.27, 0.24), 'sean': (0.5, 0.15, 0.26), 'tequilajoe': (0.31, 0.16, 0.28), 'vera': (0.45, 0.26, 0.28)}
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['dc']: dodge_city(); sys.exit()
+    dodge_city()
     card('sparo', (0, 0, 1, .95))
     card('schivata')
     card('whisky')

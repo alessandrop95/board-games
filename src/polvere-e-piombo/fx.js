@@ -16,8 +16,7 @@ var FX = (function () {
   function later(ms, f) { setTimeout(f, reduce ? 0 : ms); }
   function plateEl(i) { return document.querySelector('[data-plate="' + i + '"]'); }
   function seatRect(i) { // dove "siede" il giocatore i sullo schermo
-    if (i === myIdx()) { var me = document.querySelector('.me > .card') || document.querySelector('.me'); return R(me) || R(document.querySelector('.hand')); }
-    var p = plateEl(i); return p ? R(p.querySelector('.ph') || p) : null;
+    var p = plateEl(i); return p ? R(p.querySelector('.pt') || p) : (i === myIdx() ? R(document.querySelector('.hand')) : null);
   }
   function board() { return document.querySelector('.board'); }
   function shakeScreen() { var b = board(); if (!b || reduce) return; b.classList.remove('screen-shake'); void b.offsetWidth; b.classList.add('screen-shake'); setTimeout(function () { b.classList.remove('screen-shake'); }, 600); }
@@ -138,7 +137,7 @@ var FX = (function () {
     document.querySelectorAll('[data-plate]').forEach(function (el) { o.plates[el.getAttribute('data-plate')] = R(el); });
     document.querySelectorAll('.hand [data-card], .eqs [data-card], .pile [data-card], .store [data-card]').forEach(function (el) { o.cards[el.getAttribute('data-card')] = R(el); });
     o.deck = R(document.querySelector('.pile.deck .card')); o.disc = R(document.querySelector('.pile.disc .card, .pile.disc .empty'));
-    o.me = R(document.querySelector('.me > .card') || document.querySelector('.me'));
+    o.me = R(plateEl(myIdx()));
     return o;
   }
   function before() { rects = domRects(); }
@@ -160,7 +159,7 @@ var FX = (function () {
   }
   function stampede() {
     Sound.play('stampede');
-    stamp('Stampede!', 'small'); shakeScreen();
+    stamp('Indiani!', 'small'); shakeScreen();
     if (reduce) return;
     var H = window.innerHeight;
     for (var i = 0; i < 26; i++) (function (i) {
@@ -241,7 +240,7 @@ var FX = (function () {
     clearTimeout(tumbleTimer);
     if (reduce) return;
     tumbleTimer = setTimeout(function () {
-      var felt = document.querySelector('.felt');
+      var felt = document.querySelector('.oval');
       if (felt && !document.hidden) {
         var svg = '<svg viewBox="0 0 60 60"><g fill="none" stroke="#b08a52" stroke-width="1.6" stroke-linecap="round">';
         for (var i = 0; i < 16; i++) { var a = Math.random() * 6.28, b = a + 1 + Math.random() * 2.5, r1 = 10 + Math.random() * 18, r2 = 10 + Math.random() * 18;
@@ -298,7 +297,7 @@ var FX = (function () {
       } else if (n.k === 'eq') {
         var chip = document.querySelector('.eqs [data-card="' + c + '"]'), tr = R(chip) || seatRect(n.p);
         if (chip) hideDest(c);
-        fly(c, from, tr ? { x: tr.x, y: tr.y - 30, w: 66, h: tr.h + 60 } : null, { face: true, w: 66, hide: !!chip, delay: (k++) * 120, land: function () { var p = plateEl(n.p); if (p && !reduce) anim(p, [{ transform: 'rotate(var(--tilt)) scale(1.04)' }, { transform: 'rotate(var(--tilt)) scale(1)' }], { duration: 260 }); } });
+        fly(c, from, tr ? { x: tr.x, y: tr.y - 30, w: 66, h: tr.h + 60 } : null, { face: true, w: 66, hide: !!chip, delay: (k++) * 120, land: function () { var p = plateEl(n.p); if (p && !reduce) anim(p, [{ transform: 'scale(1.08)' }, { transform: 'scale(1)' }], { duration: 260 }); } });
       } else {
         var to = seatRect(n.p); if (!to) return;
         fly(c, from, { x: to.x, y: to.y, w: 48, h: 67 }, { face: fromVisible, w: 48, toPlate: true, delay: (k++) * 110 });
@@ -312,6 +311,7 @@ var FX = (function () {
     if (f && f.n > lastFlash) {
       lastFlash = f.n;
       if (f.kind === 'bang') later(150, function () { shot(f.p, f.t); });
+      else if (f.kind === 'event' && PPData.EVENTS[f.ev]) later(200, function () { banner(PPData.EVENTS[f.ev].n, PPData.EVENTS[f.ev].s); Sound.play('turn'); });
       else if (f.kind === 'check') {
         var why = (g.log.filter(function (l) { return l.k === 'draw'; }).slice(-1)[0] || {}).t || '';
         reveal(f.card, esc(g.players[f.p].nick) + ' estrae' + (why.indexOf(' per ') > 0 ? ' per ' + esc(why.split(' per ')[1].split(':')[0]) : ''), null);
@@ -320,7 +320,7 @@ var FX = (function () {
         if (t === 'mitraglia') later(250, function () { gatling(f.p); });
         else if (t === 'stampede') later(250, stampede);
         else if (t === 'sfida' && top && top.type === 'duel') later(250, function () { duel(top.a, top.b); });
-        else if (t === 'giro') floatText(mid(R(document.querySelector('.felt'))), 'Salute!', 'ok word', 260);
+        else if (t === 'giro') floatText(mid(R(document.querySelector('.oval'))), 'Salute!', 'ok word', 260);
         if (t === 'giro') Sound.play('cheers'); else if (t === 'cassaforte') Sound.play('safe'); else if (t === 'posta') Sound.play('post'); else if (t === 'bottega') Sound.play('shopbell'); else if (t === 'gattabuia') Sound.play('jail');
         else if (t === 'cassaforte' || t === 'posta') floatText(mid(seatRect(f.p)), t === 'posta' ? 'Posta!' : 'Colpo in banca!', 'word', 220);
       }

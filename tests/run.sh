@@ -29,6 +29,8 @@ step "Regole di Flip 7" node tests/rules/flip7.js
 step "Partite intere tra bot (Flip 7)" node tests/rules/flip7_bots.js 10
 step "Regole di Citadels" node tests/rules/citadels.js
 step "Partite intere tra bot (Citadels)" node tests/rules/citadels_bots.js 10
+step "Regole di Bang! con le espansioni" node tests/rules/pp_rules.js
+step "Partite intere tra bot (Bang!, tutte le combinazioni di espansioni)" node tests/rules/pp_bots.js
 step "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs
 step "Database" python3 tests/db/test_db.py
 step "Funzione notify" node --experimental-strip-types --no-warnings tests/push/notify.mjs
