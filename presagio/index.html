@@ -3385,7 +3385,7 @@ function tableReducer(doc, from, op) {
       if (doc.seats.length < 3) return { err: 'Servono almeno 3 giocatori: aggiungi dei giocatori automatici.' };
       var seats = doc.seats.slice();
       for (var i = seats.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = seats[i]; seats[i] = seats[j]; seats[j] = t; }
-      doc.gid = (doc.gid || 0) + 1; doc.game = E.newGame(seats, doc.opts); doc.phase = 'play'; return {};
+      doc.game = E.newGame(seats, doc.opts); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
     case 'auto': if (!isHost) return hostOnly; if (!doc.game || !doc.game.players[op.p]) return { changed: false }; doc.game.players[op.p].bot = !!op.on; return {};

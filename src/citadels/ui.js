@@ -69,7 +69,7 @@ function tableReducer(doc, from, op) {
       if (!doc.seats.length) return { err: 'Non c’è nessuno al tavolo.' };
       var used2 = doc.seats.map(function (s) { return s.nick; });
       while (doc.seats.length < MINP) { var nb = BOTNAMES.filter(function (b) { return used2.indexOf(b) < 0; })[0] || 'Cavaliere ' + doc.seats.length; used2.push(nb); doc.seats.push({ uid: 'bot-' + Math.random().toString(36).slice(2, 8), nick: nb, bot: true }); }
-      doc.gid = (doc.gid || 0) + 1; doc.game = E.newGame(doc.seats.slice(), doc.opts || {}); doc.phase = 'play'; return {};
+      doc.game = E.newGame(doc.seats.slice(), doc.opts || {}); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
     case 'auto': if (!isHost) return hostOnly; if (!doc.game || !doc.game.players[op.p]) return { changed: false }; doc.game.players[op.p].bot = !!op.on; if (!op.on) doc.game.players[op.p].away = false; return {};

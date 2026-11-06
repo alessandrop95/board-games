@@ -89,7 +89,7 @@ function tableReducer(doc, from, op) {
       if (doc.seats.length > maxSeats(doc)) return { err: 'In 8 si gioca solo con Dodge City: attivala o togli un giocatore.' };
       var seats = doc.seats.slice();
       for (var i = seats.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = seats[i]; seats[i] = seats[j]; seats[j] = t; }
-      doc.gid = (doc.gid || 0) + 1; doc.game = E.newGame(seats, expOf(doc)); doc.phase = 'play';
+      doc.game = E.newGame(seats, expOf(doc)); doc.phase = 'play';
       return {};
     }
     case 'rematch': if (!isHost) return hostOnly(); doc.phase = 'lobby'; doc.game = null; return {};
