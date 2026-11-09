@@ -1,3 +1,4 @@
+// gioco: catan
 // Prove delle regole di Catan: una per ogni regola del documento di analisi (regolamento ufficiale, 5ª edizione).
 var path = require('path'), SRC = path.join(__dirname, '../../src/catan/');
 var D = require(SRC + 'data.js'), E = require(SRC + 'engine.js');

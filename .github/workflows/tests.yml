@@ -1,7 +1,11 @@
 name: Prove
-# Fa girare tutte le prove (tests/run.sh): regole, notifiche, database e partite vere nel browser.
+# Fa girare le prove (tests/run.sh): regole, notifiche, database e partite vere nel browser.
 # Parte dopo ogni ricostruzione dei giochi (così prova le pagine appena rigenerate) e quando cambiano prove,
-# server, home o pagine modificate a mano. Se qualcosa non va il pallino diventa rosso e GitHub manda una email;
+# server, home o pagine modificate a mano.
+# Si provano SOLO i giochi cambiati dall'ultima volta che le prove sono passate (src/<gioco>/, <gioco>/index.html
+# o le loro prove, che dichiarano il gioco nella prima riga «gioco: …»). Home, server, notifiche e prove comuni
+# fanno partire le prove «comuni»; src/shared/ e build.py (usati da tutti i giochi) fanno partire tutto.
+# Avvio a mano (Actions → Prove → Run workflow): si scelgono i giochi, «tutti» o «comuni». Se qualcosa non va il pallino diventa rosso e GitHub manda una email;
 # nel riepilogo dell'esecuzione c'è l'elenco delle prove, tra gli allegati le schermate.
 on:
   workflow_run:
@@ -11,8 +15,14 @@ on:
     branches: [main]
     paths: ['tests/**', 'supabase/**', 'index.html', 'sw.js', '*/index.html', '.github/workflows/tests.yml']
   workflow_dispatch:
+    inputs:
+      giochi:
+        description: 'Prove da fare, separate da spazi: nomi dei giochi (es. skyjo flip7), «comuni» o «tutti»'
+        required: true
+        default: 'tutti'
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: prove
   cancel-in-progress: true
@@ -38,18 +48,56 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
+      - name: Scegli le prove
+        id: which
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT: ${{ github.event.inputs.giochi }}
+        run: |
+          if [ -n "$INPUT" ]; then sel="$INPUT"
+          else
+            base=$(gh run list --workflow tests.yml --branch main --status success --limit 1 --json headSha -q '.[0].headSha' 2>/dev/null || true)
+            if [ -z "$base" ] || ! git cat-file -e "$base" 2>/dev/null; then sel="tutti"; echo "Nessuna esecuzione riuscita da confrontare: provo tutto."
+            else
+              changed=$(git diff --name-only "$base" HEAD)
+              echo "Cambiato dall'ultima volta che le prove sono passate ($base):"; echo "$changed" | sed 's/^/  /'
+              sel=""
+              add() { case " $sel " in *" $1 "*) ;; *) sel="$sel $1";; esac; }
+              for d in src/*/; do g=$(basename "$d"); [ "$g" = shared ] && continue
+                if echo "$changed" | grep -q -e "^src/$g/" -e "^$g/"; then add "$g"; fi; done
+              for f in $(echo "$changed" | grep -E '^tests/(web|rules)/' || true); do
+                [ -f "$f" ] || continue
+                g=$(head -3 "$f" | sed -n 's/^\(#\|\/\/\) gioco: *//p' | head -1); add "${g:-comuni}"; done
+              if echo "$changed" | grep -q -E '^(index\.html|sw\.js|supabase/|tests/(tools|lib|db|push)/|tests/run\.sh|\.github/workflows/tests\.yml)'; then add comuni; fi
+              if echo "$changed" | grep -q -e '^src/shared/' -e '^build\.py$'; then sel="tutti"; fi
+            fi
+          fi
+          sel=$(echo $sel)
+          echo "Prove da fare: ${sel:-nessuna}"
+          echo "games=$sel" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
+        if: steps.which.outputs.games != ''
         with:
           node-version: 22
       - uses: actions/setup-python@v5
+        if: steps.which.outputs.games != ''
         with:
           python-version: '3.12'
       - name: Browser per le prove
+        if: steps.which.outputs.games != ''
         run: |
           pip install -q playwright
           python -m playwright install --with-deps chromium
       - name: Prove
+        if: steps.which.outputs.games != ''
+        env:
+          GAMES: ${{ steps.which.outputs.games }}
         run: bash tests/run.sh
+      - name: Niente da provare
+        if: steps.which.outputs.games == ''
+        run: |
+          echo "### Prove: nessun gioco cambiato, niente da provare" >> "$GITHUB_STEP_SUMMARY"
       - name: Schermate e registri
         if: always()
         uses: actions/upload-artifact@v4

@@ -1,3 +1,4 @@
+# gioco: skyjo
 """Skyjo nel browser con due telefoni (Ale host e Bea) e un giocatore automatico: prime due carte, pesca dal mazzo,
 scarto e carta scoperta, presa dagli scarti, colonna di tre carte uguali che sparisce, fine della manche con il raddoppio,
 «Prossima manche» e fine della partita con la classifica. Serve: broker su 8897 (vedi tests/run.sh)."""

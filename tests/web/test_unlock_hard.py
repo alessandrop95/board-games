@@ -1,3 +1,4 @@
+# gioco: unlock
 """Unlock! nel browser, avventure difficili: livelli su 4, «Cerca» per i numeri da calcolare, indizi contati (2 al livello 3,
 1 al livello 4) con i pulsanti che si bloccano, macchina a sequenza, tempo scaduto = avventura persa e «Ricomincia da capo».
 Serve: broker su 8897 (vedi tests/run.sh)."""

@@ -1,3 +1,4 @@
+# gioco: comuni
 """Sessioni dei tavoli: presenza, host offline e ritorno, subentro, doppia scheda, giocatore offline al suo turno,
 passaggio del comando all'uscita, avvisi dei nuovi tavoli. Broker su 8897 (sito senza server)."""
 import os, sys

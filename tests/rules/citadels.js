@@ -1,3 +1,4 @@
+// gioco: citadels
 // Prove delle regole di Citadels (una prova per regola)
 var path = require('path'), SRC = path.join(__dirname, '../../src/citadels/');
 var E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

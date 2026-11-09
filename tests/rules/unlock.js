@@ -1,3 +1,4 @@
+// gioco: unlock
 // Prove delle regole di Unlock! e coerenza delle avventure
 var path = require('path'), SRC = path.join(__dirname, '../../src/unlock/');
 var SC = require(SRC + 'scen.js'), E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

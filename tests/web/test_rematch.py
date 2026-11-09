@@ -1,3 +1,4 @@
+# gioco: comuni
 """Rivincita con le stesse persone: dopo «Nuova partita con lo stesso tavolo» animazioni e suoni devono ripartire
 in tutti i giochi, sia per l'host sia per gli altri giocatori. (Prima i contatori degli effetti della partita vecchia
 restavano più alti di quelli della nuova e Skyjo, Flip 7 e Citadels restavano muti e fermi.)

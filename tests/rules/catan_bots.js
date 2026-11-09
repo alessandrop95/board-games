@@ -1,3 +1,4 @@
+// gioco: catan
 // Catan: partite intere tra giocatori automatici (3 e 4 giocatori). Fallisce se una partita si blocca o dà errori.
 var path = require('path'), SRC = path.join(__dirname, '../../src/catan/');
 var D = require(SRC + 'data.js'), E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

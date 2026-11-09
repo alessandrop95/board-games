@@ -1,3 +1,4 @@
+# gioco: flip7
 """Flip 7 nel browser con due telefoni (Ale host e Bea) e un giocatore automatico: distribuzione, PESCA e STOP,
 Congela dato a un altro con la finestra di scelta, doppione che fa sballare, Seconda possibilità che salva,
 Flip Three automatico, Flip 7 che chiude la manche, punti della manche, «Prossima manche» e fine della partita.

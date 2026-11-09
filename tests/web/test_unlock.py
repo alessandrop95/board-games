@@ -1,3 +1,4 @@
+# gioco: unlock
 """Unlock! nel browser con due telefoni (Ale host e Bea): tutorial «La soffitta del nonno» giocato dall'interfaccia,
 con numeri visibili e nascosti, chi guarda cosa, unioni giuste e sbagliate, carta penalità, macchina, lucchetto,
 indizi, pausa e fine con le stelle. Poi un pezzo di «Abisso» con il modificatore +20 e la radio in Morse.

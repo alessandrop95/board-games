@@ -1,3 +1,4 @@
+// gioco: flip7
 // Flip 7: partite intere tra giocatori automatici (2-8 giocatori). Fallisce se una partita si blocca, dà errori o perde carte.
 var path = require('path'), SRC = path.join(__dirname, '../../src/flip7/');
 var E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

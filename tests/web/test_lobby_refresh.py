@@ -1,3 +1,4 @@
+# gioco: comuni
 """Lista dei tavoli aperti dopo che l'app è rimasta «addormentata» (in background i messaggi non arrivano):
 al risveglio la lista si richiede da sola al server ogni 5 secondi, quindi compaiono i tavoli aperti nel frattempo
 e spariscono quelli chiusi, senza aspettare il segnale dell'host (20 s) o la scadenza (150 s).

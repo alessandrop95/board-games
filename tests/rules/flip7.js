@@ -1,3 +1,4 @@
+// gioco: flip7
 // Prove delle regole di Flip 7 (una prova per regola)
 var path = require('path'), SRC = path.join(__dirname, '../../src/flip7/');
 var E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

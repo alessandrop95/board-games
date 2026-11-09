@@ -1,3 +1,4 @@
+# gioco: catan
 """Catan nel browser, con due telefoni veri (Ale host e Bea) e un giocatore automatico:
 fondazione toccando l'isola, scambio tra giocatori, il 7 con lo scarto e il ladro, costruzione, nessun errore nelle pagine.
 Serve: broker su 8897 (vedi tests/run.sh)."""

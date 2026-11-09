@@ -1,3 +1,4 @@
+# gioco: comuni
 """Funzioni per giocare con gli amici: amici online e «Raggiungi», tavoli «solo amici», serie di partite, statistiche,
 reazioni rapide, partita guidata contro i bot (tutti i giochi), «Continua la partita» in home.
 Serve: broker su 8897 e Supabase simulato su 8898 (vedi tests/run.sh)."""

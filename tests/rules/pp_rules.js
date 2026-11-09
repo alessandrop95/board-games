@@ -1,3 +1,4 @@
+// gioco: polvere-e-piombo
 /* Regole puntuali di Bang! con le espansioni Dodge City, Mezzogiorno di Fuoco e Per un Pugno di Carte. */
 var D = require('../../src/polvere-e-piombo/data.js');
 var E = require('../../src/polvere-e-piombo/engine.js');

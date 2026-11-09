@@ -1,3 +1,4 @@
+// gioco: machiavelli
 // Prove delle regole del Machiavelli
 var path = require('path'), SRC = path.join(__dirname, '../../src/machiavelli/');
 var E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

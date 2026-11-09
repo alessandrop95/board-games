@@ -1,3 +1,4 @@
+// gioco: skyjo
 // Prove delle regole di Skyjo (una prova per regola)
 var path = require('path'), SRC = path.join(__dirname, '../../src/skyjo/');
 var E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

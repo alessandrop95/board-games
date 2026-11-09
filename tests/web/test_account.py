@@ -1,3 +1,4 @@
+# gioco: comuni
 """Account: accesso obbligatorio, registrazione, amici, inviti, annuncio dei tavoli, notifica mostrata dalla pagina, uscita.
 Broker su 8897 e Supabase simulato su 8898."""
 import os, sys

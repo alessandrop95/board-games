@@ -1,3 +1,4 @@
+# gioco: comuni
 """Tavolo «Invita amico» (privato): non compare nella lista, col solo codice non si entra,
 ogni invito personale vale per una sola persona (che può rientrare), e tornando «aperto a tutti» si entra di nuovo.
 Serve: broker su 8897 (vedi tests/run.sh)."""

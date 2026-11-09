@@ -1,3 +1,4 @@
+# gioco: polvere-e-piombo
 """Bang! nel browser con le espansioni: sala d'attesa con Dodge City, Mezzogiorno di Fuoco e Per un Pugno di Carte,
 tavolo ovale in 8 (tu in basso, gli altri nell'ordine vero del giro, freccia dorata verso il prossimo, distanze nel mirino),
 mira con le linee e il motivo di chi è fuori tiro, carte con scarto in più, carte verdi, evento al centro, risposte (Bibbia, Peyote),

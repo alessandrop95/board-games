@@ -1,3 +1,4 @@
+# gioco: comuni
 """Identità al tavolo per dispositivo, interruttore degli avvisi nella pagina, avvisi durante la partita,
 iscrizione alle notifiche riparata da sola. Broker su 8897 e Supabase simulato su 8898."""
 import os, sys

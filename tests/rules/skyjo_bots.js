@@ -1,3 +1,4 @@
+// gioco: skyjo
 // Skyjo: partite intere tra giocatori automatici (2-8 giocatori), nelle quattro combinazioni di varianti
 // (classica, Skyjo Action, eliminazione, Action + eliminazione). Fallisce se una partita si blocca o dà errori.
 var path = require('path'), SRC = path.join(__dirname, '../../src/skyjo/');

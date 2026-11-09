@@ -1,3 +1,4 @@
+# gioco: citadels
 """Citadels nel browser con due telefoni (Ale host e Bea) e giocatori automatici: posti riempiti fino a 4,
 scelta segreta dei personaggi (la finestra si apre da sola, gli altri non vedono la scelta), riga «Adesso» che spiega
 cosa succede, Assassino che uccide, Ladro che deruba, risorse, costruzione, avviso di fine turno, Mago, Condottiero,

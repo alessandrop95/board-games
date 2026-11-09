@@ -1,3 +1,4 @@
+# gioco: unlock
 """Unlock! nel browser, le due avventure aggiunte: «Il teatro dell’illusionista» (3/4) e «Stazione Polare» (4/4).
 Lucchetto a carte (scelta semplice con le icone), messaggio cifrato da cercare, radio a manopole, modificatore +50 usato due volte,
 selettore della pista. Serve: broker su 8897 (vedi tests/run.sh)."""

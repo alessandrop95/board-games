@@ -1,3 +1,4 @@
+// gioco: citadels
 // Citadels: partite intere tra giocatori automatici (4-7 giocatori). Fallisce se una partita si blocca, dà errori o perde carte.
 var path = require('path'), SRC = path.join(__dirname, '../../src/citadels/');
 var E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

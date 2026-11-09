@@ -1,3 +1,4 @@
+# gioco: binari-italia
 """Ticket to Ride Italy (cartella binari-italia) nel browser: 5 biglietti iniziali, carta Traghetto pescata dal mucchio,
 traghetto pagato con le carte Traghetto, valichi dei Paesi confinanti, vista e scheda delle regioni, punteggio finale.
 Serve: broker su 8897 (vedi tests/run.sh)."""

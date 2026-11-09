@@ -1,3 +1,4 @@
+# gioco: skyjo
 """Skyjo Action e variante a eliminazione nel browser, con due telefoni (Ale host e Bea) e un giocatore automatico:
 opzioni della sala d'attesa, stella scoperta che dà una carta Azione, fila delle Azioni, Scambio con i bersagli,
 Pesca tre, Sbircia, Spazzata contro lo Scudo, Furto, penalità di +10 per le Azioni in mano, eliminazione a 100 punti

@@ -1,3 +1,4 @@
+# gioco: comuni
 """Uscita dal tavolo: host che chiude o passa il comando, solo automatici, giocatore che lascia la partita o esce per ora.
 Broker su 8897 (sito senza server)."""
 import os, sys

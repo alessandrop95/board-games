@@ -1,3 +1,4 @@
+// gioco: binari-italia
 // Prove delle regole di Ticket to Ride Italy (cartella binari-italia): regole base + mappa Italia
 var fs = require('fs'), path = require('path'), SRC = path.join(__dirname, '../../src/binari-italia/');
 global.window = global;

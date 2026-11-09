@@ -1,3 +1,4 @@
+// gioco: polvere-e-piombo
 /* Partite complete tra bot, con ogni combinazione di espansioni: nessun errore, carte conservate, partita conclusa. */
 var D = require('../../src/polvere-e-piombo/data.js');
 var E = require('../../src/polvere-e-piombo/engine.js');

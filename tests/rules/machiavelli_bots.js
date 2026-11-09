@@ -1,3 +1,4 @@
+// gioco: machiavelli
 // Machiavelli: partite intere tra giocatori automatici (2-5 giocatori). Fallisce se una partita si blocca o dà errori.
 var path = require('path'), SRC = path.join(__dirname, '../../src/machiavelli/');
 var E = require(SRC + 'engine.js'), B = require(SRC + 'bot.js');

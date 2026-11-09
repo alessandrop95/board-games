@@ -1,3 +1,4 @@
+# gioco: machiavelli
 """Machiavelli nel browser con due telefoni (Ale host e Bea): carte trascinate sul tavolo con i posti giusti evidenziati,
 mossa sbagliata rifiutata, bozza vista in diretta dall'altro telefono, fine turno, pesca, vittoria.
 Serve: broker su 8897 (vedi tests/run.sh)."""
