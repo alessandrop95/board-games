@@ -122,9 +122,17 @@ def build_cd():
         'Citadels', 'Il gioco dei personaggi segreti: ogni round scegli chi essere (Assassino, Ladro, Re, Mercante…), raccogli oro e costruisci la città più ricca. Da 4 a 7 giocatori, ognuno dal proprio telefono.', '#1a1232',
         'family=Cinzel:wght@700;800;900&family=Nunito:wght@400;600;700;800;900', r(cd, 'style.css'), cd_js, 'Citadels'))
 
+def build_cb():
+    cb = 'src/cabo/'
+    cb_js = "window.GAME_PREFIX = 'cabo/v1/';\n" + '\n'.join(r(cb, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(cb, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'cabo'), exist_ok=True)
+    open(os.path.join(ROOT, 'cabo', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Cabo', 'Il gioco di carte della memoria: quattro carte coperte, ne conosci due. Sbircia, spia gli altri, scambia le carte e chiama Cabo quando pensi di avere meno punti di tutti. Da 2 a 6 giocatori, ognuno dal proprio telefono.', '#0c2350',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(cb, 'style.css'), cb_js, 'Cabo'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

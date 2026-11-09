@@ -38,6 +38,8 @@ gstep flip7 "Regole di Flip 7" node tests/rules/flip7.js
 gstep flip7 "Partite intere tra bot (Flip 7)" node tests/rules/flip7_bots.js 10
 gstep citadels "Regole di Citadels" node tests/rules/citadels.js
 gstep citadels "Partite intere tra bot (Citadels)" node tests/rules/citadels_bots.js 10
+gstep cabo "Regole di Cabo" node tests/rules/cabo.js
+gstep cabo "Partite intere tra bot (Cabo)" node tests/rules/cabo_bots.js 10
 gstep polvere-e-piombo "Regole di Bang! con le espansioni" node tests/rules/pp_rules.js
 gstep polvere-e-piombo "Partite intere tra bot (Bang!, tutte le combinazioni di espansioni)" node tests/rules/pp_bots.js
 gstep comuni "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs

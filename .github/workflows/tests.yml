@@ -2,9 +2,9 @@ name: Prove
 # Fa girare le prove (tests/run.sh): regole, notifiche, database e partite vere nel browser.
 # Parte dopo ogni ricostruzione dei giochi (così prova le pagine appena rigenerate) e quando cambiano prove,
 # server, home o pagine modificate a mano.
-# Si provano SOLO i giochi cambiati dall'ultima volta che le prove sono passate (src/<gioco>/, <gioco>/index.html
-# o le loro prove, che dichiarano il gioco nella prima riga «gioco: …»). Home, server, notifiche e prove comuni
-# fanno partire le prove «comuni»; src/shared/ e build.py (usati da tutti i giochi) fanno partire tutto.
+# Si provano SOLO i giochi cambiati dall'ultima volta che le prove sono passate (src/<gioco>/ o le loro prove,
+# che dichiarano il gioco nella prima riga «gioco: …»). Codice condiviso (src/shared/, build.py), home, server,
+# notifiche e strumenti di prova fanno partire le prove «comuni», che passano comunque da tutti i giochi.
 # Avvio a mano (Actions → Prove → Run workflow): si scelgono i giochi, «tutti» o «comuni». Se qualcosa non va il pallino diventa rosso e GitHub manda una email;
 # nel riepilogo dell'esecuzione c'è l'elenco delle prove, tra gli allegati le schermate.
 on:
@@ -65,12 +65,13 @@ jobs:
               sel=""
               add() { case " $sel " in *" $1 "*) ;; *) sel="$sel $1";; esac; }
               for d in src/*/; do g=$(basename "$d"); [ "$g" = shared ] && continue
-                if echo "$changed" | grep -q -e "^src/$g/" -e "^$g/"; then add "$g"; fi; done
+                if echo "$changed" | grep -q -e "^src/$g/"; then add "$g"; fi; done
               for f in $(echo "$changed" | grep -E '^tests/(web|rules)/' || true); do
                 [ -f "$f" ] || continue
                 g=$(head -3 "$f" | sed -n 's/^\(#\|\/\/\) gioco: *//p' | head -1); add "${g:-comuni}"; done
-              if echo "$changed" | grep -q -E '^(index\.html|sw\.js|supabase/|tests/(tools|lib|db|push)/|tests/run\.sh|\.github/workflows/tests\.yml)'; then add comuni; fi
-              if echo "$changed" | grep -q -e '^src/shared/' -e '^build\.py$'; then sel="tutti"; fi
+              # parti comuni a tutti i giochi (codice condiviso, home, server, strumenti di prova): le prove comuni,
+              # che girano su tutti i giochi (sala d'attesa, rivincita, account…), senza rifare le prove di ogni gioco
+              if echo "$changed" | grep -q -E '^(src/shared/|build\.py|index\.html|sw\.js|supabase/|tests/(tools|lib|db|push)/|tests/run\.sh|\.github/workflows/tests\.yml)'; then add comuni; fi
             fi
           fi
           sel=$(echo $sel)
