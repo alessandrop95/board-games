@@ -43,6 +43,7 @@ gstep cabo "Partite intere tra bot (Cabo)" node tests/rules/cabo_bots.js 10
 gstep nograzie "Regole di No Grazie!" node tests/rules/nograzie.js
 gstep nograzie "Partite intere tra bot (No Grazie!)" node tests/rules/nograzie_bots.js 20
 gstep sushigo "Regole e partite tra bot di Sushi Go!" node tests/rules/sushigo.js 20
+gstep prendi6 "Regole e partite tra bot di Prendi 6!" node tests/rules/prendi6.js 10
 gstep polvere-e-piombo "Regole di Bang! con le espansioni" node tests/rules/pp_rules.js
 gstep polvere-e-piombo "Partite intere tra bot (Bang!, tutte le combinazioni di espansioni)" node tests/rules/pp_bots.js
 gstep comuni "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs

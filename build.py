@@ -146,9 +146,17 @@ def build_sg():
         'Sushi Go!', 'Il gioco del sushi: tutti insieme scegliete una carta e passate la mano. Tris di sashimi, tempura, gyoza, maki, nigiri sul wasabi e budini. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#2a1f4a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(sg, 'style.css'), sg_js, 'Sushi Go!'))
 
+def build_p6():
+    p6 = 'src/prendi6/'
+    p6_js = "window.GAME_PREFIX = 'prendi6/v1/';\n" + '\n'.join(r(p6, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(p6, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'prendi6'), exist_ok=True)
+    open(os.path.join(ROOT, 'prendi6', 'index.html'), 'w', encoding='utf-8').write(page(
+        'Prendi 6!', 'Il gioco delle teste di toro: tutti insieme giocate una carta e chi mette la sesta in una fila se la prende. Vince chi prende meno teste. Da 2 a 10 giocatori, ognuno dal proprio telefono.', '#4f7a2a',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(p6, 'style.css'), p6_js, 'Prendi 6!'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()
