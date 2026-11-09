@@ -418,6 +418,8 @@ select.field { color: #13284f; }
 .tbar.out { opacity: .6; } .tbar.out b { text-decoration: line-through; }
 .scard td.gone { color: #b5c2d8; } .scard tr.tot td.outc { color: #9aa6bd; text-decoration: line-through; }
 @media (prefers-reduced-motion: reduce) { .cl, .st, .hand.full .hc-card, .tag.wait, .lastbar, .board.big .slot.can, .pile.can .skc, .banner span, .sheet, .toast, .rr-row, .tbar i, .stamp, .played, .played .pl-card, .arc.can .skc, .hero-balloon, .over-balloon, .hero::before { animation: none !important; } .skc-in { transition: none; } }
+/* la descrizione nella presentazione non è un’etichetta: testo normale */
+.hero p.tag { display: block; font: 700 16px/1.45 var(--f-body); text-transform: none; letter-spacing: 0; background: none; padding: 0; border-radius: 0; color: #12305f; }
 
 </style>
 </head>
@@ -3152,6 +3154,7 @@ var Alerts = (function () {
     { p: 'unlock/v1/', path: 'unlock/', n: 'Unlock!' },
     { p: 'skyjo/v1/', path: 'skyjo/', n: 'Skyjo' },
     { p: 'cabo/v1/', path: 'cabo/', n: 'Cabo' },
+    { p: 'nograzie/v1/', path: 'nograzie/', n: 'No Grazie!' },
     { p: 'flip7/v1/', path: 'flip7/', n: 'Flip 7' },
     { p: 'citadels/v1/', path: 'citadels/', n: 'Citadels' }
   ];
@@ -3441,7 +3444,7 @@ var Alerts = (function () {
   }
 
   /* --- home: «Continua la partita», i tavoli dove sei seduto in qualsiasi gioco --- */
-  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table', 'unlock/': 'ul-table', 'skyjo/': 'sk-table', 'flip7/': 'f7-table', 'citadels/': 'cd-table', 'cabo/': 'cb-table' };
+  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table', 'unlock/': 'ul-table', 'skyjo/': 'sk-table', 'flip7/': 'f7-table', 'citadels/': 'cd-table', 'cabo/': 'cb-table', 'nograzie/': 'ng-table' };
   function mountContinue(el) {
     if (!el || typeof Net === 'undefined' || !Net.peekAt) return;
     var box = el.closest('section') || el, cards = {};

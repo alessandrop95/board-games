@@ -1,4 +1,4 @@
-/* ===== Cabo: suoni (carte che si girano, vento, campanelli d'aria) ===== */
+/* ===== Cabo: suoni (carte che si girano, onde, campanelli) ===== */
 (function () {
   var S = Sound, N = S.N;
   function flick(at, v) { S.hiss({ ft: 'highpass', f: [2600, 5600], q: .7, a: .004, dur: .08, vol: v || .16, at: at || 0 }); }

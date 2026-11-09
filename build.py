@@ -130,9 +130,17 @@ def build_cb():
         'Cabo', 'Il gioco di carte della memoria: quattro carte coperte, ne conosci due. Sbircia, spia gli altri, scambia le carte e chiama Cabo quando pensi di avere meno punti di tutti. Da 2 a 6 giocatori, ognuno dal proprio telefono.', '#0c2350',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(cb, 'style.css'), cb_js, 'Cabo'))
 
+def build_ng():
+    ng = 'src/nograzie/'
+    ng_js = "window.GAME_PREFIX = 'nograzie/v1/';\n" + '\n'.join(r(ng, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ng, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'nograzie'), exist_ok=True)
+    open(os.path.join(ROOT, 'nograzie', 'index.html'), 'w', encoding='utf-8').write(page(
+        'No Grazie!', 'Il gioco dei regali che nessuno vuole: prendi la carta o paga un gettone e di\' «No grazie!». Le carte in scala contano solo per la più bassa. Da 3 a 7 giocatori, ognuno dal proprio telefono.', '#4a0b1f',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(ng, 'style.css'), ng_js, 'No Grazie!'))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

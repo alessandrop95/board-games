@@ -399,3 +399,5 @@ select.field { color: #13284f; }
 .tbar.out { opacity: .6; } .tbar.out b { text-decoration: line-through; }
 .scard td.gone { color: #b5c2d8; } .scard tr.tot td.outc { color: #9aa6bd; text-decoration: line-through; }
 @media (prefers-reduced-motion: reduce) { .cl, .st, .hand.full .hc-card, .tag.wait, .lastbar, .board.big .slot.can, .pile.can .skc, .banner span, .sheet, .toast, .rr-row, .tbar i, .stamp, .played, .played .pl-card, .arc.can .skc, .hero-balloon, .over-balloon, .hero::before { animation: none !important; } .skc-in { transition: none; } }
+/* la descrizione nella presentazione non è un’etichetta: testo normale */
+.hero p.tag { display: block; font: 700 16px/1.45 var(--f-body); text-transform: none; letter-spacing: 0; background: none; padding: 0; border-radius: 0; color: #12305f; }
