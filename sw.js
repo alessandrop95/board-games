@@ -1,6 +1,6 @@
 /* Service worker di Board Games: le pagine si caricano dalla rete (così gli aggiornamenti arrivano subito)
    e, se la rete manca, dalla copia salvata. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v27';
+var CACHE = 'board-games-v28';
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js', './src/shared/account.js',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',
   './presagio/', './presagio/manifest.webmanifest', './presagio/icon-192.png',
@@ -60,6 +60,7 @@ self.addEventListener('notificationclick', function (e) {
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
     for (var i = 0; i < list.length; i++) {
       var c = list[i];
+      if (c.url === url && 'focus' in c) return c.focus();   // è già lì (per esempio «tocca a te»): basta riportarla davanti, senza ricaricare
       if (c.url.split('?')[0] === url.split('?')[0] && 'focus' in c) return c.focus().then(function (w) { return w && w.navigate ? w.navigate(url) : null; }).catch(function () { return self.clients.openWindow(url); });
     }
     return self.clients.openWindow(url);

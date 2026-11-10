@@ -3,18 +3,51 @@
    Modello: il dispositivo "host" del tavolo tiene la verità. Pubblica lo stato completo
    come messaggio "retained" (chi arriva lo riceve subito); gli altri inviano solo azioni.
    Robustezza: controllo continuo che il server risponda, riconnessione immediata quando
-   la pagina torna in primo piano, subentro automatico se l'host sparisce. */
+   la pagina torna in primo piano, subentro automatico se l'host sparisce.
+   App in secondo piano: finché il telefono lascia girare la pagina, la connessione resta viva (battito da un
+   Web Worker, che il browser non rallenta) e gli altri vedono «in pausa» invece di «offline»; se chi regge il
+   tavolo smette di guardare, il comando passa subito a chi è presente e torna al titolare quando rientra. */
 
 var NETQ = new URLSearchParams(location.search);
 var NET_PING_MS = +(NETQ.get('ping') || 10000);     // ogni quanto si interroga il server
 var NET_DEAD_MS = +(NETQ.get('dead') || 15000);     // silenzio oltre il quale si verifica la connessione
 var NET_PROBE_MS = 5000;                            // attesa della risposta alla verifica
-var NET_STALE_MS = +(NETQ.get('stale') || 70000);   // oltre questo silenzio la connessione è morta di sicuro (keepalive 45 s × 1,5)
+var NET_WAKE_PROBE_MS = 2500;                       // la stessa attesa, più corta, quando la pagina torna in primo piano
+var NET_KEEP_S = +(NETQ.get('keep') || 120);        // silenzio che il server tollera (×1,5) prima di scollegarci: largo, così regge anche i timer rallentati
+var NET_STALE_MS = +(NETQ.get('stale') || 30000);   // dopo un sonno così lungo non si verifica nemmeno: ci si ricollega subito
+
+/* ---------- battito che non si ferma in secondo piano ----------
+   I timer di una pagina nascosta vengono rallentati dal browser (fino a uno al minuto). I controlli periodici
+   (ping, presenza, tavolo) passano da qui: mentre si è a un tavolo il battito arriva da un Web Worker, che non
+   viene rallentato. Se il telefono sospende del tutto la pagina, al risveglio ce ne accorgiamo dal salto d'orario. */
+var Beat = (function () {
+  var jobs = [], worker = null, last = Date.now(), gapFn = null;
+  function pump() {
+    var now = Date.now(), gap = now - last; last = now;
+    if (gap > 8000 && gapFn) { try { gapFn(gap); } catch (e) {} }
+    jobs.slice().forEach(function (j) {
+      if (j.dead || now - j.last < j.ms - 60) return;
+      j.last = now; try { j.fn(); } catch (e) { console.warn('battito', e); }
+    });
+  }
+  setInterval(pump, 1000);
+  // fn ogni ms millisecondi (al secondo più vicino); restituisce la funzione per smettere
+  function every(ms, fn) { var j = { ms: ms, fn: fn, last: Date.now(), dead: false }; jobs.push(j); return function () { j.dead = true; jobs = jobs.filter(function (x) { return x !== j; }); }; }
+  function boost(on) {
+    if (on && !worker) {
+      try {
+        worker = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},1000)'], { type: 'text/javascript' })));
+        worker.onmessage = pump; worker.onerror = function () { worker = null; };
+      } catch (e) { worker = null; }
+    } else if (!on && worker) { try { worker.terminate(); } catch (e) {} worker = null; }
+  }
+  return { every: every, boost: boost, onGap: function (f) { gapFn = f; }, get boosted() { return !!worker; } };
+})();
 
 /* ---------- client MQTT 3.1.1 minimo ---------- */
 function MQ(url) {
   this.url = url; this.subs = {}; this.handlers = []; this.statusHandlers = [];
-  this.connected = false; this.closed = false; this.pid = 1; this.buf = new Uint8Array(0);
+  this.connected = false; this.closed = false; this.pid = 1; this.buf = new Uint8Array(0); this.acks = {};
   this.backoff = 800; this.lastRx = Date.now(); this.id = 'pp' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-6);
   var self = this;
   this.ready = new Promise(function (res, rej) { self._res = res; self._rej = rej; });
@@ -36,7 +69,7 @@ MQ.prototype._open = function () {
   ws.binaryType = 'arraybuffer'; this.ws = ws; this.buf = new Uint8Array(0);
   this.openTimer = setTimeout(function () { if (!self.connected && self.ws === ws) self._drop(); }, 7000);
   ws.onopen = function () {
-    var body = MQ.str('MQTT').concat([4, 0x02, 0, 45]).concat(MQ.str(self.id));
+    var body = MQ.str('MQTT').concat([4, 0x02, NET_KEEP_S >> 8, NET_KEEP_S & 255]).concat(MQ.str(self.id));
     ws.send(MQ.packet(0x10, body));
   };
   ws.onmessage = function (ev) {
@@ -56,7 +89,7 @@ MQ.prototype._drop = function () {
 };
 MQ.prototype._down = function () {
   var self = this, was = this.connected;
-  this.connected = false; clearInterval(this.pinger); clearTimeout(this.openTimer); clearTimeout(this.probeTimer); this.probeTimer = null;
+  this.connected = false; if (this.pinger) { this.pinger(); this.pinger = null; } clearTimeout(this.openTimer); clearTimeout(this.probeTimer); this.probeTimer = null; this.acks = {};
   if (was) this.statusHandlers.forEach(function (f) { f(false); });
   if (this.closed) return;
   if (!this.everUp) { this._rej(new Error('broker non raggiungibile')); this.closed = true; return; }
@@ -65,19 +98,19 @@ MQ.prototype._down = function () {
   this.backoff = Math.min(this.backoff * 1.7, 8000);
 };
 // Verifica attiva: manda un ping e, se entro pochi secondi non arriva nulla, considera la connessione morta.
-MQ.prototype.probe = function () {
+MQ.prototype.probe = function (ms) {
   var self = this;
   if (!this.connected || this.probeTimer) return;
   var since = Date.now();
   this._raw(MQ.packet(0xC0, []));
-  this.probeTimer = setTimeout(function () { self.probeTimer = null; if (self.connected && self.lastRx < since) self._drop(); }, NET_PROBE_MS);
+  this.probeTimer = setTimeout(function () { self.probeTimer = null; if (self.connected && self.lastRx < since) self._drop(); }, ms || NET_PROBE_MS);
 };
 // Da chiamare quando la pagina torna visibile o la rete torna disponibile.
 MQ.prototype.wake = function () {
   if (this.closed) return;
   // dopo un lungo sonno (app in background) il server ci ha già scollegati: inutile aspettare la verifica, si riparte subito
   if (this.connected && Date.now() - this.lastRx > NET_STALE_MS) { this._drop(); return; }
-  if (this.connected) { this.probe(); return; }
+  if (this.connected) { this.probe(NET_WAKE_PROBE_MS); return; }
   if (!this.ws) { this.backoff = 800; this._open(); }
 };
 MQ.prototype._parse = function () {
@@ -97,10 +130,11 @@ MQ.prototype._handle = function (h, body) {
     if (body[1] !== 0) { this._drop(); return; }
     clearTimeout(this.openTimer);
     this.connected = true; this.everUp = true; this.backoff = 800;
-    this.pinger = setInterval(function () {
+    if (this.pinger) this.pinger();
+    this.pinger = Beat.every(NET_PING_MS, function () {
       if (Date.now() - self.lastRx > NET_DEAD_MS) self.probe();
       else self._raw(MQ.packet(0xC0, []));
-    }, NET_PING_MS);
+    });
     var topics = Object.keys(this.subs); if (topics.length) this._sub(topics);
     this._res(this);
     this.statusHandlers.forEach(function (f) { f(true); });
@@ -109,18 +143,23 @@ MQ.prototype._handle = function (h, body) {
     if (qos > 0) { var id = [body[p], body[p + 1]]; p += 2; if (qos === 1) this._raw(MQ.packet(0x40, id)); }
     var payload = MQ.dec.decode(body.subarray(p)), retained = !!(h & 1);
     this.handlers.forEach(function (f) { f(topic, payload, retained); });
+  } else if (type === 9) { // SUBACK: il server ha registrato l'iscrizione
+    var sid = (body[0] << 8) | body[1], ack = this.acks[sid];
+    if (ack) { delete this.acks[sid]; ack(); }
   }
 };
 MQ.prototype._raw = function (pkt) { if (this.ws && this.ws.readyState === 1) { try { this.ws.send(pkt); return true; } catch (e) {} } return false; };
 MQ.prototype._nextId = function () { this.pid = this.pid % 65000 + 1; return [this.pid >> 8, this.pid & 255]; };
 MQ.prototype._sub = function (topics) {
-  var body = this._nextId();
+  var body = this._nextId(), id = this.pid;
   topics.forEach(function (t) { body = body.concat(MQ.str(t), [0]); });
   this._raw(MQ.packet(0x82, body));
+  return id;
 };
 // Richiede di nuovo un argomento già seguito: il server rimanda i messaggi conservati (per esempio la lista dei tavoli).
 MQ.prototype.resub = function (topic) { if (!this.connected || !this.subs[topic]) return false; this._sub([topic]); return true; };
-MQ.prototype.subscribe = function (topic) { this.subs[topic] = true; if (this.connected) this._sub([topic]); };
+// onAck (facoltativa): chiamata quando il server conferma l'iscrizione; i messaggi conservati arrivano subito dopo.
+MQ.prototype.subscribe = function (topic, onAck) { this.subs[topic] = true; if (this.connected) { var id = this._sub([topic]); if (onAck) this.acks[id] = onAck; } };
 MQ.prototype.unsubscribe = function (topic) {
   if (!this.subs[topic]) return; delete this.subs[topic];
   if (this.connected) this._raw(MQ.packet(0xA2, this._nextId().concat(MQ.str(topic))));
@@ -143,9 +182,12 @@ var Net = (function () {
     'wss://broker.emqx.io:8084/mqtt',
     'wss://test.mosquitto.org:8081/mqtt'
   ];
-  var HOST_TIMEOUT = +(qs.get('hostTimeout') || 20000);          // dopo quanto mostrare l'avviso
-  var AUTO_TAKEOVER = +(qs.get('autoTakeover') || HOST_TIMEOUT * 1.5); // dopo quanto subentrare da soli
-  var STAGGER = +(qs.get('stagger') || 6000);                     // attesa extra per ogni giocatore prima di me
+  var HOST_TIMEOUT = +(qs.get('hostTimeout') || 12000);          // dopo quanto mostrare l'avviso
+  var AUTO_TAKEOVER = +(qs.get('autoTakeover') || HOST_TIMEOUT * 1.25); // dopo quanto subentrare da soli in partita (in sala d'attesa il doppio)
+  var STAGGER = +(qs.get('stagger') || 5000);                     // attesa extra per ogni giocatore prima di me
+  var GIVEBACK = +(qs.get('giveBack') || 5000);                   // il titolare è tornato e guarda il tavolo da così tanto: gli si rende il comando
+  var PROXY_MS = +(qs.get('proxyMs') || 5500);                    // host muto da così tanto: chi arriva si siede da solo
+  var TABLE_MAX_AGE = 7 * 24 * 3600e3;                            // un tavolo fermo da una settimana è abbandonato: si chiude da solo
   var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
   var uid = null; try { uid = localStorage.getItem('pp-uid'); } catch (e) {}
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); try { localStorage.setItem('pp-uid', uid); } catch (e) {} }
@@ -156,6 +198,8 @@ var Net = (function () {
   var LOBBY_SWEEP = +(qs.get('lobbySweep') || 3000);     // attesa delle risposte prima di togliere i tavoli spariti
   var FIND_MS = +(qs.get('findMs') || 4500);          // attesa massima della risposta quando si cerca un tavolo
   var PRES_MS = +(qs.get('presMs') || 35000);       // oltre questo silenzio un giocatore risulta offline
+  var HB_MS = Math.min(10000, PRES_MS / 3);          // ogni quanto ognuno dice «ci sono»
+  var HID_MS = Math.max(25000, HB_MS * 2.5);         // «in pausa» vale finché viene confermato
   function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
   /* Stesso tavolo aperto in due schede dello stesso telefono/computer: resta attiva solo l'ultima aperta
      (due schede con la stessa identità applicherebbero le mosse due volte e la partita si sdoppierebbe). */
@@ -188,20 +232,36 @@ var Net = (function () {
     Object.keys(clients).forEach(function (k) { clients[k].wake(); });
     if (T) { T.lastPing = Math.max(T.lastPing, Date.now() - 2000); T.graceUntil = Date.now() + 8000; heartbeat(T, true); }
   }
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wakeAll(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') { wakeAll(); return; }
+    // la pagina va in secondo piano: gli altri lo sanno subito e, se reggo io la partita, la passo a chi sta guardando
+    if (T) { heartbeat(T, true); maybeHandOver(T); }
+  });
   window.addEventListener('online', wakeAll);
-  window.addEventListener('pageshow', function (e) { if (e.persisted) wakeAll(); });
+  window.addEventListener('pageshow', wakeAll);
   window.addEventListener('focus', wakeAll);
+  document.addEventListener('resume', wakeAll);   // la pagina era stata «congelata» dal browser
+  try { if (navigator.connection && navigator.connection.addEventListener) navigator.connection.addEventListener('change', wakeAll); } catch (e) {}   // da Wi-Fi a rete mobile
+  Beat.onGap(wakeAll);                             // il telefono (o il computer) ha dormito senza avvisare
 
-  function probeState(c, code, ms) {
+  // quick (facoltativo): se il server conferma l'iscrizione e poco dopo non è arrivato niente, il tavolo non c'è
+  // (senza aspettare tutta l'attesa massima). Si usa solo per scegliere un codice libero.
+  function probeState(c, code, ms, quick) {
     return new Promise(function (res) {
       var st = topic(code, 'state'), done = false;
       function fin(v) { if (done) return; done = true; c.handlers = c.handlers.filter(function (x) { return x !== h; }); res(v); }
       function h(t, p) { if (t === st) fin(p ? safeParse(p) : null); }
       c.onMessage(h);
-      c.subscribe(st);
+      c.subscribe(st, quick ? function () { setTimeout(function () { fin(null); }, quick); } : null);
       setTimeout(function () { fin(null); }, ms);
     });
+  }
+  function expired(d) { return !!(d && !d.closed && d.updated && Date.now() - d.updated > TABLE_MAX_AGE); }
+  // Chiude un tavolo sul server: lascia una «lapide» (così nessuno lo riapre per errore) e lo toglie dalla lista.
+  function tombstone(c, code, d) {
+    var ok = c.publish(topic(code, 'state'), JSON.stringify({ code: code, closed: true, rev: ((d && d.rev) || 0) + 1, updated: Date.now() }), true);
+    if (ok) { if (d && d.lobbyId) c.publish(lobbyTopic(d.lobbyId), '', true); c.publish(topic(code, 'chatlog'), '', true); }
+    return ok;
   }
   function safeParse(p) { try { return JSON.parse(p); } catch (e) { return null; } }
   async function firstBroker() {
@@ -220,6 +280,7 @@ var Net = (function () {
           reached = true;
           if (done) return;
           return probeState(c, code, ms).then(function (doc) {
+            if (expired(doc)) { tombstone(c, code, doc); doc = { code: code, closed: true }; }   // abbandonato da giorni
             if (doc && doc.code === code && !doc.closed) { finish({ i: i, c: c, doc: doc }); return; }
             if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
             if (doc && doc.closed) closed = true;
@@ -269,23 +330,27 @@ var Net = (function () {
         client(i).then(function (c) {
           return new Promise(function (res) {
             var t0 = setTimeout(function () { c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); res(); }, ms || 4000);
-            function h(t, p) { if (t !== st) return; var d = p ? safeParse(p) : null; if (d && d.closed) closed = true; else if (d && d.code === code) { clearTimeout(t0); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); fin({ doc: d }); } }
+            function h(t, p) { if (t !== st) return; var d = p ? safeParse(p) : null; if (expired(d)) d = { closed: true }; if (d && d.closed) closed = true; else if (d && d.code === code) { clearTimeout(t0); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); fin({ doc: d }); } }
             c.onMessage(h); c.subscribe(st);
           });
         }).catch(function () {}).then(function () { if (--pending === 0) fin(closed ? { closed: true } : null); });
       });
     });
   }
+  function acctName() { var a = window.Account && Account.user && Account.user(); return a && /^[A-Za-z0-9_.-]{3,18}$/.test(a.username || '') ? a.username : null; }
   function newCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 
   async function create(nick, opts) {
     var b = await firstBroker();
     for (var k = 0; k < 6; k++) {
       var code = newCode();
-      var ex = await probeState(b.c, code, 1200);
+      var ex = await probeState(b.c, code, 1200, 400);
       b.c.unsubscribe(topic(code, 'state'));
-      if (ex && ex.code && !ex.closed) continue;
-      var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
+      if (ex && ex.code && !ex.closed && !expired(ex)) continue;
+      var seat = { uid: uid, nick: nick }, an = acctName(); if (an) seat.acct = an;
+      // host = chi regge il tavolo adesso; owner = il titolare (chi l'ha aperto): se il comando passa a un altro
+      // mentre lui non c'è, al suo ritorno gli viene reso.
+      var doc = { code: code, host: uid, owner: uid, phase: 'lobby', seats: [seat], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
         vis: visOf(opts && opts.vis), lobbyId: rid() };
       if (opts && opts.practice) { doc.practice = true; doc.vis = 'invite'; }
       if (!b.c.publish(topic(code, 'state'), JSON.stringify(doc), true)) throw 'La connessione è caduta. Riprova.';
@@ -303,10 +368,10 @@ var Net = (function () {
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     if (!mayEnter(f.doc, uid, keyFor(code))) { f.c.unsubscribe(topic(code, 'state')); return 'private'; }
     var c = f.c;
-    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], graceUntil: 0, chat: [], chatIds: {},
-      seen: {}, upSince: Date.now(), lastHb: 0, resync: false, unpub: false, hostRev: 0 };
+    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, stops: [], graceUntil: 0, chat: [], chatIds: {},
+      seen: {}, hid: {}, visSince: {}, lost: {}, upSince: Date.now(), lastHb: 0, sentHid: null, resync: false, unpub: false, hostRev: 0 };
     var me = T;
-    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tReact = topic(code, 'react');
+    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tVis = topic(code, 'vis'), tReact = topic(code, 'react');
     me.handler = function (t, p) {
       if (T !== me) return;
       if (t === tState) {
@@ -322,23 +387,24 @@ var Net = (function () {
         }
         me.lastPing = Date.now();
         accept(d);
-      } else if (t === tPing) { me.lastPing = Date.now(); if (me.doc) me.seen[me.doc.host] = Date.now(); }
-      else if (t === tHb) { var hu = String(p || '').slice(0, 40); if (hu) me.seen[hu] = Date.now(); }
+      } else if (t === tPing) { me.lastPing = Date.now(); if (me.doc) heard(me, me.doc.host); }
+      else if (t === tHb) { var hu = String(p || '').slice(0, 40); if (hu) heard(me, hu); }
+      else if (t === tVis) { var vm = /^([^|]{1,40})\|([hv])$/.exec(String(p || '')); if (vm) heard(me, vm[1], vm[2] === 'h'); }
       else if (t === tRes) {
         var r = safeParse(p); if (!r || !me.pending[r.id]) return;
         var pd = me.pending[r.id]; delete me.pending[r.id]; clearInterval(pd.timer);
         if (r.err) pd.rej(r.err); else pd.res(r.out || null);
       } else if (t === tChat) {
-        var cm = safeParse(p); if (cm && cm.uid) me.seen[String(cm.uid).slice(0, 40)] = Date.now();
+        var cm = safeParse(p); if (cm && cm.uid) heard(me, String(cm.uid).slice(0, 40), false);
         if (addChat(me, cm, false) && me.isHost) saveChatLog(me);
       } else if (t === tReact) {
-        var rm = safeParse(p); if (rm && rm.uid && reactCb) { me.seen[String(rm.uid).slice(0, 40)] = Date.now(); reactCb(rm); }
+        var rm = safeParse(p); if (rm && rm.uid) { heard(me, String(rm.uid).slice(0, 40), false); if (reactCb) reactCb(rm); }
       } else if (t === tLog) {
         var arr = p ? safeParse(p) : null;
         if (Array.isArray(arr)) arr.forEach(function (m) { addChat(me, m, true); });
       } else if (t === tAct && me.isHost && !me.resync) {
         var m = safeParse(p); if (!m || !m.id || !m.from) return;
-        me.seen[String(m.from).slice(0, 40)] = Date.now();
+        heard(me, String(m.from).slice(0, 40));
         hostHandle(m);
       }
     };
@@ -357,18 +423,31 @@ var Net = (function () {
       if (onStatus) onStatus();
     };
     c.onStatus(me.statusFn);
-    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tReact);
+    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tVis); c.subscribe(tReact);
     accept(f.doc);
     heartbeat(me, true);
     if (bc) { try { bc.postMessage({ k: 'open', key: PREFIX + code, tab: TAB }); } catch (e) {} }
-    me.timers.push(setInterval(function () {
+    Beat.boost(true);   // seduti a un tavolo: il battito non deve rallentare se l'app va in secondo piano
+    me.stops.push(Beat.every(Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4)), function () {
       if (T !== me) return;
       heartbeat(me, false);
-      if (me.isHost) { c.publish(tPing, String(Date.now()), false); if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true); }
-      else maybeTakeOver(me);
+      if (me.isHost) {
+        c.publish(tPing, String(Date.now()), false);
+        if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true);
+        maybeHandOver(me); maybeGiveBack(me);
+      } else maybeTakeOver(me);
       if (onStatus) onStatus();
-    }, Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4))));
+    }));
     return true;
+  }
+  // Ho sentito un giocatore. hidden: true = ha l'app in secondo piano, false = la sta guardando, niente = non lo dice.
+  function heard(me, u, hidden) {
+    var now = Date.now(), prev = me.seen[u] || 0;
+    me.seen[u] = now;
+    if (hidden === true) { me.hid[u] = now; me.visSince[u] = 0; return; }
+    if (hidden === false) delete me.hid[u];
+    else if (me.hid[u] && now - me.hid[u] > HID_MS) delete me.hid[u];
+    if (!me.hid[u] && (!me.visSince[u] || now - prev > Math.max(15000, HB_MS * 2))) me.visSince[u] = now;   // presente e attento da adesso
   }
   // Fine della risincronizzazione dopo una disconnessione. d = stato trovato sul server (o null se non è arrivato).
   function endResync(me, d) {
@@ -377,7 +456,8 @@ var Net = (function () {
     // Ero l'host ma sul server c'è uno stato pubblicato da un altro dopo che avevo preso il comando:
     // mentre ero via qualcuno è subentrato. Vale il suo stato; le mie modifiche fatte offline si scartano.
     if (d && me.isHost && d.host !== uid && (d.rev || 0) >= (me.hostRev || 0)) { me.unpub = false; me.lastPing = Date.now(); accept(d); return; }
-    if (d && (!me.doc || (d.rev || 0) > (me.doc.rev || 0))) { me.lastPing = Date.now(); accept(d); return; }
+    // (stessa versione ma io non avevo pubblicato la mia: mentre ero via qualcuno si è seduto da solo, vedi selfSeat)
+    if (d && (!me.doc || (d.rev || 0) > (me.doc.rev || 0) || (me.unpub && (d.rev || 0) === (me.doc.rev || 0)))) { me.unpub = false; me.lastPing = Date.now(); accept(d); return; }
     // Sono l'host e il server ha uno stato più vecchio del mio (o niente): pubblico il mio.
     if (me.isHost && me.doc && (me.unpub || !d || (d.rev || 0) < (me.doc.rev || 0))) flush(me);
   }
@@ -386,43 +466,71 @@ var Net = (function () {
     me.unpub = !(me.up && me.c.publish(topic(me.code, 'state'), JSON.stringify(me.doc), true));
     if (!me.unpub) announce(true);
   }
-  // Segnale di presenza: ogni giocatore lo manda ogni 10 secondi finché ha la pagina aperta e collegata.
+  // Segnale di presenza: ogni giocatore lo manda ogni 10 secondi finché la pagina gira ed è collegata.
+  // Con l'app in secondo piano aggiunge «sono in pausa»: gli altri lo vedono distinto da chi è sparito davvero.
   function heartbeat(me, now) {
-    if (!me.up || (!now && Date.now() - me.lastHb < 10000)) return;
+    if (!me.up || (!now && Date.now() - me.lastHb < HB_MS)) return;
+    var hidden = document.visibilityState === 'hidden';
     if (me.c.publish(topic(me.code, 'hb'), uid, false)) me.lastHb = Date.now();
+    if ((hidden || me.sentHid !== hidden) && me.c.publish(topic(me.code, 'vis'), uid + '|' + (hidden ? 'h' : 'v'), false)) me.sentHid = hidden;
   }
-  // 'on' = collegato adesso, 'off' = non si sente da un po', null = non si sa ancora (appena entrati o offline noi).
+  // 'on' = collegato e sta guardando, 'away' = collegato ma con l'app in secondo piano, 'off' = non si sente da un po',
+  // null = non si sa ancora (appena entrati o offline noi).
   function presence(u) {
     if (!T || !u || /^bot-/.test(u)) return null;
     if (u === uid) return T.up ? 'on' : 'off';
     var s = T.seen[u], now = Date.now();
-    if (s && now - s < PRES_MS) return 'on';
+    if (s && now - s < PRES_MS) return T.hid[u] && now - T.hid[u] < HID_MS ? 'away' : 'on';
     if (!T.up || T.resync || now - T.upSince < PRES_MS) return null;
     return 'off';
   }
-  function offlineFor(u) { if (!T) return 0; return presence(u) === 'off' ? Date.now() - Math.max(T.seen[u] || 0, T.upSince) + PRES_MS : 0; }
+  // Da quanto non si sente un giocatore che risulta offline (0 se è collegato o non si sa).
+  function offlineFor(u) { if (!T) return 0; return presence(u) === 'off' ? Date.now() - Math.max(T.seen[u] || 0, T.upSince) : 0; }
   var presCss = false;
   function dot(u) {
     var st = presence(u); if (!st) return '';
     if (!presCss) {
       presCss = true; var el = document.createElement('style');
-      el.textContent = '.pres{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 6px 1px 0;vertical-align:middle;flex:none}.pres-on{background:#3fd27a;box-shadow:0 0 0 2px rgba(63,210,122,.25)}.pres-off{background:#9aa0a8;box-shadow:0 0 0 2px rgba(154,160,168,.2)}.pres-t{font-size:.78em;opacity:.75;margin-left:6px;font-weight:400;white-space:nowrap}';
+      el.textContent = '.pres{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 6px 1px 0;vertical-align:middle;flex:none}.pres-on{background:#3fd27a;box-shadow:0 0 0 2px rgba(63,210,122,.25)}.pres-off{background:#9aa0a8;box-shadow:0 0 0 2px rgba(154,160,168,.2)}.pres-away{background:#f0b33e;box-shadow:0 0 0 2px rgba(240,179,62,.25)}.pres-t{font-size:.78em;opacity:.75;margin-left:6px;font-weight:400;white-space:nowrap}';
       document.head.appendChild(el);
     }
-    return '<i class="pres pres-' + st + '" title="' + (st === 'on' ? 'Collegato' : 'Offline') + '" aria-hidden="true"></i>';
+    return '<i class="pres pres-' + st + '" title="' + (st === 'on' ? 'Collegato' : st === 'away' ? 'Collegato, con l’app in secondo piano' : 'Offline') + '" aria-hidden="true"></i>';
   }
-  function offTag(u) { return presence(u) === 'off' ? '<span class="pres-t">offline</span>' : ''; }
+  function offTag(u) { var st = presence(u); return st === 'off' ? '<span class="pres-t">offline</span>' : st === 'away' ? '<span class="pres-t">in pausa</span>' : ''; }
   function presenceSig() { if (!T || !T.doc) return ''; return T.doc.seats.map(function (s) { return s.bot ? '' : presence(s.uid) || '-'; }).join(''); }
   // Subentro automatico: solo un giocatore seduto, collegato e con la pagina aperta.
   // Per evitare due subentri insieme, ognuno aspetta in più in base al suo posto.
+  // In partita si subentra presto (chi aspetta la sua mossa non deve restare fermo); in sala d'attesa con più calma,
+  // perché lì chi ha aperto il tavolo spesso è solo andato a mandare l'invito agli amici.
   function maybeTakeOver(me) {
     if (!me.doc || me.closed || !me.up || me.resync || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
     var humans = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== me.doc.host; }).map(function (s) { return s.uid; });
     var rank = humans.indexOf(uid);
     if (rank < 0) return;
-    if (Date.now() - me.lastPing < AUTO_TAKEOVER + rank * STAGGER) return;
-    takeHost();
+    if (Date.now() - me.lastPing < AUTO_TAKEOVER * (me.doc.phase === 'lobby' ? 2 : 1) + rank * STAGGER) return;
+    me.lost[me.doc.host] = (me.lost[me.doc.host] || 0) + 1;
+    takeHost(true);
     if (onTakeover) onTakeover();
+  }
+  function seatedHuman(d, u) { return !!(d && d.seats && d.seats.some(function (s) { return s.uid === u && !s.bot; })); }
+  // Reggo la partita ma la mia app è finita in secondo piano (il telefono può sospenderla da un momento all'altro):
+  // passo subito il comando a chi sta guardando il tavolo. Resto il titolare: quando torno mi viene reso.
+  // In sala d'attesa no: lì il comando serve a chi ha aperto il tavolo (opzioni, inizio della partita).
+  function maybeHandOver(me) {
+    if (T !== me || !me.isHost || !me.doc || me.doc.phase === 'lobby' || me.closed || !me.up || me.resync || me.unpub || document.visibilityState !== 'hidden') return;
+    var next = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== uid && presence(s.uid) === 'on'; })[0];
+    if (!next) return;
+    hostApply(function (w) { if (!w.owner) w.owner = uid; w.host = next.uid; return true; });
+  }
+  // Reggo il tavolo al posto del titolare e lui è tornato (collegato, con il tavolo davanti, da qualche secondo):
+  // gli rendo il comando. Se l'aveva già perso più volte per la connessione, aspetto un po' di più.
+  function maybeGiveBack(me) {
+    var d = me.doc;
+    if (T !== me || !me.isHost || !d || !d.owner || d.owner === uid || me.closed || !me.up || me.resync || me.unpub) return;
+    if (!seatedHuman(d, d.owner) || presence(d.owner) !== 'on') return;
+    var since = me.visSince[d.owner];
+    if (!since || Date.now() - since < GIVEBACK * (1 + 3 * Math.min(4, me.lost[d.owner] || 0))) return;
+    hostApply(function (w) { if (w.owner === uid || !seatedHuman(w, w.owner)) return false; w.host = w.owner; return true; });
   }
   function accept(d) {
     T.doc = d;
@@ -527,6 +635,8 @@ var Net = (function () {
   // L'host applica sempre la modifica sul suo telefono; la pubblica solo se è collegato e sincronizzato.
   // Se non può (offline o appena ricollegato), la tiene da parte: endResync decide poi se pubblicarla o scartarla.
   function publishState() {
+    // il titolare deve essere una persona seduta al tavolo: se se n'è andato, lo diventa chi regge il tavolo
+    if (!T.doc.owner || !seatedHuman(T.doc, T.doc.owner)) T.doc.owner = T.doc.host;
     if (beforePublish) beforePublish(T.doc);
     T.doc.rev = (T.doc.rev || 0) + 1; T.doc.updated = Date.now();
     T.unpub = !(T.up && !T.resync && T.c.publish(topic(T.code, 'state'), JSON.stringify(T.doc), true));
@@ -551,7 +661,37 @@ var Net = (function () {
     if (gate && seatedIn(work, from)) {   // l'invito ora è di chi l'ha usato per sedersi
       var hk = khash(String(op.k)); (work.keys || []).forEach(function (x) { if (x.h === hk) x.u = from; }); r.changed = true;
     }
+    if (stampAcct(work, from, op)) r.changed = true;
     if (r.changed !== false) { T.doc = work; publishState(); }
+    return r;
+  }
+  // Chi si siede con l'account lascia sul suo posto il nome utente: serve a mandargli la notifica «tocca a te»
+  // quando ha l'app chiusa (vedi turns.js).
+  function stampAcct(work, from, op) {
+    if (!op || op.t !== 'join') return false;
+    var s = work.seats.filter(function (x) { return x.uid === from; })[0]; if (!s) return false;
+    var a = typeof op.acct === 'string' && /^[A-Za-z0-9_.-]{3,18}$/.test(op.acct) ? op.acct : null;
+    if ((s.acct || null) === a) return false;
+    if (a) s.acct = a; else delete s.acct;
+    return true;
+  }
+  /* L'host non risponde (telefono in tasca, app sospesa mentre manda l'invito su WhatsApp…) e io voglio sedermi:
+     lo faccio da solo, con le stesse regole che userebbe lui e senza togliergli il comando. Al suo ritorno trova
+     il mio posto già occupato. Risponde come l'host ({err} / {out}), oppure null se qui non si può fare. */
+  function selfSeat(me, op) {
+    var work = JSON.parse(JSON.stringify(me.doc));
+    var gate = work.vis === 'direct' && work.host !== uid && !seatedIn(work, uid);
+    if (gate && !mayEnter(work, uid, op.k)) return { err: PRIVATE };
+    var r; try { r = reducer(work, uid, op) || {}; } catch (e) { return null; }
+    if (r.err) return r;
+    if (r.changed === false && !stampAcct(work, uid, op)) return r;   // già seduto, o partita in corso (si guarda): niente da scrivere
+    if (me.doc.phase !== 'lobby' || work.phase !== 'lobby') return r.changed === false ? r : null;   // a partita iniziata scrive solo l'host
+    if (gate && seatedIn(work, uid)) { var hk = khash(String(op.k)); (work.keys || []).forEach(function (x) { if (x.h === hk) x.u = uid; }); }
+    stampAcct(work, uid, op);
+    if (beforePublish) beforePublish(work);
+    work.rev = (work.rev || 0) + 1; work.updated = Date.now();
+    if (!me.c.publish(topic(me.code, 'state'), JSON.stringify(work), true)) return null;
+    accept(work);
     return r;
   }
   // Un giocatore lascia il tavolo per sempre (scelta dal pulsante «Esci», vedi exit.js). Vale per tutti i giochi.
@@ -603,17 +743,33 @@ var Net = (function () {
   }
   function send(op) {
     if (!T || !T.doc) return Promise.reject('Non sei collegato a nessun tavolo.');
-    if (op && op.t === 'join' && !op.k && keyFor(T.code)) op = Object.assign({}, op, { k: keyFor(T.code) });
+    if (op && op.t === 'join') {
+      var extra = {}, an = acctName();
+      if (!op.k && keyFor(T.code)) extra.k = keyFor(T.code);
+      if (an && !op.acct) extra.acct = an;
+      op = Object.assign({}, op, extra);
+    }
     if (T.isHost) { var r = applyLocal(uid, op); return r.err ? Promise.reject(r.err) : Promise.resolve(r.out || null); }
     var id = uid + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), me = T;
     var msg = JSON.stringify({ id: id, from: uid, op: op });
     if (!me.up) me.c.wake(); else if (Date.now() - me.c.lastRx > 8000) me.c.probe();
     return new Promise(function (res, rej) {
       var tries = 0;
+      function stop() { clearInterval(pd.timer); delete me.pending[id]; }
       function fire() {
-        if (T !== me) { clearInterval(pd.timer); delete me.pending[id]; rej('Hai lasciato il tavolo.'); return; }
-        if (tries++ >= 4) {
-          clearInterval(pd.timer); delete me.pending[id];
+        if (T !== me) { stop(); rej('Hai lasciato il tavolo.'); return; }
+        // nel frattempo il comando è passato a me: la mossa la applico io
+        if (me.isHost && !me.resync) { stop(); var mine = applyLocal(uid, op); if (mine.err) rej(mine.err); else res(mine.out || null); return; }
+        var mute = me.up && Date.now() - me.lastPing > PROXY_MS;
+        // l'host è muto e voglio solo sedermi: lo faccio da me (vedi selfSeat)
+        if (tries >= 2 && mute && op && op.t === 'join' && me.doc) {
+          var own = selfSeat(me, op);
+          if (own) { stop(); if (own.err) rej(own.err); else res(own.out || null); return; }
+        }
+        // host sparito: si insiste finché un altro giocatore non prende il comando (la stessa mossa arriva a lui, una volta sola)
+        var max = me.up && me.doc && me.doc.phase !== 'lobby' && Date.now() - me.lastPing > HOST_TIMEOUT ? 4 + Math.ceil((AUTO_TAKEOVER + 2 * STAGGER) / 3000) : 4;
+        if (tries++ >= max) {
+          stop();
           rej(me.up ? 'L’host non risponde. Se è uscito, il comando passa a un altro giocatore tra poco.' : 'Sei offline: la mossa non è partita. Riprova quando torna la connessione.');
           return;
         }
@@ -630,21 +786,42 @@ var Net = (function () {
     if (!fn(work)) return false;
     T.doc = work; publishState(); return true;
   }
-  function takeHost() {
+  // auto = subentro automatico perché l'host non risponde: il titolare resta lui e al ritorno riavrà il comando.
+  // Senza auto è «Prendi il comando» premuto apposta: il tavolo diventa di chi lo prende.
+  function takeHost(auto) {
     if (!T || !T.doc) return false;
-    var work = JSON.parse(JSON.stringify(T.doc)); work.host = uid;
+    var work = JSON.parse(JSON.stringify(T.doc));
+    if (!work.owner) work.owner = work.host;   // tavolo aperto con una versione precedente
+    if (auto !== true) work.owner = uid;
+    work.host = uid;
     T.doc = work; publishState(); return true;
   }
-  // Chiude il tavolo per tutti: lascia una "lapide" (stato chiuso) così nessuno può riaprirlo per errore
-  // ricollegandosi, e lo toglie dalla lista pubblica.
+  /* Chiude il tavolo per tutti: lascia una "lapide" (stato chiuso) così nessuno può riaprirlo per errore
+     ricollegandosi, e lo toglie dalla lista pubblica. Se in questo momento siamo offline il tavolo si chiude lo stesso
+     per noi, e sul server appena torna la connessione (finché la pagina resta aperta): risponde 'later'. */
+  var closes = [];
   function closeTable() {
     if (!T || !T.doc) return false;
-    var d = T.doc, tomb = { code: d.code, closed: true, rev: (d.rev || 0) + 1, updated: Date.now() };
-    var ok = T.c.publish(topic(T.code, 'state'), JSON.stringify(tomb), true);
-    if (d.lobbyId) T.c.publish(lobbyTopic(d.lobbyId), '', true);
-    T.c.publish(topic(T.code, 'chatlog'), '', true);
-    T.closed = true;
-    return ok;
+    var me = T, d = me.doc;
+    me.closed = true;
+    if (tombstone(me.c, me.code, d)) return true;
+    var job = { c: me.c, code: me.code, d: d, at: Date.now() };
+    closes.push(job);
+    if (!me.c.closeFn) { me.c.closeFn = function (up) { if (up) setTimeout(flushCloses, 1200); }; me.c.onStatus(me.c.closeFn); }
+    me.c.wake();
+    note('Sei offline: il tavolo ' + me.code + ' si chiude appena torna la connessione. Tieni aperta questa pagina.');
+    setTimeout(function () { if (T === me) { me.doc = null; me.onDoc(null); } }, 0);
+    return 'later';
+  }
+  function flushCloses() {
+    closes = closes.filter(function (j) { return Date.now() - j.at < 30 * 60e3 && !tombstone(j.c, j.code, j.d); });
+  }
+  // Piccolo avviso in alto, per le poche cose che questa parte deve dire da sola.
+  function note(text) {
+    var d = document.createElement('div');
+    d.setAttribute('role', 'status');
+    d.setAttribute('style', 'position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:99990;max-width:calc(100vw - 24px);background:#2a2118;color:#f6ead2;border:1px solid rgba(242,193,78,.5);border-radius:12px;padding:10px 14px;font:15px/1.4 system-ui,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.45)');
+    d.textContent = text; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 5200);
   }
   function clearTable() { return closeTable(); }
 
@@ -690,10 +867,15 @@ var Net = (function () {
         me.c.publish(topic(me.code, 'state'), JSON.stringify(w), true);
       }
     }
+    // Partita finita e al tavolo non c'è più nessun altro: uscendo per ultimo lo chiudo, così non resta in giro
+    // (né nei «tavoli recenti» degli altri, né in «Continua la partita»).
+    if (!(opts && opts.quiet) && me.up && !me.resync && !me.closed && me.doc && me.doc.phase === 'over' && seatedHuman(me.doc, uid) &&
+        me.doc.seats.every(function (s) { return s.bot || s.uid === uid || presence(s.uid) === 'off'; })) { tombstone(me.c, me.code, me.doc); me.closed = true; }
     T = null; clearTimeout(me.resyncTimer);
-    me.timers.forEach(clearInterval);
+    Beat.boost(false);
+    me.stops.forEach(function (f) { f(); });
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
-    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'react'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'vis', 'react'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
     me.c.handlers = me.c.handlers.filter(function (h) { return h !== me.handler; });
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
@@ -706,6 +888,7 @@ var Net = (function () {
     setOnTakeover: function (f) { onTakeover = f; },
     get uid() { return uid; },
     get isHost() { return !!(T && T.isHost); },
+    get isOwner() { return !!(T && T.doc && (T.doc.owner || T.doc.host) === uid); },
     get connected() { return !!(T && T.up); },
     hostAlive: function () { return !T || T.isHost || Date.now() - T.lastPing < HOST_TIMEOUT; },
     presence: presence, offlineFor: offlineFor, dot: dot, offTag: offTag, presenceSig: presenceSig,

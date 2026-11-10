@@ -126,7 +126,7 @@ var Alerts = (function () {
   function standalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
   function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
   function allGames() { return GAMES.map(function (g) { return g.path.replace(/\/$/, ''); }); }
-  function prefs() { var p = obj(PREFS); return { games: Array.isArray(p.games) ? p.games : allGames(), invites: p.invites !== false }; }
+  function prefs() { var p = obj(PREFS); return { games: Array.isArray(p.games) ? p.games : allGames(), invites: p.invites !== false, turns: p.turns !== false }; }
   function pushOn() { return !!get(SUBK) && pushSupported() && Notification.permission === 'granted'; }
   function keyBytes(b) { b = b.replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; var s = atob(b), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
   function registration() {
@@ -138,7 +138,12 @@ var Alerts = (function () {
   }
   function save(sub) {
     var j = sub.toJSON(), p = prefs();
-    return Account.rpc('save_push', { p_token: Account.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_games: p.games, p_invites: p.invites, p_ua: ua.slice(0, 200) })
+    var args = { p_token: Account.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_games: p.games, p_invites: p.invites, p_ua: ua.slice(0, 200), p_turns: p.turns };
+    return Account.rpc('save_push', args)
+      .catch(function (e) {   // server non ancora aggiornato (non conosce «tocca a te»): si salva come prima
+        if (!/save_push|schema cache|function/i.test(String(e))) throw e;
+        delete args.p_turns; return Account.rpc('save_push', args);
+      })
       .then(function () { set(SUBK, j.endpoint); set(SYNC, String(Date.now())); });
   }
   var pushMsg = null;
@@ -210,6 +215,7 @@ var Alerts = (function () {
     }
     h += '<p class="pa-note">Avvisami quando qualcuno apre un tavolo di:</p><div class="pa-games">' + GAMES.map(function (g) { var id = g.path.replace(/\/$/, ''); return '<label class="pa-check"><input type="checkbox" data-pp="game" value="' + id + '"' + (p.games.indexOf(id) >= 0 ? ' checked' : '') + '> ' + esc(g.n) + '</label>'; }).join('') + '</div>' +
       '<label class="pa-check"><input type="checkbox" data-pp="inv"' + (p.invites ? ' checked' : '') + '> Inviti e richieste di amicizia</label>' +
+      '<label class="pa-check"><input type="checkbox" data-pp="turns"' + (p.turns ? ' checked' : '') + '> «Tocca a te», quando arriva il mio turno e non ho il gioco davanti</label>' +
       '<label class="pa-check"><input type="checkbox" data-pp="inapp"' + (enabled() ? ' checked' : '') + '> Avvisi dei nuovi tavoli anche dentro l’app, mentre la usi</label>' +
       (pushMsg ? '<p class="pa-err">' + esc(pushMsg) + '</p>' : '') +
       '<p class="pa-note">Con l’app aperta gli avvisi compaiono in alto nella pagina; ad app chiusa arrivano come notifiche del telefono.</p>';
@@ -221,6 +227,7 @@ var Alerts = (function () {
     if (k === 'master') { (t.checked ? enablePush() : disablePush()); return; }
     if (k === 'game') { p.games = Array.prototype.map.call(document.querySelectorAll('[data-pp="game"]:checked'), function (x) { return x.value; }); setPrefs(p); }
     if (k === 'inv') { p.invites = t.checked; setPrefs(p); }
+    if (k === 'turns') { p.turns = t.checked; setPrefs(p); }
     if (k === 'inapp') { set(KEY, t.checked ? 'on' : 'off'); if (t.checked) start(); }
   });
   function repaintAll() { repaint(); if (window.Account && Account.render) Account.render(); }
@@ -228,7 +235,9 @@ var Alerts = (function () {
   if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
     var d = e.data; if (!d || d.type !== 'push' || !d.data) return;
     if (d.data.kind === 'table' && (!enabled() || busy())) return;   // chi sta giocando (o ha spento gli avvisi) non viene disturbato
-    banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' ? 'Apri' : 'Siediti');
+    // «tocca a te»: se ho già quel tavolo davanti non serve dirmelo
+    if (d.data.kind === 'turn' && busy() && String(d.data.url || '').indexOf('?t=' + Net.tableCode) >= 0 && here && String(d.data.url).indexOf('/' + here.path) >= 0) return;
+    banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' || d.data.kind === 'turn' ? 'Apri' : 'Siediti');
   });
 
   /* --- grafica: avviso nella pagina, interruttore, lista in home --- */
@@ -344,5 +353,5 @@ var Alerts = (function () {
 
   if (enabled()) setTimeout(start, 1200);
   return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables,
-    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
+    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, turnsOn: function () { return prefs().turns; }, endpoint: function () { return get(SUBK); }, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
 })();

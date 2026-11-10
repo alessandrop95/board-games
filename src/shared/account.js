@@ -1,4 +1,6 @@
 /* ===== Account (nome utente e password), amici e inviti — server Supabase =====
+   Niente email: chi dimentica la password la cambia con il «codice di recupero» ricevuto alla registrazione
+   (o creato dopo, dalla scheda dell'account). Dalla stessa scheda si vedono i dispositivi collegati.
    L'indirizzo del server sta in server.json (scritto dall'azione «Server» su GitHub). Finché il server
    non è configurato, i giochi funzionano come prima, senza account. */
 var Account = (function () {
@@ -8,6 +10,7 @@ var Account = (function () {
   function jget(k) { try { return JSON.parse(get(k) || 'null'); } catch (e) { return null; } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   var sig = null, cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
+  var showPw = false, hasRecovery = null, devices = null, reloadOnClose = false;
   var readyRes; var ready = new Promise(function (r) { readyRes = r; });
 
   /* ---------- server ---------- */
@@ -46,15 +49,82 @@ var Account = (function () {
   (function () { var dev = get('pp-uid-dev'); if (dev && /^u[a-z0-9]+$/.test(dev)) set('pp-uid', dev); if (dev != null) set('pp-uid-dev', null); })();
   function setSession(s) { session = s; set('pp-session', s ? JSON.stringify(s) : null); if (s && !get('pp-nick')) set('pp-nick', s.username); }
   function dropSession() { setSession(null); friendsData = null; repaint(); }
-  function check() { if (session && configured()) rpc('me', { p_token: session.token }).then(function (m) { if (m && m.username !== session.username) { session.username = m.username; set('pp-session', JSON.stringify(session)); repaint(); } refreshFriends(true); }, function () {}); }
+  function check() {
+    if (session && configured()) rpc('me', { p_token: session.token }).then(function (m) {
+      if (m && m.username !== session.username) { session.username = m.username; set('pp-session', JSON.stringify(session)); repaint(); }
+      if (m && typeof m.recovery === 'boolean') { hasRecovery = m.recovery; if (view && view.v === 'account') render(); }
+      refreshFriends(true);
+    }, function () {});
+  }
+  // Accesso o uscita fatti in un'altra scheda (o in un altro gioco aperto): questa pagina si adegua da sola.
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'pp-session') return;
+    var was = session && session.token; session = jget('pp-session');
+    if ((session && session.token) === was) return;
+    friendsData = null; hasRecovery = null; devices = null; presSig = null;
+    repaint(); paintLists(); if (view) { if (!session && view.v !== 'login' && view.v !== 'register' && view.v !== 'recover') close(); else render(); }
+    if (session) check();
+  });
   function user() { return configured() && session ? session : null; }
   function reloadSoon() { setTimeout(function () { location.reload(); }, 350); }
 
+  /* Dopo l'accesso la pagina si ricarica (così tutto riparte con l'account). Quello che l'utente stava facendo quando
+     gli è stato chiesto di accedere (aprire un tavolo, sedersi a uno) riprende da solo dopo la ricarica. */
+  var AFTER = 'pp-after-login', lastAct = null;
+  function sget(k) { try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function sset(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-act],[data-coach]'); if (!b) return;
+    var a = b.getAttribute('data-act'), jc = document.getElementById('joincode');
+    if (b.getAttribute('data-coach') === 'start') lastAct = { act: 'coach', at: Date.now() };
+    else if (a === 'create') lastAct = { act: 'create', at: Date.now() };
+    else if (a === 'join') lastAct = { act: 'join', code: (jc && jc.value) || '', at: Date.now() };
+    else if (a === 'jointable' || a === 'lobbyjoin') lastAct = { act: 'join', code: b.getAttribute('data-code') || '', at: Date.now() };
+  }, true);
+  function intent() {
+    var jc = document.getElementById('joincode'), i = lastAct && Date.now() - lastAct.at < 1500 ? lastAct : document.activeElement === jc && jc ? { act: 'join', code: jc.value } : null;
+    if (!i) return null;
+    if (i.act === 'join' && !/^[A-Za-z]{4}$/.test(String(i.code || '').trim())) return null;
+    if (i.act === 'create' && window.Lobby && Lobby.pickedVis && document.querySelector('input[name="vis"]')) Lobby.pickedVis();   // la scelta «chi può sedersi» resta quella
+    return { act: i.act, code: String(i.code || '').trim().toUpperCase() };
+  }
+  function resume() {
+    var a = sget(AFTER); sset(AFTER, null);
+    if (!a || Date.now() - a.at > 120000 || !user()) return;
+    if (a.toast) toastMsg(a.toast);
+    setTimeout(function () {
+      try {
+        if (a.act === 'create' && typeof createTable === 'function' && !(window.App && App.code)) createTable();
+        else if (a.act === 'join' && typeof joinTable === 'function') joinTable(a.code);
+        else if (a.act === 'coach' && window.Coach && Coach.start && !(window.App && App.code)) Coach.start();
+      } catch (e) { console.warn('ripresa', e); }
+    }, 400);
+  }
+  // s = risposta di login / register / recover. Con un codice di recupero nuovo lo si mostra prima di ricaricare.
+  function entered(s, hello) {
+    var code = s.recovery || null, pend = view && view.x && view.x.intent; delete s.recovery;
+    setSession(s); set('pp-nick', s.username);
+    sset(AFTER, { toast: hello, act: pend && pend.act, code: pend && pend.code, at: Date.now() });
+    return (window.Alerts && Alerts.resync ? Alerts.resync() : Promise.resolve()).catch(function () {}).then(function () {
+      if (code) { hasRecovery = true; reloadOnClose = true; view = { v: 'code', x: { code: code, fresh: true } }; msg = null; render(); return; }
+      close(); toastMsg(hello); reloadSoon();
+    });
+  }
   function login(u, p, isNew) {
     return rpc(isNew ? 'register' : 'login', { p_username: u, p_password: p, p_device: device() }).then(function (s) {
-      setSession(s); set('pp-nick', s.username);
-      return (window.Alerts && Alerts.resync ? Alerts.resync() : Promise.resolve()).catch(function () {}).then(function () { close(); toastMsg(isNew ? 'Benvenuto, ' + s.username + '! Account creato.' : 'Bentornato, ' + s.username + '!'); reloadSoon(); });
+      return entered(s, isNew ? 'Benvenuto, ' + s.username + '! Account creato.' : 'Bentornato, ' + s.username + '!');
     });
+  }
+  function recover(u, code, p) {
+    return rpc('recover', { p_username: u, p_code: code, p_password: p, p_device: device() }).then(function (s) { return entered(s, 'Password cambiata. Bentornato, ' + s.username + '!'); });
+  }
+  function loadDevices() {
+    if (!user()) return;
+    rpc('my_sessions', { p_token: session.token }).then(function (l) { devices = Array.isArray(l) ? l : []; if (view && view.v === 'account') render(); }, function () { devices = []; });
+  }
+  function ago(ts) {
+    var m = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
+    return m < 2 ? 'adesso' : m < 60 ? m + ' minuti fa' : m < 48 * 60 ? Math.round(m / 60) + ' ore fa' : Math.round(m / 1440) + ' giorni fa';
   }
   function logout() {
     var s = session; if (!s) return;
@@ -156,15 +226,22 @@ var Account = (function () {
     '.pa-chip .n{background:#c4301f;color:#fff;border-radius:999px;font-size:11px;padding:0 6px;font-weight:800}.pa-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
     '.pa-check{display:flex!important;flex-direction:row!important;gap:10px!important;align-items:center;font-size:15px!important;color:inherit!important;padding:4px 0}.pa-check input{width:20px;height:20px;accent-color:#e6c56f;flex:none}' +
     '.pa-games{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 10px}.pa-sep{border:0;border-top:1px solid rgba(255,255,255,.1);margin:4px 0}' +
+    '.pa-pw{position:relative;display:block}.pa-pw input{width:100%;box-sizing:border-box;padding-right:52px!important}.pa-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);appearance:none;border:0;background:none;color:#4a4136;font:600 13px system-ui,sans-serif;min-width:44px;min-height:40px;cursor:pointer;border-radius:8px}' +
+    '.pa-code{font:700 24px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-align:center;padding:14px 10px;border-radius:12px;background:#0e1216;border:1px dashed rgba(230,197,111,.7);color:#f6e3a8;user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}' +
+    '.pa-warn{padding:10px 12px;border-radius:10px;background:rgba(230,150,60,.14);border:1px solid rgba(230,150,60,.5);font-size:14.5px;display:grid;gap:8px}.pa-link{appearance:none;border:0;background:none;color:#e6c56f;font:600 14.5px system-ui,sans-serif;text-decoration:underline;padding:6px 0;cursor:pointer;justify-self:start}' +
     '.pa-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:99;background:#1b2128;color:#f1ece2;border:1px solid rgba(230,197,111,.5);padding:10px 14px;border-radius:12px;font:15px system-ui,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.5);max-width:min(92vw,460px)}';
   function css() { if (!document.getElementById('pa-css')) { var s = document.createElement('style'); s.id = 'pa-css'; s.textContent = CSS; document.head.appendChild(s); } }
   function toastMsg(t) { css(); var d = document.createElement('div'); d.className = 'pa-toast'; d.textContent = t; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3200); }
-  function close() { var m = document.querySelector('.pa-back'); if (m) m.remove(); view = null; msg = null; }
+  function close() {
+    var m = document.querySelector('.pa-back'); if (m) m.remove(); view = null; msg = null; showPw = false;
+    if (reloadOnClose) { reloadOnClose = false; reloadSoon(); }   // appena entrati: ora che il codice di recupero è stato visto, si riparte con l'account
+  }
   function open(v, extra) {
     css(); view = { v: v || (user() ? 'account' : 'login'), x: extra || {} }; msg = null;
-    if (view.v !== 'login' && view.v !== 'register' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
+    if (view.v !== 'login' && view.v !== 'register' && view.v !== 'recover' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
     render();
     if (user() && (view.v === 'account' || view.v === 'invite')) refreshFriends().catch(function () {});
+    if (user() && view.v === 'account') { devices = null; loadDevices(); }
     if (user() && view.v === 'stats') { statsData = null; loadStats(); }
   }
   function render() {
@@ -172,9 +249,9 @@ var Account = (function () {
     var html = body(), back = document.querySelector('.pa-back');
     if (!back) { back = document.createElement('div'); back.className = 'pa-back'; back.addEventListener('click', function (e) { if (e.target === back) close(); }); document.body.appendChild(back); }
     var focused = document.activeElement && document.activeElement.name, vals = {};
-    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { vals[i.name] = i.value; });
+    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (i.name) vals[i.name] = i.value; });
     back.innerHTML = '<div class="pa-sheet" role="dialog" aria-modal="true">' + html + '</div>';
-    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (vals[i.name] != null) i.value = vals[i.name]; });
+    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (i.name && vals[i.name] != null) i.value = vals[i.name]; });
     var f = focused && back.querySelector('[name="' + focused + '"]'); if (f) f.focus();
   }
   function msgHTML() { return msg ? '<p class="' + (msg.ok ? 'pa-ok' : 'pa-err') + '" role="status">' + esc(msg.t) + '</p>' : ''; }
@@ -185,12 +262,29 @@ var Account = (function () {
       var reg = v === 'register';
       return '<h2>' + (reg ? 'Crea il tuo account' : 'Entra in Board Games') + '</h2>' + (view.x.why ? '<p>' + esc(view.x.why) + '</p>' : '') +
         '<div class="pa-tabs" role="tablist"><button type="button" class="' + (!reg ? 'on' : '') + '" data-pa="tab" data-v="login">Accedi</button><button type="button" class="' + (reg ? 'on' : '') + '" data-pa="tab" data-v="register">Registrati</button></div>' +
-        '<form data-pa-form="' + v + '" autocomplete="on"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>' +
-        '<label>Password<input type="password" name="p" maxlength="72" autocomplete="' + (reg ? 'new-password' : 'current-password') + '" required></label>' +
-        (reg ? '<label>Ripeti la password<input type="password" name="p2" maxlength="72" autocomplete="new-password" required></label>' : '') + msgHTML() +
+        '<form data-pa-form="' + v + '" autocomplete="on"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></label>' +
+        pwField('Password', 'p', reg ? 'new-password' : 'current-password', reg ? 'next' : 'go') +
+        (reg ? pwField('Ripeti la password', 'p2', 'new-password', 'go') : '') + msgHTML() +
         '<button class="pa-btn" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : reg ? 'Crea account' : 'Accedi') + '</button></form>' +
-        '<p class="pa-note">' + (reg ? 'Da 3 a 18 caratteri tra lettere, numeri, punto e trattini. Niente email: la password non si può recuperare, quindi scrivila in un posto sicuro (il browser può ricordarla per te).' : 'Con l’account ritrovi amici, inviti e notifiche su tutti i tuoi dispositivi.') + '</p>' +
+        (reg ? '' : '<button type="button" class="pa-link" data-pa="go" data-v="recover">Password dimenticata?</button>') +
+        '<p class="pa-note">' + (reg ? 'Nome da 3 a 18 caratteri tra lettere, numeri, punto e trattini; password di almeno 6. Niente email: subito dopo ricevi un <b>codice di recupero</b>, che serve se dimentichi la password.' : 'Con l’account ritrovi amici, inviti e notifiche su tutti i tuoi dispositivi, e resti collegato finché non esci tu.') + '</p>' +
         '<button class="pa-btn g" data-pa="close" type="button">' + (view.x.why ? 'Non ora' : 'Chiudi') + '</button>';
+    }
+    if (v === 'recover') {
+      return '<h2>Password dimenticata</h2><p class="pa-note">Scrivi il tuo nome utente, il <b>codice di recupero</b> che hai ricevuto quando hai creato l’account (12 caratteri, tipo ABCD-EFGH-JKLM) e la nuova password.</p>' +
+        '<form data-pa-form="recover" autocomplete="off"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>' +
+        '<label>Codice di recupero<input type="text" name="c" maxlength="20" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH-JKLM" required></label>' +
+        pwField('Nuova password', 'p', 'new-password', 'go') + msgHTML() +
+        '<button class="pa-btn" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : 'Cambia password ed entra') + '</button></form>' +
+        '<p class="pa-note">Non hai il codice? Se sei ancora collegato su un altro dispositivo, da lì puoi crearne uno nuovo (👤 → Codice di recupero) o cambiare la password. Altrimenti l’account non si può recuperare: creane uno nuovo.</p>' +
+        '<button class="pa-btn g" data-pa="go" data-v="login" type="button">Torna all’accesso</button>';
+    }
+    if (v === 'code') {
+      return '<h2>Il tuo codice di recupero</h2><p>Se un giorno dimentichi la password, con questo codice ne scegli una nuova. <b>Lo vedi solo adesso</b>: scrivilo, copialo nelle note o fai uno screenshot.</p>' +
+        '<div class="pa-code" data-code>' + esc(view.x.code) + '</div>' + msgHTML() +
+        '<button class="pa-btn g" type="button" data-pa="copycode">Copia il codice</button>' +
+        '<p class="pa-note">Vale una volta sola: quando lo usi ne ricevi uno nuovo.' + (view.x.fresh ? '' : ' Il codice di prima non vale più.') + '</p>' +
+        '<button class="pa-btn" type="button" data-pa="close">L’ho salvato</button>';
     }
     if (!u) return '';
     if (v === 'stats') return statsHTML();
@@ -206,6 +300,7 @@ var Account = (function () {
     // account
     var d = friendsData, fr2 = d ? d.friends : [], inc = d ? d.incoming : [], out = d ? d.outgoing : [];
     var h = '<h2>Ciao, ' + esc(u.username) + '</h2>' + msgHTML();
+    if (hasRecovery === false && !view.x.rec) h += '<div class="pa-warn"><span><b>Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso (amici e statistiche compresi).</span><button class="pa-btn s" type="button" data-pa="rec">Crea il codice di recupero</button></div>';
     h += '<h3>Notifiche</h3>' + (window.Alerts && Alerts.settingsHTML ? Alerts.settingsHTML() : '');
     h += '<hr class="pa-sep"><h3>Amici</h3>';
     if (inc.length) h += '<div class="pa-list">' + inc.map(function (n) { return '<div class="pa-row"><b>' + esc(n) + ' vuole essere tuo amico</b><button class="pa-btn s" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button class="pa-btn s g" data-pa="decline" data-u="' + esc(n) + '">No</button></div>'; }).join('') + '</div>';
@@ -214,10 +309,20 @@ var Account = (function () {
     h += '<form data-pa-form="friend" class="pa-bar"><input type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" style="flex:1;min-width:170px" required><button class="pa-btn s" type="submit">Aggiungi</button></form>';
     h += '<hr class="pa-sep"><h3>Partite</h3><div class="pa-bar"><button class="pa-btn s" data-pa="go" data-v="stats">📊 Statistiche e classifica tra amici</button></div>';
     h += '<hr class="pa-sep"><h3>Account</h3>';
-    if (view.x.pw) h += '<form data-pa-form="password"><label>Password attuale<input type="password" name="o" autocomplete="current-password" required></label><label>Nuova password<input type="password" name="n" autocomplete="new-password" required></label><button class="pa-btn s" type="submit">Cambia password</button></form>';
-    if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p><label>Password<input type="password" name="d" autocomplete="current-password" required></label><button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
-    h += '<div class="pa-bar">' + (view.x.pw ? '' : '<button class="pa-btn s g" data-pa="pw">Cambia password</button>') + '<button class="pa-btn s g" data-pa="logout">Esci</button>' + (view.x.del ? '' : '<button class="pa-btn s g" data-pa="del">Cancella account</button>') + '</div>';
+    if (devices && devices.length) {
+      h += '<div class="pa-list">' + devices.map(function (dv) { return '<div class="pa-row"><span class="pa-dot' + (dv.here ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><b>' + esc(dv.device) + '</b><br><span class="pa-note">' + (dv.here ? 'questo dispositivo' : 'ultimo uso ' + ago(dv.used)) + '</span></span></div>'; }).join('') + '</div>';
+      h += devices.length > 1 ? '<div class="pa-bar"><button class="pa-btn s g" data-pa="others">Esci dagli altri dispositivi</button></div>' : '<p class="pa-note">Sei collegato solo da qui. L’accesso resta attivo finché non esci tu (o per 6 mesi senza usarlo).</p>';
+    }
+    if (view.x.pw) h += '<form data-pa-form="password">' + pwField('Password attuale', 'o', 'current-password') + pwField('Nuova password', 'n', 'new-password') + '<button class="pa-btn s" type="submit">Cambia password</button></form>';
+    if (view.x.rec) h += '<form data-pa-form="recovery"><p>Per creare un nuovo codice di recupero scrivi la tua password. Il codice di prima, se c’era, non varrà più.</p>' + pwField('Password', 'r', 'current-password') + '<button class="pa-btn s" type="submit">Crea il codice</button></form>';
+    if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p>' + pwField('Password', 'd', 'current-password') + '<button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
+    h += '<div class="pa-bar">' + (view.x.pw ? '' : '<button class="pa-btn s g" data-pa="pw">Cambia password</button>') + (view.x.rec ? '' : '<button class="pa-btn s g" data-pa="rec">Codice di recupero</button>') + '<button class="pa-btn s g" data-pa="logout">Esci</button>' + (view.x.del ? '' : '<button class="pa-btn s g" data-pa="del">Cancella account</button>') + '</div>';
     return h + '<button class="pa-btn g" data-pa="close">Chiudi</button>';
+  }
+  // Campo password con «Mostra»: sul telefono si sbaglia facilmente a scrivere alla cieca.
+  function pwField(lab, name, auto, hint) {
+    return '<label>' + lab + '<span class="pa-pw"><input type="' + (showPw ? 'text' : 'password') + '" name="' + name + '" maxlength="72" autocomplete="' + auto + '" autocapitalize="none" autocorrect="off" spellcheck="false"' + (hint ? ' enterkeyhint="' + hint + '"' : '') + ' required>' +
+      '<button type="button" class="pa-eye" data-pa="eye" aria-pressed="' + showPw + '" aria-label="' + (showPw ? 'Nascondi la password' : 'Mostra la password') + '">' + (showPw ? 'Nascondi' : 'Mostra') + '</button></span></label>';
   }
   function repaint() {
     document.querySelectorAll('[data-pa-chip]').forEach(function (e) { e.outerHTML = chipHTML(); });
@@ -237,7 +342,7 @@ var Account = (function () {
   // Prima di sedersi a un tavolo: con il server attivo serve l'account.
   function allow() {
     if (!configured() || user()) return true;
-    open('login', { why: 'Per giocare serve un account: è gratis, basta un nome utente e una password.' });
+    open('login', { why: 'Per giocare serve un account: è gratis, basta un nome utente e una password.', intent: intent() });
     return false;
   }
   function allowQuiet() { return !configured() || !!user(); }
@@ -249,7 +354,14 @@ var Account = (function () {
     var k = b.getAttribute('data-pa'), uname = b.getAttribute('data-u');
     if (k === 'open') { e.preventDefault(); open(b.getAttribute('data-v')); }
     else if (k === 'close') close();
-    else if (k === 'tab' || k === 'go') { view = { v: b.getAttribute('data-v'), x: {} }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); if (view.v === 'stats') { statsData = null; loadStats(); } }
+    else if (k === 'eye') { e.preventDefault(); showPw = !showPw; render(); }
+    else if (k === 'copycode') { var cc = view && view.x.code; try { navigator.clipboard.writeText(cc).then(function () { msg = { ok: true, t: 'Codice copiato: incollalo in un posto sicuro (le note del telefono vanno bene).' }; render(); }, function () { msg = { t: 'Tieni premuto sul codice per copiarlo.' }; render(); }); } catch (er) { msg = { t: 'Tieni premuto sul codice per copiarlo.' }; render(); } }
+    else if (k === 'rec') { view.x.rec = true; render(); }
+    else if (k === 'others') {
+      b.disabled = true;
+      rpc('logout_others', { p_token: session.token, p_keep_endpoint: (window.Alerts && Alerts.endpoint && Alerts.endpoint()) || null }).then(function (n) { msg = { ok: true, t: n ? 'Fatto: gli altri dispositivi dovranno accedere di nuovo.' : 'Non c’erano altri dispositivi collegati.' }; loadDevices(); render(); }, function (er) { msg = { t: String(er) }; render(); });
+    }
+    else if (k === 'tab' || k === 'go') { var keepX = view && view.x && (view.x.why || view.x.intent) && /^(login|register|recover)$/.test(b.getAttribute('data-v')) ? { why: view.x.why, intent: view.x.intent } : {}; view = { v: b.getAttribute('data-v'), x: keepX }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); if (view.v === 'stats') { statsData = null; loadStats(); } }
     else if (k === 'board') { boardGame = b.getAttribute('data-g') || ''; rpc('friends_board', { p_token: session.token, p_game: boardGame || null }).then(function (r) { boardData = r; render(); }, function (er) { msg = { t: String(er) }; render(); }); render(); }
     else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
     else if (k === 'invite') {
@@ -275,6 +387,11 @@ var Account = (function () {
       if (k === 'register' && v('p') !== v('p2')) { msg = { t: 'Le due password non coincidono.' }; render(); return; }
       busy = true; msg = null; render();
       login(v('u').trim(), v('p'), k === 'register').catch(function (er) { msg = { t: String(er) }; }).then(function () { busy = false; render(); });
+    } else if (k === 'recover') {
+      busy = true; msg = null; render();
+      recover(v('u').trim(), v('c').trim(), v('p')).catch(function (er) { msg = { t: String(er) }; }).then(function () { busy = false; render(); });
+    } else if (k === 'recovery') {
+      rpc('new_recovery', { p_token: session.token, p_password: v('r') }).then(function (r) { hasRecovery = true; view = { v: 'code', x: { code: r.recovery } }; msg = null; render(); }, function (er) { msg = { t: String(er) }; render(); });
     } else if (k === 'friend') {
       addFriend(v('f').trim()).then(function () { var i = document.querySelector('[name="f"]'); if (i) i.value = ''; }, function (er) { msg = { t: String(er) }; render(); });
     } else if (k === 'password') {
@@ -288,6 +405,7 @@ var Account = (function () {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && view) close(); });
   // link dalle notifiche: ?amici=1 apre la lista degli amici
   if (/[?&]amici=1/.test(location.search)) ready.then(function () { if (user()) open('account'); });
+  ready.then(resume);
 
   load();
   return { ready: ready, configured: configured, user: user, open: open, close: close, allow: allow, allowQuiet: allowQuiet, chipHTML: chipHTML, inviteHTML: inviteHTML,

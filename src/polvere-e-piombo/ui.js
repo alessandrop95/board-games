@@ -565,6 +565,7 @@ function sheetBody(s) {
     return '<h2>Tavolo ' + esc(d.code) + '</h2><div class="list">' +
       '<button class="opt" data-act="rules">Regole in breve</button>' +
       '<button class="opt" data-act="invite">Invita amici al tavolo</button>' +
+      Awake.menuHTML('opt') +
       (d.host !== Net.uid ? '<button class="opt" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="opt" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
       (d.host === Net.uid ? '<button class="opt" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +

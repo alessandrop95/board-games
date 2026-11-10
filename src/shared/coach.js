@@ -80,5 +80,7 @@ var Coach = (function () {
     else if (k === 'suggest') suggest();
     else if (k === 'rules') { var r = document.querySelector('[data-act="rules"]'); if (r) r.click(); }
   });
-  return { setup: setup, buttonHTML: buttonHTML, start: start, paint: paint };
+  // Tocca a questo giocatore fare qualcosa adesso? (lo usano il richiamo «tocca a te» e la notifica a chi è assente)
+  function needs(g, i) { try { return !!(cfg && myTurn(g, i)); } catch (e) { return false; } }
+  return { setup: setup, buttonHTML: buttonHTML, start: start, paint: paint, needs: needs };
 })();

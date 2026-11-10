@@ -1431,18 +1431,51 @@ var SKRules = (function () {
    Modello: il dispositivo "host" del tavolo tiene la verità. Pubblica lo stato completo
    come messaggio "retained" (chi arriva lo riceve subito); gli altri inviano solo azioni.
    Robustezza: controllo continuo che il server risponda, riconnessione immediata quando
-   la pagina torna in primo piano, subentro automatico se l'host sparisce. */
+   la pagina torna in primo piano, subentro automatico se l'host sparisce.
+   App in secondo piano: finché il telefono lascia girare la pagina, la connessione resta viva (battito da un
+   Web Worker, che il browser non rallenta) e gli altri vedono «in pausa» invece di «offline»; se chi regge il
+   tavolo smette di guardare, il comando passa subito a chi è presente e torna al titolare quando rientra. */
 
 var NETQ = new URLSearchParams(location.search);
 var NET_PING_MS = +(NETQ.get('ping') || 10000);     // ogni quanto si interroga il server
 var NET_DEAD_MS = +(NETQ.get('dead') || 15000);     // silenzio oltre il quale si verifica la connessione
 var NET_PROBE_MS = 5000;                            // attesa della risposta alla verifica
-var NET_STALE_MS = +(NETQ.get('stale') || 70000);   // oltre questo silenzio la connessione è morta di sicuro (keepalive 45 s × 1,5)
+var NET_WAKE_PROBE_MS = 2500;                       // la stessa attesa, più corta, quando la pagina torna in primo piano
+var NET_KEEP_S = +(NETQ.get('keep') || 120);        // silenzio che il server tollera (×1,5) prima di scollegarci: largo, così regge anche i timer rallentati
+var NET_STALE_MS = +(NETQ.get('stale') || 30000);   // dopo un sonno così lungo non si verifica nemmeno: ci si ricollega subito
+
+/* ---------- battito che non si ferma in secondo piano ----------
+   I timer di una pagina nascosta vengono rallentati dal browser (fino a uno al minuto). I controlli periodici
+   (ping, presenza, tavolo) passano da qui: mentre si è a un tavolo il battito arriva da un Web Worker, che non
+   viene rallentato. Se il telefono sospende del tutto la pagina, al risveglio ce ne accorgiamo dal salto d'orario. */
+var Beat = (function () {
+  var jobs = [], worker = null, last = Date.now(), gapFn = null;
+  function pump() {
+    var now = Date.now(), gap = now - last; last = now;
+    if (gap > 8000 && gapFn) { try { gapFn(gap); } catch (e) {} }
+    jobs.slice().forEach(function (j) {
+      if (j.dead || now - j.last < j.ms - 60) return;
+      j.last = now; try { j.fn(); } catch (e) { console.warn('battito', e); }
+    });
+  }
+  setInterval(pump, 1000);
+  // fn ogni ms millisecondi (al secondo più vicino); restituisce la funzione per smettere
+  function every(ms, fn) { var j = { ms: ms, fn: fn, last: Date.now(), dead: false }; jobs.push(j); return function () { j.dead = true; jobs = jobs.filter(function (x) { return x !== j; }); }; }
+  function boost(on) {
+    if (on && !worker) {
+      try {
+        worker = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(1)},1000)'], { type: 'text/javascript' })));
+        worker.onmessage = pump; worker.onerror = function () { worker = null; };
+      } catch (e) { worker = null; }
+    } else if (!on && worker) { try { worker.terminate(); } catch (e) {} worker = null; }
+  }
+  return { every: every, boost: boost, onGap: function (f) { gapFn = f; }, get boosted() { return !!worker; } };
+})();
 
 /* ---------- client MQTT 3.1.1 minimo ---------- */
 function MQ(url) {
   this.url = url; this.subs = {}; this.handlers = []; this.statusHandlers = [];
-  this.connected = false; this.closed = false; this.pid = 1; this.buf = new Uint8Array(0);
+  this.connected = false; this.closed = false; this.pid = 1; this.buf = new Uint8Array(0); this.acks = {};
   this.backoff = 800; this.lastRx = Date.now(); this.id = 'pp' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-6);
   var self = this;
   this.ready = new Promise(function (res, rej) { self._res = res; self._rej = rej; });
@@ -1464,7 +1497,7 @@ MQ.prototype._open = function () {
   ws.binaryType = 'arraybuffer'; this.ws = ws; this.buf = new Uint8Array(0);
   this.openTimer = setTimeout(function () { if (!self.connected && self.ws === ws) self._drop(); }, 7000);
   ws.onopen = function () {
-    var body = MQ.str('MQTT').concat([4, 0x02, 0, 45]).concat(MQ.str(self.id));
+    var body = MQ.str('MQTT').concat([4, 0x02, NET_KEEP_S >> 8, NET_KEEP_S & 255]).concat(MQ.str(self.id));
     ws.send(MQ.packet(0x10, body));
   };
   ws.onmessage = function (ev) {
@@ -1484,7 +1517,7 @@ MQ.prototype._drop = function () {
 };
 MQ.prototype._down = function () {
   var self = this, was = this.connected;
-  this.connected = false; clearInterval(this.pinger); clearTimeout(this.openTimer); clearTimeout(this.probeTimer); this.probeTimer = null;
+  this.connected = false; if (this.pinger) { this.pinger(); this.pinger = null; } clearTimeout(this.openTimer); clearTimeout(this.probeTimer); this.probeTimer = null; this.acks = {};
   if (was) this.statusHandlers.forEach(function (f) { f(false); });
   if (this.closed) return;
   if (!this.everUp) { this._rej(new Error('broker non raggiungibile')); this.closed = true; return; }
@@ -1493,19 +1526,19 @@ MQ.prototype._down = function () {
   this.backoff = Math.min(this.backoff * 1.7, 8000);
 };
 // Verifica attiva: manda un ping e, se entro pochi secondi non arriva nulla, considera la connessione morta.
-MQ.prototype.probe = function () {
+MQ.prototype.probe = function (ms) {
   var self = this;
   if (!this.connected || this.probeTimer) return;
   var since = Date.now();
   this._raw(MQ.packet(0xC0, []));
-  this.probeTimer = setTimeout(function () { self.probeTimer = null; if (self.connected && self.lastRx < since) self._drop(); }, NET_PROBE_MS);
+  this.probeTimer = setTimeout(function () { self.probeTimer = null; if (self.connected && self.lastRx < since) self._drop(); }, ms || NET_PROBE_MS);
 };
 // Da chiamare quando la pagina torna visibile o la rete torna disponibile.
 MQ.prototype.wake = function () {
   if (this.closed) return;
   // dopo un lungo sonno (app in background) il server ci ha già scollegati: inutile aspettare la verifica, si riparte subito
   if (this.connected && Date.now() - this.lastRx > NET_STALE_MS) { this._drop(); return; }
-  if (this.connected) { this.probe(); return; }
+  if (this.connected) { this.probe(NET_WAKE_PROBE_MS); return; }
   if (!this.ws) { this.backoff = 800; this._open(); }
 };
 MQ.prototype._parse = function () {
@@ -1525,10 +1558,11 @@ MQ.prototype._handle = function (h, body) {
     if (body[1] !== 0) { this._drop(); return; }
     clearTimeout(this.openTimer);
     this.connected = true; this.everUp = true; this.backoff = 800;
-    this.pinger = setInterval(function () {
+    if (this.pinger) this.pinger();
+    this.pinger = Beat.every(NET_PING_MS, function () {
       if (Date.now() - self.lastRx > NET_DEAD_MS) self.probe();
       else self._raw(MQ.packet(0xC0, []));
-    }, NET_PING_MS);
+    });
     var topics = Object.keys(this.subs); if (topics.length) this._sub(topics);
     this._res(this);
     this.statusHandlers.forEach(function (f) { f(true); });
@@ -1537,18 +1571,23 @@ MQ.prototype._handle = function (h, body) {
     if (qos > 0) { var id = [body[p], body[p + 1]]; p += 2; if (qos === 1) this._raw(MQ.packet(0x40, id)); }
     var payload = MQ.dec.decode(body.subarray(p)), retained = !!(h & 1);
     this.handlers.forEach(function (f) { f(topic, payload, retained); });
+  } else if (type === 9) { // SUBACK: il server ha registrato l'iscrizione
+    var sid = (body[0] << 8) | body[1], ack = this.acks[sid];
+    if (ack) { delete this.acks[sid]; ack(); }
   }
 };
 MQ.prototype._raw = function (pkt) { if (this.ws && this.ws.readyState === 1) { try { this.ws.send(pkt); return true; } catch (e) {} } return false; };
 MQ.prototype._nextId = function () { this.pid = this.pid % 65000 + 1; return [this.pid >> 8, this.pid & 255]; };
 MQ.prototype._sub = function (topics) {
-  var body = this._nextId();
+  var body = this._nextId(), id = this.pid;
   topics.forEach(function (t) { body = body.concat(MQ.str(t), [0]); });
   this._raw(MQ.packet(0x82, body));
+  return id;
 };
 // Richiede di nuovo un argomento già seguito: il server rimanda i messaggi conservati (per esempio la lista dei tavoli).
 MQ.prototype.resub = function (topic) { if (!this.connected || !this.subs[topic]) return false; this._sub([topic]); return true; };
-MQ.prototype.subscribe = function (topic) { this.subs[topic] = true; if (this.connected) this._sub([topic]); };
+// onAck (facoltativa): chiamata quando il server conferma l'iscrizione; i messaggi conservati arrivano subito dopo.
+MQ.prototype.subscribe = function (topic, onAck) { this.subs[topic] = true; if (this.connected) { var id = this._sub([topic]); if (onAck) this.acks[id] = onAck; } };
 MQ.prototype.unsubscribe = function (topic) {
   if (!this.subs[topic]) return; delete this.subs[topic];
   if (this.connected) this._raw(MQ.packet(0xA2, this._nextId().concat(MQ.str(topic))));
@@ -1571,9 +1610,12 @@ var Net = (function () {
     'wss://broker.emqx.io:8084/mqtt',
     'wss://test.mosquitto.org:8081/mqtt'
   ];
-  var HOST_TIMEOUT = +(qs.get('hostTimeout') || 20000);          // dopo quanto mostrare l'avviso
-  var AUTO_TAKEOVER = +(qs.get('autoTakeover') || HOST_TIMEOUT * 1.5); // dopo quanto subentrare da soli
-  var STAGGER = +(qs.get('stagger') || 6000);                     // attesa extra per ogni giocatore prima di me
+  var HOST_TIMEOUT = +(qs.get('hostTimeout') || 12000);          // dopo quanto mostrare l'avviso
+  var AUTO_TAKEOVER = +(qs.get('autoTakeover') || HOST_TIMEOUT * 1.25); // dopo quanto subentrare da soli in partita (in sala d'attesa il doppio)
+  var STAGGER = +(qs.get('stagger') || 5000);                     // attesa extra per ogni giocatore prima di me
+  var GIVEBACK = +(qs.get('giveBack') || 5000);                   // il titolare è tornato e guarda il tavolo da così tanto: gli si rende il comando
+  var PROXY_MS = +(qs.get('proxyMs') || 5500);                    // host muto da così tanto: chi arriva si siede da solo
+  var TABLE_MAX_AGE = 7 * 24 * 3600e3;                            // un tavolo fermo da una settimana è abbandonato: si chiude da solo
   var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
   var uid = null; try { uid = localStorage.getItem('pp-uid'); } catch (e) {}
   if (!uid) { uid = 'u' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6); try { localStorage.setItem('pp-uid', uid); } catch (e) {} }
@@ -1584,6 +1626,8 @@ var Net = (function () {
   var LOBBY_SWEEP = +(qs.get('lobbySweep') || 3000);     // attesa delle risposte prima di togliere i tavoli spariti
   var FIND_MS = +(qs.get('findMs') || 4500);          // attesa massima della risposta quando si cerca un tavolo
   var PRES_MS = +(qs.get('presMs') || 35000);       // oltre questo silenzio un giocatore risulta offline
+  var HB_MS = Math.min(10000, PRES_MS / 3);          // ogni quanto ognuno dice «ci sono»
+  var HID_MS = Math.max(25000, HB_MS * 2.5);         // «in pausa» vale finché viene confermato
   function lobbyTopic(id) { return PREFIX + 'lobby/' + id; }
   /* Stesso tavolo aperto in due schede dello stesso telefono/computer: resta attiva solo l'ultima aperta
      (due schede con la stessa identità applicherebbero le mosse due volte e la partita si sdoppierebbe). */
@@ -1616,20 +1660,36 @@ var Net = (function () {
     Object.keys(clients).forEach(function (k) { clients[k].wake(); });
     if (T) { T.lastPing = Math.max(T.lastPing, Date.now() - 2000); T.graceUntil = Date.now() + 8000; heartbeat(T, true); }
   }
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') wakeAll(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') { wakeAll(); return; }
+    // la pagina va in secondo piano: gli altri lo sanno subito e, se reggo io la partita, la passo a chi sta guardando
+    if (T) { heartbeat(T, true); maybeHandOver(T); }
+  });
   window.addEventListener('online', wakeAll);
-  window.addEventListener('pageshow', function (e) { if (e.persisted) wakeAll(); });
+  window.addEventListener('pageshow', wakeAll);
   window.addEventListener('focus', wakeAll);
+  document.addEventListener('resume', wakeAll);   // la pagina era stata «congelata» dal browser
+  try { if (navigator.connection && navigator.connection.addEventListener) navigator.connection.addEventListener('change', wakeAll); } catch (e) {}   // da Wi-Fi a rete mobile
+  Beat.onGap(wakeAll);                             // il telefono (o il computer) ha dormito senza avvisare
 
-  function probeState(c, code, ms) {
+  // quick (facoltativo): se il server conferma l'iscrizione e poco dopo non è arrivato niente, il tavolo non c'è
+  // (senza aspettare tutta l'attesa massima). Si usa solo per scegliere un codice libero.
+  function probeState(c, code, ms, quick) {
     return new Promise(function (res) {
       var st = topic(code, 'state'), done = false;
       function fin(v) { if (done) return; done = true; c.handlers = c.handlers.filter(function (x) { return x !== h; }); res(v); }
       function h(t, p) { if (t === st) fin(p ? safeParse(p) : null); }
       c.onMessage(h);
-      c.subscribe(st);
+      c.subscribe(st, quick ? function () { setTimeout(function () { fin(null); }, quick); } : null);
       setTimeout(function () { fin(null); }, ms);
     });
+  }
+  function expired(d) { return !!(d && !d.closed && d.updated && Date.now() - d.updated > TABLE_MAX_AGE); }
+  // Chiude un tavolo sul server: lascia una «lapide» (così nessuno lo riapre per errore) e lo toglie dalla lista.
+  function tombstone(c, code, d) {
+    var ok = c.publish(topic(code, 'state'), JSON.stringify({ code: code, closed: true, rev: ((d && d.rev) || 0) + 1, updated: Date.now() }), true);
+    if (ok) { if (d && d.lobbyId) c.publish(lobbyTopic(d.lobbyId), '', true); c.publish(topic(code, 'chatlog'), '', true); }
+    return ok;
   }
   function safeParse(p) { try { return JSON.parse(p); } catch (e) { return null; } }
   async function firstBroker() {
@@ -1648,6 +1708,7 @@ var Net = (function () {
           reached = true;
           if (done) return;
           return probeState(c, code, ms).then(function (doc) {
+            if (expired(doc)) { tombstone(c, code, doc); doc = { code: code, closed: true }; }   // abbandonato da giorni
             if (doc && doc.code === code && !doc.closed) { finish({ i: i, c: c, doc: doc }); return; }
             if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
             if (doc && doc.closed) closed = true;
@@ -1697,23 +1758,27 @@ var Net = (function () {
         client(i).then(function (c) {
           return new Promise(function (res) {
             var t0 = setTimeout(function () { c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); res(); }, ms || 4000);
-            function h(t, p) { if (t !== st) return; var d = p ? safeParse(p) : null; if (d && d.closed) closed = true; else if (d && d.code === code) { clearTimeout(t0); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); fin({ doc: d }); } }
+            function h(t, p) { if (t !== st) return; var d = p ? safeParse(p) : null; if (expired(d)) d = { closed: true }; if (d && d.closed) closed = true; else if (d && d.code === code) { clearTimeout(t0); c.handlers = c.handlers.filter(function (x) { return x !== h; }); c.unsubscribe(st); fin({ doc: d }); } }
             c.onMessage(h); c.subscribe(st);
           });
         }).catch(function () {}).then(function () { if (--pending === 0) fin(closed ? { closed: true } : null); });
       });
     });
   }
+  function acctName() { var a = window.Account && Account.user && Account.user(); return a && /^[A-Za-z0-9_.-]{3,18}$/.test(a.username || '') ? a.username : null; }
   function newCode() { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ', s = ''; for (var i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 
   async function create(nick, opts) {
     var b = await firstBroker();
     for (var k = 0; k < 6; k++) {
       var code = newCode();
-      var ex = await probeState(b.c, code, 1200);
+      var ex = await probeState(b.c, code, 1200, 400);
       b.c.unsubscribe(topic(code, 'state'));
-      if (ex && ex.code && !ex.closed) continue;
-      var doc = { code: code, host: uid, phase: 'lobby', seats: [{ uid: uid, nick: nick }], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
+      if (ex && ex.code && !ex.closed && !expired(ex)) continue;
+      var seat = { uid: uid, nick: nick }, an = acctName(); if (an) seat.acct = an;
+      // host = chi regge il tavolo adesso; owner = il titolare (chi l'ha aperto): se il comando passa a un altro
+      // mentre lui non c'è, al suo ritorno gli viene reso.
+      var doc = { code: code, host: uid, owner: uid, phase: 'lobby', seats: [seat], game: null, created: Date.now(), rev: ((ex && ex.rev) || 0) + 1, updated: Date.now(),
         vis: visOf(opts && opts.vis), lobbyId: rid() };
       if (opts && opts.practice) { doc.practice = true; doc.vis = 'invite'; }
       if (!b.c.publish(topic(code, 'state'), JSON.stringify(doc), true)) throw 'La connessione è caduta. Riprova.';
@@ -1731,10 +1796,10 @@ var Net = (function () {
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     if (!mayEnter(f.doc, uid, keyFor(code))) { f.c.unsubscribe(topic(code, 'state')); return 'private'; }
     var c = f.c;
-    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, timers: [], graceUntil: 0, chat: [], chatIds: {},
-      seen: {}, upSince: Date.now(), lastHb: 0, resync: false, unpub: false, hostRev: 0 };
+    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, stops: [], graceUntil: 0, chat: [], chatIds: {},
+      seen: {}, hid: {}, visSince: {}, lost: {}, upSince: Date.now(), lastHb: 0, sentHid: null, resync: false, unpub: false, hostRev: 0 };
     var me = T;
-    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tReact = topic(code, 'react');
+    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tVis = topic(code, 'vis'), tReact = topic(code, 'react');
     me.handler = function (t, p) {
       if (T !== me) return;
       if (t === tState) {
@@ -1750,23 +1815,24 @@ var Net = (function () {
         }
         me.lastPing = Date.now();
         accept(d);
-      } else if (t === tPing) { me.lastPing = Date.now(); if (me.doc) me.seen[me.doc.host] = Date.now(); }
-      else if (t === tHb) { var hu = String(p || '').slice(0, 40); if (hu) me.seen[hu] = Date.now(); }
+      } else if (t === tPing) { me.lastPing = Date.now(); if (me.doc) heard(me, me.doc.host); }
+      else if (t === tHb) { var hu = String(p || '').slice(0, 40); if (hu) heard(me, hu); }
+      else if (t === tVis) { var vm = /^([^|]{1,40})\|([hv])$/.exec(String(p || '')); if (vm) heard(me, vm[1], vm[2] === 'h'); }
       else if (t === tRes) {
         var r = safeParse(p); if (!r || !me.pending[r.id]) return;
         var pd = me.pending[r.id]; delete me.pending[r.id]; clearInterval(pd.timer);
         if (r.err) pd.rej(r.err); else pd.res(r.out || null);
       } else if (t === tChat) {
-        var cm = safeParse(p); if (cm && cm.uid) me.seen[String(cm.uid).slice(0, 40)] = Date.now();
+        var cm = safeParse(p); if (cm && cm.uid) heard(me, String(cm.uid).slice(0, 40), false);
         if (addChat(me, cm, false) && me.isHost) saveChatLog(me);
       } else if (t === tReact) {
-        var rm = safeParse(p); if (rm && rm.uid && reactCb) { me.seen[String(rm.uid).slice(0, 40)] = Date.now(); reactCb(rm); }
+        var rm = safeParse(p); if (rm && rm.uid) { heard(me, String(rm.uid).slice(0, 40), false); if (reactCb) reactCb(rm); }
       } else if (t === tLog) {
         var arr = p ? safeParse(p) : null;
         if (Array.isArray(arr)) arr.forEach(function (m) { addChat(me, m, true); });
       } else if (t === tAct && me.isHost && !me.resync) {
         var m = safeParse(p); if (!m || !m.id || !m.from) return;
-        me.seen[String(m.from).slice(0, 40)] = Date.now();
+        heard(me, String(m.from).slice(0, 40));
         hostHandle(m);
       }
     };
@@ -1785,18 +1851,31 @@ var Net = (function () {
       if (onStatus) onStatus();
     };
     c.onStatus(me.statusFn);
-    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tReact);
+    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tVis); c.subscribe(tReact);
     accept(f.doc);
     heartbeat(me, true);
     if (bc) { try { bc.postMessage({ k: 'open', key: PREFIX + code, tab: TAB }); } catch (e) {} }
-    me.timers.push(setInterval(function () {
+    Beat.boost(true);   // seduti a un tavolo: il battito non deve rallentare se l'app va in secondo piano
+    me.stops.push(Beat.every(Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4)), function () {
       if (T !== me) return;
       heartbeat(me, false);
-      if (me.isHost) { c.publish(tPing, String(Date.now()), false); if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true); }
-      else maybeTakeOver(me);
+      if (me.isHost) {
+        c.publish(tPing, String(Date.now()), false);
+        if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true);
+        maybeHandOver(me); maybeGiveBack(me);
+      } else maybeTakeOver(me);
       if (onStatus) onStatus();
-    }, Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4))));
+    }));
     return true;
+  }
+  // Ho sentito un giocatore. hidden: true = ha l'app in secondo piano, false = la sta guardando, niente = non lo dice.
+  function heard(me, u, hidden) {
+    var now = Date.now(), prev = me.seen[u] || 0;
+    me.seen[u] = now;
+    if (hidden === true) { me.hid[u] = now; me.visSince[u] = 0; return; }
+    if (hidden === false) delete me.hid[u];
+    else if (me.hid[u] && now - me.hid[u] > HID_MS) delete me.hid[u];
+    if (!me.hid[u] && (!me.visSince[u] || now - prev > Math.max(15000, HB_MS * 2))) me.visSince[u] = now;   // presente e attento da adesso
   }
   // Fine della risincronizzazione dopo una disconnessione. d = stato trovato sul server (o null se non è arrivato).
   function endResync(me, d) {
@@ -1805,7 +1884,8 @@ var Net = (function () {
     // Ero l'host ma sul server c'è uno stato pubblicato da un altro dopo che avevo preso il comando:
     // mentre ero via qualcuno è subentrato. Vale il suo stato; le mie modifiche fatte offline si scartano.
     if (d && me.isHost && d.host !== uid && (d.rev || 0) >= (me.hostRev || 0)) { me.unpub = false; me.lastPing = Date.now(); accept(d); return; }
-    if (d && (!me.doc || (d.rev || 0) > (me.doc.rev || 0))) { me.lastPing = Date.now(); accept(d); return; }
+    // (stessa versione ma io non avevo pubblicato la mia: mentre ero via qualcuno si è seduto da solo, vedi selfSeat)
+    if (d && (!me.doc || (d.rev || 0) > (me.doc.rev || 0) || (me.unpub && (d.rev || 0) === (me.doc.rev || 0)))) { me.unpub = false; me.lastPing = Date.now(); accept(d); return; }
     // Sono l'host e il server ha uno stato più vecchio del mio (o niente): pubblico il mio.
     if (me.isHost && me.doc && (me.unpub || !d || (d.rev || 0) < (me.doc.rev || 0))) flush(me);
   }
@@ -1814,43 +1894,71 @@ var Net = (function () {
     me.unpub = !(me.up && me.c.publish(topic(me.code, 'state'), JSON.stringify(me.doc), true));
     if (!me.unpub) announce(true);
   }
-  // Segnale di presenza: ogni giocatore lo manda ogni 10 secondi finché ha la pagina aperta e collegata.
+  // Segnale di presenza: ogni giocatore lo manda ogni 10 secondi finché la pagina gira ed è collegata.
+  // Con l'app in secondo piano aggiunge «sono in pausa»: gli altri lo vedono distinto da chi è sparito davvero.
   function heartbeat(me, now) {
-    if (!me.up || (!now && Date.now() - me.lastHb < 10000)) return;
+    if (!me.up || (!now && Date.now() - me.lastHb < HB_MS)) return;
+    var hidden = document.visibilityState === 'hidden';
     if (me.c.publish(topic(me.code, 'hb'), uid, false)) me.lastHb = Date.now();
+    if ((hidden || me.sentHid !== hidden) && me.c.publish(topic(me.code, 'vis'), uid + '|' + (hidden ? 'h' : 'v'), false)) me.sentHid = hidden;
   }
-  // 'on' = collegato adesso, 'off' = non si sente da un po', null = non si sa ancora (appena entrati o offline noi).
+  // 'on' = collegato e sta guardando, 'away' = collegato ma con l'app in secondo piano, 'off' = non si sente da un po',
+  // null = non si sa ancora (appena entrati o offline noi).
   function presence(u) {
     if (!T || !u || /^bot-/.test(u)) return null;
     if (u === uid) return T.up ? 'on' : 'off';
     var s = T.seen[u], now = Date.now();
-    if (s && now - s < PRES_MS) return 'on';
+    if (s && now - s < PRES_MS) return T.hid[u] && now - T.hid[u] < HID_MS ? 'away' : 'on';
     if (!T.up || T.resync || now - T.upSince < PRES_MS) return null;
     return 'off';
   }
-  function offlineFor(u) { if (!T) return 0; return presence(u) === 'off' ? Date.now() - Math.max(T.seen[u] || 0, T.upSince) + PRES_MS : 0; }
+  // Da quanto non si sente un giocatore che risulta offline (0 se è collegato o non si sa).
+  function offlineFor(u) { if (!T) return 0; return presence(u) === 'off' ? Date.now() - Math.max(T.seen[u] || 0, T.upSince) : 0; }
   var presCss = false;
   function dot(u) {
     var st = presence(u); if (!st) return '';
     if (!presCss) {
       presCss = true; var el = document.createElement('style');
-      el.textContent = '.pres{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 6px 1px 0;vertical-align:middle;flex:none}.pres-on{background:#3fd27a;box-shadow:0 0 0 2px rgba(63,210,122,.25)}.pres-off{background:#9aa0a8;box-shadow:0 0 0 2px rgba(154,160,168,.2)}.pres-t{font-size:.78em;opacity:.75;margin-left:6px;font-weight:400;white-space:nowrap}';
+      el.textContent = '.pres{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 6px 1px 0;vertical-align:middle;flex:none}.pres-on{background:#3fd27a;box-shadow:0 0 0 2px rgba(63,210,122,.25)}.pres-off{background:#9aa0a8;box-shadow:0 0 0 2px rgba(154,160,168,.2)}.pres-away{background:#f0b33e;box-shadow:0 0 0 2px rgba(240,179,62,.25)}.pres-t{font-size:.78em;opacity:.75;margin-left:6px;font-weight:400;white-space:nowrap}';
       document.head.appendChild(el);
     }
-    return '<i class="pres pres-' + st + '" title="' + (st === 'on' ? 'Collegato' : 'Offline') + '" aria-hidden="true"></i>';
+    return '<i class="pres pres-' + st + '" title="' + (st === 'on' ? 'Collegato' : st === 'away' ? 'Collegato, con l’app in secondo piano' : 'Offline') + '" aria-hidden="true"></i>';
   }
-  function offTag(u) { return presence(u) === 'off' ? '<span class="pres-t">offline</span>' : ''; }
+  function offTag(u) { var st = presence(u); return st === 'off' ? '<span class="pres-t">offline</span>' : st === 'away' ? '<span class="pres-t">in pausa</span>' : ''; }
   function presenceSig() { if (!T || !T.doc) return ''; return T.doc.seats.map(function (s) { return s.bot ? '' : presence(s.uid) || '-'; }).join(''); }
   // Subentro automatico: solo un giocatore seduto, collegato e con la pagina aperta.
   // Per evitare due subentri insieme, ognuno aspetta in più in base al suo posto.
+  // In partita si subentra presto (chi aspetta la sua mossa non deve restare fermo); in sala d'attesa con più calma,
+  // perché lì chi ha aperto il tavolo spesso è solo andato a mandare l'invito agli amici.
   function maybeTakeOver(me) {
     if (!me.doc || me.closed || !me.up || me.resync || document.visibilityState === 'hidden' || Date.now() < me.graceUntil) return;
     var humans = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== me.doc.host; }).map(function (s) { return s.uid; });
     var rank = humans.indexOf(uid);
     if (rank < 0) return;
-    if (Date.now() - me.lastPing < AUTO_TAKEOVER + rank * STAGGER) return;
-    takeHost();
+    if (Date.now() - me.lastPing < AUTO_TAKEOVER * (me.doc.phase === 'lobby' ? 2 : 1) + rank * STAGGER) return;
+    me.lost[me.doc.host] = (me.lost[me.doc.host] || 0) + 1;
+    takeHost(true);
     if (onTakeover) onTakeover();
+  }
+  function seatedHuman(d, u) { return !!(d && d.seats && d.seats.some(function (s) { return s.uid === u && !s.bot; })); }
+  // Reggo la partita ma la mia app è finita in secondo piano (il telefono può sospenderla da un momento all'altro):
+  // passo subito il comando a chi sta guardando il tavolo. Resto il titolare: quando torno mi viene reso.
+  // In sala d'attesa no: lì il comando serve a chi ha aperto il tavolo (opzioni, inizio della partita).
+  function maybeHandOver(me) {
+    if (T !== me || !me.isHost || !me.doc || me.doc.phase === 'lobby' || me.closed || !me.up || me.resync || me.unpub || document.visibilityState !== 'hidden') return;
+    var next = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== uid && presence(s.uid) === 'on'; })[0];
+    if (!next) return;
+    hostApply(function (w) { if (!w.owner) w.owner = uid; w.host = next.uid; return true; });
+  }
+  // Reggo il tavolo al posto del titolare e lui è tornato (collegato, con il tavolo davanti, da qualche secondo):
+  // gli rendo il comando. Se l'aveva già perso più volte per la connessione, aspetto un po' di più.
+  function maybeGiveBack(me) {
+    var d = me.doc;
+    if (T !== me || !me.isHost || !d || !d.owner || d.owner === uid || me.closed || !me.up || me.resync || me.unpub) return;
+    if (!seatedHuman(d, d.owner) || presence(d.owner) !== 'on') return;
+    var since = me.visSince[d.owner];
+    if (!since || Date.now() - since < GIVEBACK * (1 + 3 * Math.min(4, me.lost[d.owner] || 0))) return;
+    hostApply(function (w) { if (w.owner === uid || !seatedHuman(w, w.owner)) return false; w.host = w.owner; return true; });
   }
   function accept(d) {
     T.doc = d;
@@ -1955,6 +2063,8 @@ var Net = (function () {
   // L'host applica sempre la modifica sul suo telefono; la pubblica solo se è collegato e sincronizzato.
   // Se non può (offline o appena ricollegato), la tiene da parte: endResync decide poi se pubblicarla o scartarla.
   function publishState() {
+    // il titolare deve essere una persona seduta al tavolo: se se n'è andato, lo diventa chi regge il tavolo
+    if (!T.doc.owner || !seatedHuman(T.doc, T.doc.owner)) T.doc.owner = T.doc.host;
     if (beforePublish) beforePublish(T.doc);
     T.doc.rev = (T.doc.rev || 0) + 1; T.doc.updated = Date.now();
     T.unpub = !(T.up && !T.resync && T.c.publish(topic(T.code, 'state'), JSON.stringify(T.doc), true));
@@ -1979,7 +2089,37 @@ var Net = (function () {
     if (gate && seatedIn(work, from)) {   // l'invito ora è di chi l'ha usato per sedersi
       var hk = khash(String(op.k)); (work.keys || []).forEach(function (x) { if (x.h === hk) x.u = from; }); r.changed = true;
     }
+    if (stampAcct(work, from, op)) r.changed = true;
     if (r.changed !== false) { T.doc = work; publishState(); }
+    return r;
+  }
+  // Chi si siede con l'account lascia sul suo posto il nome utente: serve a mandargli la notifica «tocca a te»
+  // quando ha l'app chiusa (vedi turns.js).
+  function stampAcct(work, from, op) {
+    if (!op || op.t !== 'join') return false;
+    var s = work.seats.filter(function (x) { return x.uid === from; })[0]; if (!s) return false;
+    var a = typeof op.acct === 'string' && /^[A-Za-z0-9_.-]{3,18}$/.test(op.acct) ? op.acct : null;
+    if ((s.acct || null) === a) return false;
+    if (a) s.acct = a; else delete s.acct;
+    return true;
+  }
+  /* L'host non risponde (telefono in tasca, app sospesa mentre manda l'invito su WhatsApp…) e io voglio sedermi:
+     lo faccio da solo, con le stesse regole che userebbe lui e senza togliergli il comando. Al suo ritorno trova
+     il mio posto già occupato. Risponde come l'host ({err} / {out}), oppure null se qui non si può fare. */
+  function selfSeat(me, op) {
+    var work = JSON.parse(JSON.stringify(me.doc));
+    var gate = work.vis === 'direct' && work.host !== uid && !seatedIn(work, uid);
+    if (gate && !mayEnter(work, uid, op.k)) return { err: PRIVATE };
+    var r; try { r = reducer(work, uid, op) || {}; } catch (e) { return null; }
+    if (r.err) return r;
+    if (r.changed === false && !stampAcct(work, uid, op)) return r;   // già seduto, o partita in corso (si guarda): niente da scrivere
+    if (me.doc.phase !== 'lobby' || work.phase !== 'lobby') return r.changed === false ? r : null;   // a partita iniziata scrive solo l'host
+    if (gate && seatedIn(work, uid)) { var hk = khash(String(op.k)); (work.keys || []).forEach(function (x) { if (x.h === hk) x.u = uid; }); }
+    stampAcct(work, uid, op);
+    if (beforePublish) beforePublish(work);
+    work.rev = (work.rev || 0) + 1; work.updated = Date.now();
+    if (!me.c.publish(topic(me.code, 'state'), JSON.stringify(work), true)) return null;
+    accept(work);
     return r;
   }
   // Un giocatore lascia il tavolo per sempre (scelta dal pulsante «Esci», vedi exit.js). Vale per tutti i giochi.
@@ -2031,17 +2171,33 @@ var Net = (function () {
   }
   function send(op) {
     if (!T || !T.doc) return Promise.reject('Non sei collegato a nessun tavolo.');
-    if (op && op.t === 'join' && !op.k && keyFor(T.code)) op = Object.assign({}, op, { k: keyFor(T.code) });
+    if (op && op.t === 'join') {
+      var extra = {}, an = acctName();
+      if (!op.k && keyFor(T.code)) extra.k = keyFor(T.code);
+      if (an && !op.acct) extra.acct = an;
+      op = Object.assign({}, op, extra);
+    }
     if (T.isHost) { var r = applyLocal(uid, op); return r.err ? Promise.reject(r.err) : Promise.resolve(r.out || null); }
     var id = uid + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), me = T;
     var msg = JSON.stringify({ id: id, from: uid, op: op });
     if (!me.up) me.c.wake(); else if (Date.now() - me.c.lastRx > 8000) me.c.probe();
     return new Promise(function (res, rej) {
       var tries = 0;
+      function stop() { clearInterval(pd.timer); delete me.pending[id]; }
       function fire() {
-        if (T !== me) { clearInterval(pd.timer); delete me.pending[id]; rej('Hai lasciato il tavolo.'); return; }
-        if (tries++ >= 4) {
-          clearInterval(pd.timer); delete me.pending[id];
+        if (T !== me) { stop(); rej('Hai lasciato il tavolo.'); return; }
+        // nel frattempo il comando è passato a me: la mossa la applico io
+        if (me.isHost && !me.resync) { stop(); var mine = applyLocal(uid, op); if (mine.err) rej(mine.err); else res(mine.out || null); return; }
+        var mute = me.up && Date.now() - me.lastPing > PROXY_MS;
+        // l'host è muto e voglio solo sedermi: lo faccio da me (vedi selfSeat)
+        if (tries >= 2 && mute && op && op.t === 'join' && me.doc) {
+          var own = selfSeat(me, op);
+          if (own) { stop(); if (own.err) rej(own.err); else res(own.out || null); return; }
+        }
+        // host sparito: si insiste finché un altro giocatore non prende il comando (la stessa mossa arriva a lui, una volta sola)
+        var max = me.up && me.doc && me.doc.phase !== 'lobby' && Date.now() - me.lastPing > HOST_TIMEOUT ? 4 + Math.ceil((AUTO_TAKEOVER + 2 * STAGGER) / 3000) : 4;
+        if (tries++ >= max) {
+          stop();
           rej(me.up ? 'L’host non risponde. Se è uscito, il comando passa a un altro giocatore tra poco.' : 'Sei offline: la mossa non è partita. Riprova quando torna la connessione.');
           return;
         }
@@ -2058,21 +2214,42 @@ var Net = (function () {
     if (!fn(work)) return false;
     T.doc = work; publishState(); return true;
   }
-  function takeHost() {
+  // auto = subentro automatico perché l'host non risponde: il titolare resta lui e al ritorno riavrà il comando.
+  // Senza auto è «Prendi il comando» premuto apposta: il tavolo diventa di chi lo prende.
+  function takeHost(auto) {
     if (!T || !T.doc) return false;
-    var work = JSON.parse(JSON.stringify(T.doc)); work.host = uid;
+    var work = JSON.parse(JSON.stringify(T.doc));
+    if (!work.owner) work.owner = work.host;   // tavolo aperto con una versione precedente
+    if (auto !== true) work.owner = uid;
+    work.host = uid;
     T.doc = work; publishState(); return true;
   }
-  // Chiude il tavolo per tutti: lascia una "lapide" (stato chiuso) così nessuno può riaprirlo per errore
-  // ricollegandosi, e lo toglie dalla lista pubblica.
+  /* Chiude il tavolo per tutti: lascia una "lapide" (stato chiuso) così nessuno può riaprirlo per errore
+     ricollegandosi, e lo toglie dalla lista pubblica. Se in questo momento siamo offline il tavolo si chiude lo stesso
+     per noi, e sul server appena torna la connessione (finché la pagina resta aperta): risponde 'later'. */
+  var closes = [];
   function closeTable() {
     if (!T || !T.doc) return false;
-    var d = T.doc, tomb = { code: d.code, closed: true, rev: (d.rev || 0) + 1, updated: Date.now() };
-    var ok = T.c.publish(topic(T.code, 'state'), JSON.stringify(tomb), true);
-    if (d.lobbyId) T.c.publish(lobbyTopic(d.lobbyId), '', true);
-    T.c.publish(topic(T.code, 'chatlog'), '', true);
-    T.closed = true;
-    return ok;
+    var me = T, d = me.doc;
+    me.closed = true;
+    if (tombstone(me.c, me.code, d)) return true;
+    var job = { c: me.c, code: me.code, d: d, at: Date.now() };
+    closes.push(job);
+    if (!me.c.closeFn) { me.c.closeFn = function (up) { if (up) setTimeout(flushCloses, 1200); }; me.c.onStatus(me.c.closeFn); }
+    me.c.wake();
+    note('Sei offline: il tavolo ' + me.code + ' si chiude appena torna la connessione. Tieni aperta questa pagina.');
+    setTimeout(function () { if (T === me) { me.doc = null; me.onDoc(null); } }, 0);
+    return 'later';
+  }
+  function flushCloses() {
+    closes = closes.filter(function (j) { return Date.now() - j.at < 30 * 60e3 && !tombstone(j.c, j.code, j.d); });
+  }
+  // Piccolo avviso in alto, per le poche cose che questa parte deve dire da sola.
+  function note(text) {
+    var d = document.createElement('div');
+    d.setAttribute('role', 'status');
+    d.setAttribute('style', 'position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:99990;max-width:calc(100vw - 24px);background:#2a2118;color:#f6ead2;border:1px solid rgba(242,193,78,.5);border-radius:12px;padding:10px 14px;font:15px/1.4 system-ui,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.45)');
+    d.textContent = text; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 5200);
   }
   function clearTable() { return closeTable(); }
 
@@ -2118,10 +2295,15 @@ var Net = (function () {
         me.c.publish(topic(me.code, 'state'), JSON.stringify(w), true);
       }
     }
+    // Partita finita e al tavolo non c'è più nessun altro: uscendo per ultimo lo chiudo, così non resta in giro
+    // (né nei «tavoli recenti» degli altri, né in «Continua la partita»).
+    if (!(opts && opts.quiet) && me.up && !me.resync && !me.closed && me.doc && me.doc.phase === 'over' && seatedHuman(me.doc, uid) &&
+        me.doc.seats.every(function (s) { return s.bot || s.uid === uid || presence(s.uid) === 'off'; })) { tombstone(me.c, me.code, me.doc); me.closed = true; }
     T = null; clearTimeout(me.resyncTimer);
-    me.timers.forEach(clearInterval);
+    Beat.boost(false);
+    me.stops.forEach(function (f) { f(); });
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
-    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'react'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'vis', 'react'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
     me.c.handlers = me.c.handlers.filter(function (h) { return h !== me.handler; });
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
@@ -2134,6 +2316,7 @@ var Net = (function () {
     setOnTakeover: function (f) { onTakeover = f; },
     get uid() { return uid; },
     get isHost() { return !!(T && T.isHost); },
+    get isOwner() { return !!(T && T.doc && (T.doc.owner || T.doc.host) === uid); },
     get connected() { return !!(T && T.up); },
     hostAlive: function () { return !T || T.isHost || Date.now() - T.lastPing < HOST_TIMEOUT; },
     presence: presence, offlineFor: offlineFor, dot: dot, offTag: offTag, presenceSig: presenceSig,
@@ -2142,8 +2325,87 @@ var Net = (function () {
   };
 })();
 
+/* ===== Schermo acceso al tavolo e richiamo «tocca a te» (condivisi da tutti i giochi) =====
+   Schermo: mentre sei seduto a un tavolo (in attesa o in partita) il telefono non spegne lo schermo da solo. È lo
+   spegnimento automatico, quasi sempre, a «scollegare» chi aspetta il suo turno: a schermo spento il telefono ferma
+   la pagina. Si può disattivare dal menu del tavolo («Schermo sempre acceso»).
+   Richiamo: se arriva il tuo turno mentre l'app è in secondo piano ma ancora viva, il titolo della scheda cambia e,
+   con le notifiche permesse, compare una notifica; ad app chiusa del tutto ci pensa il server (vedi turns.js).
+   Usa le funzioni globali dei giochi: App, Net, Coach. */
+var Awake = (function () {
+  var KEY = 'pp-awake', lock = null, asking = false, retryAt = 0;
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function supported() { return !!(navigator.wakeLock && navigator.wakeLock.request); }
+  function enabled() { return get(KEY) !== 'off'; }
+  function seated(d) { return !!(d && d.seats && window.Net && (d.host === Net.uid || d.seats.some(function (s) { return s.uid === Net.uid; }))); }
+  function wanted() {
+    var d = window.App && App.doc;
+    return enabled() && supported() && document.visibilityState === 'visible' && !!d && App.screen === 'table' && !!Net.tableCode &&
+      (d.phase === 'lobby' || d.phase === 'play') && seated(d);
+  }
+  function release() { var l = lock; lock = null; if (l) { try { l.release().catch(function () {}); } catch (e) {} } }
+  function sync() {
+    var w = wanted();
+    if (!w) { if (lock) release(); return; }
+    if (lock || asking || Date.now() < retryAt) return;
+    asking = true;
+    navigator.wakeLock.request('screen').then(function (l) {
+      asking = false; lock = l;
+      l.addEventListener('release', function () { if (lock === l) lock = null; });   // il sistema lo toglie quando la pagina si nasconde
+      if (!wanted()) release();
+    }, function () { asking = false; retryAt = Date.now() + 15000; });   // risparmio energetico attivo, o pagina non in primo piano
+  }
+  setInterval(sync, 2500);
+  document.addEventListener('visibilitychange', function () { sync(); if (document.visibilityState === 'visible') calm(); });
+
+  /* --- voce nel menu del tavolo --- */
+  function label() { return 'Schermo sempre acceso al tavolo: <b>' + (enabled() ? 'sì' : 'no') + '</b>'; }
+  function menuHTML(cls) { return supported() ? '<button type="button" class="' + (cls || 'btn ghost block') + '" data-awake="toggle" aria-pressed="' + enabled() + '">' + label() + '</button>' : ''; }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-awake]'); if (!b) return;
+    set(KEY, enabled() ? 'off' : 'on'); retryAt = 0; sync();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-awake]'), function (x) { x.innerHTML = label(); x.setAttribute('aria-pressed', String(enabled())); });
+  });
+
+  /* --- richiamo al turno --- */
+  var baseTitle = null, wasMine = false, flagged = false;
+  function myTurn(doc) {
+    if (!doc || !doc.game || doc.phase !== 'play' || !window.Coach || !Coach.needs || !doc.game.players) return false;
+    var g = doc.game, me = -1; g.players.forEach(function (P, i) { if (P.uid === Net.uid) me = i; });
+    if (me < 0 || g.players[me].bot) return false;   // se per me sta giocando l'automatico, non c'è niente da fare adesso
+    return Coach.needs(g, me);
+  }
+  function tag() { return 'turn-' + (Net.tableCode || ''); }
+  function reg() { return navigator.serviceWorker && navigator.serviceWorker.getRegistration ? navigator.serviceWorker.getRegistration().catch(function () { return null; }) : Promise.resolve(null); }
+  function calm() {
+    if (!flagged) return; flagged = false;
+    if (baseTitle != null) document.title = baseTitle;
+    var t = tag();
+    reg().then(function (r) { if (r && r.getNotifications) return r.getNotifications({ tag: t }).then(function (l) { l.forEach(function (n) { n.close(); }); }); }).catch(function () {});
+  }
+  function call(doc) {
+    flagged = true;
+    if (baseTitle == null) baseTitle = document.title;
+    document.title = '🔔 Tocca a te · ' + baseTitle;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (window.Alerts && Alerts.turnsOn && !Alerts.turnsOn()) return;
+    var o = { body: baseTitle + ', tavolo ' + doc.code + ': gli altri ti aspettano.', tag: tag(), renotify: true, data: { url: location.href }, icon: new URL('../icon-192.png', location.href).href, lang: 'it' };
+    reg().then(function (r) { if (r && r.showNotification && document.visibilityState === 'hidden') return r.showNotification('Tocca a te!', o); }).catch(function () {});
+  }
+  // Da chiamare a ogni nuovo stato del tavolo (lo fa Turns.watch).
+  function watch(doc) {
+    var mine = myTurn(doc);
+    if (mine && !wasMine && document.visibilityState === 'hidden') call(doc);
+    if (!mine || document.visibilityState === 'visible') calm();
+    wasMine = mine;
+  }
+  return { menuHTML: menuHTML, watch: watch, supported: supported, enabled: enabled, sync: sync, get held() { return !!lock; } };
+})();
+
 /* ===== Timer di turno (condiviso): se un giocatore non fa niente per troppo tempo,
-   l'host lo fa giocare in automatico finché non torna. ===== */
+   l'host lo fa giocare in automatico finché non torna. L'host avvisa anche, con una notifica, chi deve giocare
+   e non ha il gioco davanti (app chiusa o in secondo piano). ===== */
 var Turns = (function () {
   var cfg = null, lastKey = null, timer = null, offKey = null;
   var DEFAULT = 60;
@@ -2162,6 +2424,7 @@ var Turns = (function () {
   }
   // Da chiamare a ogni nuovo stato: solo l'host arma il timer.
   function watch(doc) {
+    if (window.Awake) Awake.watch(doc);   // richiamo «tocca a te» su questo telefono, se l'app è in secondo piano
     if (!cfg) return;
     var s = secs(doc);
     if (!Net.isHost || !doc || !doc.game || doc.phase !== 'play' || !s || !doc.turnKey) { clearTimeout(timer); lastKey = null; return; }
@@ -2194,10 +2457,30 @@ var Turns = (function () {
       return cfg.onTimeout(cur, dd);
     });
   }
+  /* Solo sull'host: «tocca a te» a chi deve giocare e non c'è (offline, oppure con l'app in secondo piano).
+     La notifica parte dal server, quindi arriva anche ad app chiusa; serve che entrambi abbiano l'account e che
+     l'assente abbia le notifiche attive. Una sola per ogni volta che il turno lo trova assente. */
+  var PUSH_WAIT = +(new URLSearchParams(location.search).get('turnPushMs') || 12000), gone = {};
+  function turnPush(doc) {
+    if (!cfg || !Net.isHost || !Net.connected || !doc || !doc.game || doc.phase !== 'play' || doc.practice || !doc.game.players) { gone = {}; return; }
+    if (!window.Account || !Account.user() || !window.Coach || !Coach.needs || !window.Alerts || !Alerts.here) return;
+    if (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search)) return;   // prove locali
+    var g = doc.game, now = Date.now(), live = {};
+    g.players.forEach(function (P, i) {
+      if (!P.uid || P.bot || P.uid === Net.uid) return;
+      var st = Net.presence(P.uid), seat = doc.seats.filter(function (x) { return x.uid === P.uid; })[0];
+      if (!seat || !seat.acct || (st !== 'off' && st !== 'away') || !Coach.needs(g, i)) return;
+      var e = live[P.uid] = gone[P.uid] || { since: now, sent: false };
+      if (e.sent || now - e.since < PUSH_WAIT) return;
+      e.sent = true;
+      Account.notify({ kind: 'turn', to: seat.acct, game: Alerts.here.path.replace(/\/$/, ''), code: doc.code }).catch(function () {});
+    });
+    gone = live;
+  }
   // Conto alla rovescia visibile a chi deve giocare (elemento #tt), solo negli ultimi 20 secondi.
   function tick() {
     var doc = App.doc, s = secs(doc);
-    offlineCheck(doc);
+    offlineCheck(doc); turnPush(doc);
     var el = document.getElementById('tt'); if (!el) return;
     if (!doc || !doc.turnSince || !s) { el.textContent = ''; return; }
     var rem = Math.ceil((doc.turnSince + s * 1000 - Date.now()) / 1000);
@@ -2221,6 +2504,7 @@ var Turns = (function () {
    L'host sceglie se chiudere il tavolo per tutti oppure uscire lasciando il comando a un altro giocatore
    (scelto da solo: il primo collegato). Se al tavolo restano solo giocatori automatici, il tavolo può solo chiudersi.
    Chi non è host, a partita iniziata, sceglie se lasciare la partita (gioca l'automatico al suo posto) o uscire per ora.
+   A partita finita non c'è niente da lasciare: chi non è host esce e basta, e l'ultimo che esce chiude il tavolo (vedi net.js).
    Ogni gioco chiama Exit.ask() dal suo pulsante «Esci»: se risponde false, l'uscita è quella semplice di sempre
    (sala d'attesa da non host, oppure chi guarda soltanto). Usa le funzioni globali dei giochi: App, leaveTable. */
 var Exit = (function () {
@@ -2261,23 +2545,23 @@ var Exit = (function () {
     if (!d || !d.seats) return false;
     var seated = d.seats.some(function (s) { return s.uid === Net.uid; }), host = d.host === Net.uid;
     if (!seated && !host) return false;
-    var game = inGame(d);
+    var game = inGame(d), over = d.phase === 'over';
     if (host) {
       var nx = nextHost(d);
       if (!nx) {
         open('<h2>Uscire dal tavolo ' + esc(d.code) + '?</h2>' +
-          '<p>' + (d.seats.length > 1 ? 'Al tavolo ci sono solo giocatori automatici' : 'Sei l’unico al tavolo') + ': uscendo il tavolo si chiude' + (game ? ' e la partita finisce' : '') + '.</p>' +
+          '<p>' + (d.seats.length > 1 ? 'Al tavolo ci sono solo giocatori automatici' : 'Sei l’unico al tavolo') + ': uscendo il tavolo si chiude' + (game && !over ? ' e la partita finisce' : '') + '.</p>' +
           '<button type="button" class="px-opt red" data-px="close"><b>Chiudi il tavolo ed esci</b><span>Sparisce dalla lista dei tavoli.</span></button>');
         return true;
       }
       open('<h2>Uscire dal tavolo ' + esc(d.code) + '?</h2>' +
         '<p>Sei l’host: scegli cosa succede quando esci.</p>' +
         '<button type="button" class="px-opt main" data-px="pass" data-u="' + esc(nx.uid) + '"><b>Esci e lascia il comando a ' + esc(nx.nick) + '</b><span>' +
-          (game ? 'La partita continua: al tuo posto gioca l’automatico.' : 'Il tavolo resta aperto; il tuo posto si libera.') + '</span></button>' +
-        '<button type="button" class="px-opt red" data-px="close"><b>Chiudi il tavolo per tutti</b><span>' + (game ? 'La partita finisce e tutti' : 'Tutti') + ' tornano alla schermata iniziale.</span></button>');
+          (over ? 'Il tavolo resta aperto: gli altri possono giocarne un’altra.' : game ? 'La partita continua: al tuo posto gioca l’automatico.' : 'Il tavolo resta aperto; il tuo posto si libera.') + '</span></button>' +
+        '<button type="button" class="px-opt red" data-px="close"><b>Chiudi il tavolo per tutti</b><span>' + (game && !over ? 'La partita finisce e tutti' : 'Tutti') + ' tornano alla schermata iniziale.</span></button>');
       return true;
     }
-    if (!game) return false;   // sala d'attesa: chi non è host esce e basta, come sempre
+    if (!game || over) return false;   // sala d'attesa o partita finita: chi non è host esce e basta
     open('<h2>Uscire dalla partita?</h2>' +
       '<button type="button" class="px-opt main" data-px="quit"><b>Lascia la partita</b><span>Al tuo posto gioca l’automatico fino alla fine; il tuo posto non è più tuo.</span></button>' +
       '<button type="button" class="px-opt" data-px="later"><b>Esci per ora</b><span>Puoi rientrare quando vuoi; mentre sei via, al tuo turno gioca l’automatico.</span></button>');
@@ -2292,7 +2576,7 @@ var Exit = (function () {
     if (busy) return;
     if (k === 'close') {
       close(); App.closing = true;
-      if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); }
+      if (!Net.closeTable()) { App.closing = false; toast('Non sono riuscito a chiudere il tavolo: riprova.'); }
       return;
     }
     if (k === 'later') { close(); if (typeof leaveTable === 'function') leaveTable(); return; }
@@ -2482,7 +2766,9 @@ var Coach = (function () {
     else if (k === 'suggest') suggest();
     else if (k === 'rules') { var r = document.querySelector('[data-act="rules"]'); if (r) r.click(); }
   });
-  return { setup: setup, buttonHTML: buttonHTML, start: start, paint: paint };
+  // Tocca a questo giocatore fare qualcosa adesso? (lo usano il richiamo «tocca a te» e la notifica a chi è assente)
+  function needs(g, i) { try { return !!(cfg && myTurn(g, i)); } catch (e) { return false; } }
+  return { setup: setup, buttonHTML: buttonHTML, start: start, paint: paint, needs: needs };
 })();
 
 /* ===== Installazione come app (PWA): Android usa il prompt del browser, iOS mostra le istruzioni ===== */
@@ -3266,7 +3552,7 @@ var Alerts = (function () {
   function standalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
   function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
   function allGames() { return GAMES.map(function (g) { return g.path.replace(/\/$/, ''); }); }
-  function prefs() { var p = obj(PREFS); return { games: Array.isArray(p.games) ? p.games : allGames(), invites: p.invites !== false }; }
+  function prefs() { var p = obj(PREFS); return { games: Array.isArray(p.games) ? p.games : allGames(), invites: p.invites !== false, turns: p.turns !== false }; }
   function pushOn() { return !!get(SUBK) && pushSupported() && Notification.permission === 'granted'; }
   function keyBytes(b) { b = b.replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; var s = atob(b), o = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
   function registration() {
@@ -3278,7 +3564,12 @@ var Alerts = (function () {
   }
   function save(sub) {
     var j = sub.toJSON(), p = prefs();
-    return Account.rpc('save_push', { p_token: Account.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_games: p.games, p_invites: p.invites, p_ua: ua.slice(0, 200) })
+    var args = { p_token: Account.token, p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_games: p.games, p_invites: p.invites, p_ua: ua.slice(0, 200), p_turns: p.turns };
+    return Account.rpc('save_push', args)
+      .catch(function (e) {   // server non ancora aggiornato (non conosce «tocca a te»): si salva come prima
+        if (!/save_push|schema cache|function/i.test(String(e))) throw e;
+        delete args.p_turns; return Account.rpc('save_push', args);
+      })
       .then(function () { set(SUBK, j.endpoint); set(SYNC, String(Date.now())); });
   }
   var pushMsg = null;
@@ -3350,6 +3641,7 @@ var Alerts = (function () {
     }
     h += '<p class="pa-note">Avvisami quando qualcuno apre un tavolo di:</p><div class="pa-games">' + GAMES.map(function (g) { var id = g.path.replace(/\/$/, ''); return '<label class="pa-check"><input type="checkbox" data-pp="game" value="' + id + '"' + (p.games.indexOf(id) >= 0 ? ' checked' : '') + '> ' + esc(g.n) + '</label>'; }).join('') + '</div>' +
       '<label class="pa-check"><input type="checkbox" data-pp="inv"' + (p.invites ? ' checked' : '') + '> Inviti e richieste di amicizia</label>' +
+      '<label class="pa-check"><input type="checkbox" data-pp="turns"' + (p.turns ? ' checked' : '') + '> «Tocca a te», quando arriva il mio turno e non ho il gioco davanti</label>' +
       '<label class="pa-check"><input type="checkbox" data-pp="inapp"' + (enabled() ? ' checked' : '') + '> Avvisi dei nuovi tavoli anche dentro l’app, mentre la usi</label>' +
       (pushMsg ? '<p class="pa-err">' + esc(pushMsg) + '</p>' : '') +
       '<p class="pa-note">Con l’app aperta gli avvisi compaiono in alto nella pagina; ad app chiusa arrivano come notifiche del telefono.</p>';
@@ -3361,6 +3653,7 @@ var Alerts = (function () {
     if (k === 'master') { (t.checked ? enablePush() : disablePush()); return; }
     if (k === 'game') { p.games = Array.prototype.map.call(document.querySelectorAll('[data-pp="game"]:checked'), function (x) { return x.value; }); setPrefs(p); }
     if (k === 'inv') { p.invites = t.checked; setPrefs(p); }
+    if (k === 'turns') { p.turns = t.checked; setPrefs(p); }
     if (k === 'inapp') { set(KEY, t.checked ? 'on' : 'off'); if (t.checked) start(); }
   });
   function repaintAll() { repaint(); if (window.Account && Account.render) Account.render(); }
@@ -3368,7 +3661,9 @@ var Alerts = (function () {
   if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', function (e) {
     var d = e.data; if (!d || d.type !== 'push' || !d.data) return;
     if (d.data.kind === 'table' && (!enabled() || busy())) return;   // chi sta giocando (o ha spento gli avvisi) non viene disturbato
-    banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' ? 'Apri' : 'Siediti');
+    // «tocca a te»: se ho già quel tavolo davanti non serve dirmelo
+    if (d.data.kind === 'turn' && busy() && String(d.data.url || '').indexOf('?t=' + Net.tableCode) >= 0 && here && String(d.data.url).indexOf('/' + here.path) >= 0) return;
+    banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' || d.data.kind === 'turn' ? 'Apri' : 'Siediti');
   });
 
   /* --- grafica: avviso nella pagina, interruttore, lista in home --- */
@@ -3484,10 +3779,12 @@ var Alerts = (function () {
 
   if (enabled()) setTimeout(start, 1200);
   return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables,
-    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
+    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, turnsOn: function () { return prefs().turns; }, endpoint: function () { return get(SUBK); }, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
 })();
 
 /* ===== Account (nome utente e password), amici e inviti — server Supabase =====
+   Niente email: chi dimentica la password la cambia con il «codice di recupero» ricevuto alla registrazione
+   (o creato dopo, dalla scheda dell'account). Dalla stessa scheda si vedono i dispositivi collegati.
    L'indirizzo del server sta in server.json (scritto dall'azione «Server» su GitHub). Finché il server
    non è configurato, i giochi funzionano come prima, senza account. */
 var Account = (function () {
@@ -3497,6 +3794,7 @@ var Account = (function () {
   function jget(k) { try { return JSON.parse(get(k) || 'null'); } catch (e) { return null; } }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   var sig = null, cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
+  var showPw = false, hasRecovery = null, devices = null, reloadOnClose = false;
   var readyRes; var ready = new Promise(function (r) { readyRes = r; });
 
   /* ---------- server ---------- */
@@ -3535,15 +3833,82 @@ var Account = (function () {
   (function () { var dev = get('pp-uid-dev'); if (dev && /^u[a-z0-9]+$/.test(dev)) set('pp-uid', dev); if (dev != null) set('pp-uid-dev', null); })();
   function setSession(s) { session = s; set('pp-session', s ? JSON.stringify(s) : null); if (s && !get('pp-nick')) set('pp-nick', s.username); }
   function dropSession() { setSession(null); friendsData = null; repaint(); }
-  function check() { if (session && configured()) rpc('me', { p_token: session.token }).then(function (m) { if (m && m.username !== session.username) { session.username = m.username; set('pp-session', JSON.stringify(session)); repaint(); } refreshFriends(true); }, function () {}); }
+  function check() {
+    if (session && configured()) rpc('me', { p_token: session.token }).then(function (m) {
+      if (m && m.username !== session.username) { session.username = m.username; set('pp-session', JSON.stringify(session)); repaint(); }
+      if (m && typeof m.recovery === 'boolean') { hasRecovery = m.recovery; if (view && view.v === 'account') render(); }
+      refreshFriends(true);
+    }, function () {});
+  }
+  // Accesso o uscita fatti in un'altra scheda (o in un altro gioco aperto): questa pagina si adegua da sola.
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'pp-session') return;
+    var was = session && session.token; session = jget('pp-session');
+    if ((session && session.token) === was) return;
+    friendsData = null; hasRecovery = null; devices = null; presSig = null;
+    repaint(); paintLists(); if (view) { if (!session && view.v !== 'login' && view.v !== 'register' && view.v !== 'recover') close(); else render(); }
+    if (session) check();
+  });
   function user() { return configured() && session ? session : null; }
   function reloadSoon() { setTimeout(function () { location.reload(); }, 350); }
 
+  /* Dopo l'accesso la pagina si ricarica (così tutto riparte con l'account). Quello che l'utente stava facendo quando
+     gli è stato chiesto di accedere (aprire un tavolo, sedersi a uno) riprende da solo dopo la ricarica. */
+  var AFTER = 'pp-after-login', lastAct = null;
+  function sget(k) { try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function sset(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-act],[data-coach]'); if (!b) return;
+    var a = b.getAttribute('data-act'), jc = document.getElementById('joincode');
+    if (b.getAttribute('data-coach') === 'start') lastAct = { act: 'coach', at: Date.now() };
+    else if (a === 'create') lastAct = { act: 'create', at: Date.now() };
+    else if (a === 'join') lastAct = { act: 'join', code: (jc && jc.value) || '', at: Date.now() };
+    else if (a === 'jointable' || a === 'lobbyjoin') lastAct = { act: 'join', code: b.getAttribute('data-code') || '', at: Date.now() };
+  }, true);
+  function intent() {
+    var jc = document.getElementById('joincode'), i = lastAct && Date.now() - lastAct.at < 1500 ? lastAct : document.activeElement === jc && jc ? { act: 'join', code: jc.value } : null;
+    if (!i) return null;
+    if (i.act === 'join' && !/^[A-Za-z]{4}$/.test(String(i.code || '').trim())) return null;
+    if (i.act === 'create' && window.Lobby && Lobby.pickedVis && document.querySelector('input[name="vis"]')) Lobby.pickedVis();   // la scelta «chi può sedersi» resta quella
+    return { act: i.act, code: String(i.code || '').trim().toUpperCase() };
+  }
+  function resume() {
+    var a = sget(AFTER); sset(AFTER, null);
+    if (!a || Date.now() - a.at > 120000 || !user()) return;
+    if (a.toast) toastMsg(a.toast);
+    setTimeout(function () {
+      try {
+        if (a.act === 'create' && typeof createTable === 'function' && !(window.App && App.code)) createTable();
+        else if (a.act === 'join' && typeof joinTable === 'function') joinTable(a.code);
+        else if (a.act === 'coach' && window.Coach && Coach.start && !(window.App && App.code)) Coach.start();
+      } catch (e) { console.warn('ripresa', e); }
+    }, 400);
+  }
+  // s = risposta di login / register / recover. Con un codice di recupero nuovo lo si mostra prima di ricaricare.
+  function entered(s, hello) {
+    var code = s.recovery || null, pend = view && view.x && view.x.intent; delete s.recovery;
+    setSession(s); set('pp-nick', s.username);
+    sset(AFTER, { toast: hello, act: pend && pend.act, code: pend && pend.code, at: Date.now() });
+    return (window.Alerts && Alerts.resync ? Alerts.resync() : Promise.resolve()).catch(function () {}).then(function () {
+      if (code) { hasRecovery = true; reloadOnClose = true; view = { v: 'code', x: { code: code, fresh: true } }; msg = null; render(); return; }
+      close(); toastMsg(hello); reloadSoon();
+    });
+  }
   function login(u, p, isNew) {
     return rpc(isNew ? 'register' : 'login', { p_username: u, p_password: p, p_device: device() }).then(function (s) {
-      setSession(s); set('pp-nick', s.username);
-      return (window.Alerts && Alerts.resync ? Alerts.resync() : Promise.resolve()).catch(function () {}).then(function () { close(); toastMsg(isNew ? 'Benvenuto, ' + s.username + '! Account creato.' : 'Bentornato, ' + s.username + '!'); reloadSoon(); });
+      return entered(s, isNew ? 'Benvenuto, ' + s.username + '! Account creato.' : 'Bentornato, ' + s.username + '!');
     });
+  }
+  function recover(u, code, p) {
+    return rpc('recover', { p_username: u, p_code: code, p_password: p, p_device: device() }).then(function (s) { return entered(s, 'Password cambiata. Bentornato, ' + s.username + '!'); });
+  }
+  function loadDevices() {
+    if (!user()) return;
+    rpc('my_sessions', { p_token: session.token }).then(function (l) { devices = Array.isArray(l) ? l : []; if (view && view.v === 'account') render(); }, function () { devices = []; });
+  }
+  function ago(ts) {
+    var m = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
+    return m < 2 ? 'adesso' : m < 60 ? m + ' minuti fa' : m < 48 * 60 ? Math.round(m / 60) + ' ore fa' : Math.round(m / 1440) + ' giorni fa';
   }
   function logout() {
     var s = session; if (!s) return;
@@ -3645,15 +4010,22 @@ var Account = (function () {
     '.pa-chip .n{background:#c4301f;color:#fff;border-radius:999px;font-size:11px;padding:0 6px;font-weight:800}.pa-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
     '.pa-check{display:flex!important;flex-direction:row!important;gap:10px!important;align-items:center;font-size:15px!important;color:inherit!important;padding:4px 0}.pa-check input{width:20px;height:20px;accent-color:#e6c56f;flex:none}' +
     '.pa-games{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 10px}.pa-sep{border:0;border-top:1px solid rgba(255,255,255,.1);margin:4px 0}' +
+    '.pa-pw{position:relative;display:block}.pa-pw input{width:100%;box-sizing:border-box;padding-right:52px!important}.pa-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);appearance:none;border:0;background:none;color:#4a4136;font:600 13px system-ui,sans-serif;min-width:44px;min-height:40px;cursor:pointer;border-radius:8px}' +
+    '.pa-code{font:700 24px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-align:center;padding:14px 10px;border-radius:12px;background:#0e1216;border:1px dashed rgba(230,197,111,.7);color:#f6e3a8;user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}' +
+    '.pa-warn{padding:10px 12px;border-radius:10px;background:rgba(230,150,60,.14);border:1px solid rgba(230,150,60,.5);font-size:14.5px;display:grid;gap:8px}.pa-link{appearance:none;border:0;background:none;color:#e6c56f;font:600 14.5px system-ui,sans-serif;text-decoration:underline;padding:6px 0;cursor:pointer;justify-self:start}' +
     '.pa-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:99;background:#1b2128;color:#f1ece2;border:1px solid rgba(230,197,111,.5);padding:10px 14px;border-radius:12px;font:15px system-ui,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.5);max-width:min(92vw,460px)}';
   function css() { if (!document.getElementById('pa-css')) { var s = document.createElement('style'); s.id = 'pa-css'; s.textContent = CSS; document.head.appendChild(s); } }
   function toastMsg(t) { css(); var d = document.createElement('div'); d.className = 'pa-toast'; d.textContent = t; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3200); }
-  function close() { var m = document.querySelector('.pa-back'); if (m) m.remove(); view = null; msg = null; }
+  function close() {
+    var m = document.querySelector('.pa-back'); if (m) m.remove(); view = null; msg = null; showPw = false;
+    if (reloadOnClose) { reloadOnClose = false; reloadSoon(); }   // appena entrati: ora che il codice di recupero è stato visto, si riparte con l'account
+  }
   function open(v, extra) {
     css(); view = { v: v || (user() ? 'account' : 'login'), x: extra || {} }; msg = null;
-    if (view.v !== 'login' && view.v !== 'register' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
+    if (view.v !== 'login' && view.v !== 'register' && view.v !== 'recover' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
     render();
     if (user() && (view.v === 'account' || view.v === 'invite')) refreshFriends().catch(function () {});
+    if (user() && view.v === 'account') { devices = null; loadDevices(); }
     if (user() && view.v === 'stats') { statsData = null; loadStats(); }
   }
   function render() {
@@ -3661,9 +4033,9 @@ var Account = (function () {
     var html = body(), back = document.querySelector('.pa-back');
     if (!back) { back = document.createElement('div'); back.className = 'pa-back'; back.addEventListener('click', function (e) { if (e.target === back) close(); }); document.body.appendChild(back); }
     var focused = document.activeElement && document.activeElement.name, vals = {};
-    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { vals[i.name] = i.value; });
+    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (i.name) vals[i.name] = i.value; });
     back.innerHTML = '<div class="pa-sheet" role="dialog" aria-modal="true">' + html + '</div>';
-    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (vals[i.name] != null) i.value = vals[i.name]; });
+    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (i.name && vals[i.name] != null) i.value = vals[i.name]; });
     var f = focused && back.querySelector('[name="' + focused + '"]'); if (f) f.focus();
   }
   function msgHTML() { return msg ? '<p class="' + (msg.ok ? 'pa-ok' : 'pa-err') + '" role="status">' + esc(msg.t) + '</p>' : ''; }
@@ -3674,12 +4046,29 @@ var Account = (function () {
       var reg = v === 'register';
       return '<h2>' + (reg ? 'Crea il tuo account' : 'Entra in Board Games') + '</h2>' + (view.x.why ? '<p>' + esc(view.x.why) + '</p>' : '') +
         '<div class="pa-tabs" role="tablist"><button type="button" class="' + (!reg ? 'on' : '') + '" data-pa="tab" data-v="login">Accedi</button><button type="button" class="' + (reg ? 'on' : '') + '" data-pa="tab" data-v="register">Registrati</button></div>' +
-        '<form data-pa-form="' + v + '" autocomplete="on"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>' +
-        '<label>Password<input type="password" name="p" maxlength="72" autocomplete="' + (reg ? 'new-password' : 'current-password') + '" required></label>' +
-        (reg ? '<label>Ripeti la password<input type="password" name="p2" maxlength="72" autocomplete="new-password" required></label>' : '') + msgHTML() +
+        '<form data-pa-form="' + v + '" autocomplete="on"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></label>' +
+        pwField('Password', 'p', reg ? 'new-password' : 'current-password', reg ? 'next' : 'go') +
+        (reg ? pwField('Ripeti la password', 'p2', 'new-password', 'go') : '') + msgHTML() +
         '<button class="pa-btn" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : reg ? 'Crea account' : 'Accedi') + '</button></form>' +
-        '<p class="pa-note">' + (reg ? 'Da 3 a 18 caratteri tra lettere, numeri, punto e trattini. Niente email: la password non si può recuperare, quindi scrivila in un posto sicuro (il browser può ricordarla per te).' : 'Con l’account ritrovi amici, inviti e notifiche su tutti i tuoi dispositivi.') + '</p>' +
+        (reg ? '' : '<button type="button" class="pa-link" data-pa="go" data-v="recover">Password dimenticata?</button>') +
+        '<p class="pa-note">' + (reg ? 'Nome da 3 a 18 caratteri tra lettere, numeri, punto e trattini; password di almeno 6. Niente email: subito dopo ricevi un <b>codice di recupero</b>, che serve se dimentichi la password.' : 'Con l’account ritrovi amici, inviti e notifiche su tutti i tuoi dispositivi, e resti collegato finché non esci tu.') + '</p>' +
         '<button class="pa-btn g" data-pa="close" type="button">' + (view.x.why ? 'Non ora' : 'Chiudi') + '</button>';
+    }
+    if (v === 'recover') {
+      return '<h2>Password dimenticata</h2><p class="pa-note">Scrivi il tuo nome utente, il <b>codice di recupero</b> che hai ricevuto quando hai creato l’account (12 caratteri, tipo ABCD-EFGH-JKLM) e la nuova password.</p>' +
+        '<form data-pa-form="recover" autocomplete="off"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>' +
+        '<label>Codice di recupero<input type="text" name="c" maxlength="20" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH-JKLM" required></label>' +
+        pwField('Nuova password', 'p', 'new-password', 'go') + msgHTML() +
+        '<button class="pa-btn" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : 'Cambia password ed entra') + '</button></form>' +
+        '<p class="pa-note">Non hai il codice? Se sei ancora collegato su un altro dispositivo, da lì puoi crearne uno nuovo (👤 → Codice di recupero) o cambiare la password. Altrimenti l’account non si può recuperare: creane uno nuovo.</p>' +
+        '<button class="pa-btn g" data-pa="go" data-v="login" type="button">Torna all’accesso</button>';
+    }
+    if (v === 'code') {
+      return '<h2>Il tuo codice di recupero</h2><p>Se un giorno dimentichi la password, con questo codice ne scegli una nuova. <b>Lo vedi solo adesso</b>: scrivilo, copialo nelle note o fai uno screenshot.</p>' +
+        '<div class="pa-code" data-code>' + esc(view.x.code) + '</div>' + msgHTML() +
+        '<button class="pa-btn g" type="button" data-pa="copycode">Copia il codice</button>' +
+        '<p class="pa-note">Vale una volta sola: quando lo usi ne ricevi uno nuovo.' + (view.x.fresh ? '' : ' Il codice di prima non vale più.') + '</p>' +
+        '<button class="pa-btn" type="button" data-pa="close">L’ho salvato</button>';
     }
     if (!u) return '';
     if (v === 'stats') return statsHTML();
@@ -3695,6 +4084,7 @@ var Account = (function () {
     // account
     var d = friendsData, fr2 = d ? d.friends : [], inc = d ? d.incoming : [], out = d ? d.outgoing : [];
     var h = '<h2>Ciao, ' + esc(u.username) + '</h2>' + msgHTML();
+    if (hasRecovery === false && !view.x.rec) h += '<div class="pa-warn"><span><b>Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso (amici e statistiche compresi).</span><button class="pa-btn s" type="button" data-pa="rec">Crea il codice di recupero</button></div>';
     h += '<h3>Notifiche</h3>' + (window.Alerts && Alerts.settingsHTML ? Alerts.settingsHTML() : '');
     h += '<hr class="pa-sep"><h3>Amici</h3>';
     if (inc.length) h += '<div class="pa-list">' + inc.map(function (n) { return '<div class="pa-row"><b>' + esc(n) + ' vuole essere tuo amico</b><button class="pa-btn s" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button class="pa-btn s g" data-pa="decline" data-u="' + esc(n) + '">No</button></div>'; }).join('') + '</div>';
@@ -3703,10 +4093,20 @@ var Account = (function () {
     h += '<form data-pa-form="friend" class="pa-bar"><input type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" style="flex:1;min-width:170px" required><button class="pa-btn s" type="submit">Aggiungi</button></form>';
     h += '<hr class="pa-sep"><h3>Partite</h3><div class="pa-bar"><button class="pa-btn s" data-pa="go" data-v="stats">📊 Statistiche e classifica tra amici</button></div>';
     h += '<hr class="pa-sep"><h3>Account</h3>';
-    if (view.x.pw) h += '<form data-pa-form="password"><label>Password attuale<input type="password" name="o" autocomplete="current-password" required></label><label>Nuova password<input type="password" name="n" autocomplete="new-password" required></label><button class="pa-btn s" type="submit">Cambia password</button></form>';
-    if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p><label>Password<input type="password" name="d" autocomplete="current-password" required></label><button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
-    h += '<div class="pa-bar">' + (view.x.pw ? '' : '<button class="pa-btn s g" data-pa="pw">Cambia password</button>') + '<button class="pa-btn s g" data-pa="logout">Esci</button>' + (view.x.del ? '' : '<button class="pa-btn s g" data-pa="del">Cancella account</button>') + '</div>';
+    if (devices && devices.length) {
+      h += '<div class="pa-list">' + devices.map(function (dv) { return '<div class="pa-row"><span class="pa-dot' + (dv.here ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><b>' + esc(dv.device) + '</b><br><span class="pa-note">' + (dv.here ? 'questo dispositivo' : 'ultimo uso ' + ago(dv.used)) + '</span></span></div>'; }).join('') + '</div>';
+      h += devices.length > 1 ? '<div class="pa-bar"><button class="pa-btn s g" data-pa="others">Esci dagli altri dispositivi</button></div>' : '<p class="pa-note">Sei collegato solo da qui. L’accesso resta attivo finché non esci tu (o per 6 mesi senza usarlo).</p>';
+    }
+    if (view.x.pw) h += '<form data-pa-form="password">' + pwField('Password attuale', 'o', 'current-password') + pwField('Nuova password', 'n', 'new-password') + '<button class="pa-btn s" type="submit">Cambia password</button></form>';
+    if (view.x.rec) h += '<form data-pa-form="recovery"><p>Per creare un nuovo codice di recupero scrivi la tua password. Il codice di prima, se c’era, non varrà più.</p>' + pwField('Password', 'r', 'current-password') + '<button class="pa-btn s" type="submit">Crea il codice</button></form>';
+    if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p>' + pwField('Password', 'd', 'current-password') + '<button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
+    h += '<div class="pa-bar">' + (view.x.pw ? '' : '<button class="pa-btn s g" data-pa="pw">Cambia password</button>') + (view.x.rec ? '' : '<button class="pa-btn s g" data-pa="rec">Codice di recupero</button>') + '<button class="pa-btn s g" data-pa="logout">Esci</button>' + (view.x.del ? '' : '<button class="pa-btn s g" data-pa="del">Cancella account</button>') + '</div>';
     return h + '<button class="pa-btn g" data-pa="close">Chiudi</button>';
+  }
+  // Campo password con «Mostra»: sul telefono si sbaglia facilmente a scrivere alla cieca.
+  function pwField(lab, name, auto, hint) {
+    return '<label>' + lab + '<span class="pa-pw"><input type="' + (showPw ? 'text' : 'password') + '" name="' + name + '" maxlength="72" autocomplete="' + auto + '" autocapitalize="none" autocorrect="off" spellcheck="false"' + (hint ? ' enterkeyhint="' + hint + '"' : '') + ' required>' +
+      '<button type="button" class="pa-eye" data-pa="eye" aria-pressed="' + showPw + '" aria-label="' + (showPw ? 'Nascondi la password' : 'Mostra la password') + '">' + (showPw ? 'Nascondi' : 'Mostra') + '</button></span></label>';
   }
   function repaint() {
     document.querySelectorAll('[data-pa-chip]').forEach(function (e) { e.outerHTML = chipHTML(); });
@@ -3726,7 +4126,7 @@ var Account = (function () {
   // Prima di sedersi a un tavolo: con il server attivo serve l'account.
   function allow() {
     if (!configured() || user()) return true;
-    open('login', { why: 'Per giocare serve un account: è gratis, basta un nome utente e una password.' });
+    open('login', { why: 'Per giocare serve un account: è gratis, basta un nome utente e una password.', intent: intent() });
     return false;
   }
   function allowQuiet() { return !configured() || !!user(); }
@@ -3738,7 +4138,14 @@ var Account = (function () {
     var k = b.getAttribute('data-pa'), uname = b.getAttribute('data-u');
     if (k === 'open') { e.preventDefault(); open(b.getAttribute('data-v')); }
     else if (k === 'close') close();
-    else if (k === 'tab' || k === 'go') { view = { v: b.getAttribute('data-v'), x: {} }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); if (view.v === 'stats') { statsData = null; loadStats(); } }
+    else if (k === 'eye') { e.preventDefault(); showPw = !showPw; render(); }
+    else if (k === 'copycode') { var cc = view && view.x.code; try { navigator.clipboard.writeText(cc).then(function () { msg = { ok: true, t: 'Codice copiato: incollalo in un posto sicuro (le note del telefono vanno bene).' }; render(); }, function () { msg = { t: 'Tieni premuto sul codice per copiarlo.' }; render(); }); } catch (er) { msg = { t: 'Tieni premuto sul codice per copiarlo.' }; render(); } }
+    else if (k === 'rec') { view.x.rec = true; render(); }
+    else if (k === 'others') {
+      b.disabled = true;
+      rpc('logout_others', { p_token: session.token, p_keep_endpoint: (window.Alerts && Alerts.endpoint && Alerts.endpoint()) || null }).then(function (n) { msg = { ok: true, t: n ? 'Fatto: gli altri dispositivi dovranno accedere di nuovo.' : 'Non c’erano altri dispositivi collegati.' }; loadDevices(); render(); }, function (er) { msg = { t: String(er) }; render(); });
+    }
+    else if (k === 'tab' || k === 'go') { var keepX = view && view.x && (view.x.why || view.x.intent) && /^(login|register|recover)$/.test(b.getAttribute('data-v')) ? { why: view.x.why, intent: view.x.intent } : {}; view = { v: b.getAttribute('data-v'), x: keepX }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); if (view.v === 'stats') { statsData = null; loadStats(); } }
     else if (k === 'board') { boardGame = b.getAttribute('data-g') || ''; rpc('friends_board', { p_token: session.token, p_game: boardGame || null }).then(function (r) { boardData = r; render(); }, function (er) { msg = { t: String(er) }; render(); }); render(); }
     else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
     else if (k === 'invite') {
@@ -3764,6 +4171,11 @@ var Account = (function () {
       if (k === 'register' && v('p') !== v('p2')) { msg = { t: 'Le due password non coincidono.' }; render(); return; }
       busy = true; msg = null; render();
       login(v('u').trim(), v('p'), k === 'register').catch(function (er) { msg = { t: String(er) }; }).then(function () { busy = false; render(); });
+    } else if (k === 'recover') {
+      busy = true; msg = null; render();
+      recover(v('u').trim(), v('c').trim(), v('p')).catch(function (er) { msg = { t: String(er) }; }).then(function () { busy = false; render(); });
+    } else if (k === 'recovery') {
+      rpc('new_recovery', { p_token: session.token, p_password: v('r') }).then(function (r) { hasRecovery = true; view = { v: 'code', x: { code: r.recovery } }; msg = null; render(); }, function (er) { msg = { t: String(er) }; render(); });
     } else if (k === 'friend') {
       addFriend(v('f').trim()).then(function () { var i = document.querySelector('[name="f"]'); if (i) i.value = ''; }, function (er) { msg = { t: String(er) }; render(); });
     } else if (k === 'password') {
@@ -3777,6 +4189,7 @@ var Account = (function () {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && view) close(); });
   // link dalle notifiche: ?amici=1 apre la lista degli amici
   if (/[?&]amici=1/.test(location.search)) ready.then(function () { if (user()) open('account'); });
+  ready.then(resume);
 
   load();
   return { ready: ready, configured: configured, user: user, open: open, close: close, allow: allow, allowQuiet: allowQuiet, chipHTML: chipHTML, inviteHTML: inviteHTML,
@@ -4570,6 +4983,7 @@ function sheetBody(s) {
     return '<h2>Tavolo ' + esc(d.code) + '</h2><div style="display:grid;gap:8px">' +
       '<button class="btn ghost block" data-act="invite">Invita amici al tavolo</button><button class="btn ghost block" data-act="rules">Regole</button><button class="btn ghost block" data-act="intro">Rivedi la presentazione</button>' +
       (g ? '<button class="btn ghost block" data-act="scorecard">Segnapunti della partita</button><button class="btn ghost block" data-act="log">Tutte le mosse</button>' : '') +
+      Awake.menuHTML('btn ghost block') +
       (d.host !== Net.uid ? '<button class="btn ghost block" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="btn ghost block" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
       (d.host === Net.uid ? '<button class="btn ghost block" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +

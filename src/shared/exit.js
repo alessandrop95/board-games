@@ -2,6 +2,7 @@
    L'host sceglie se chiudere il tavolo per tutti oppure uscire lasciando il comando a un altro giocatore
    (scelto da solo: il primo collegato). Se al tavolo restano solo giocatori automatici, il tavolo può solo chiudersi.
    Chi non è host, a partita iniziata, sceglie se lasciare la partita (gioca l'automatico al suo posto) o uscire per ora.
+   A partita finita non c'è niente da lasciare: chi non è host esce e basta, e l'ultimo che esce chiude il tavolo (vedi net.js).
    Ogni gioco chiama Exit.ask() dal suo pulsante «Esci»: se risponde false, l'uscita è quella semplice di sempre
    (sala d'attesa da non host, oppure chi guarda soltanto). Usa le funzioni globali dei giochi: App, leaveTable. */
 var Exit = (function () {
@@ -42,23 +43,23 @@ var Exit = (function () {
     if (!d || !d.seats) return false;
     var seated = d.seats.some(function (s) { return s.uid === Net.uid; }), host = d.host === Net.uid;
     if (!seated && !host) return false;
-    var game = inGame(d);
+    var game = inGame(d), over = d.phase === 'over';
     if (host) {
       var nx = nextHost(d);
       if (!nx) {
         open('<h2>Uscire dal tavolo ' + esc(d.code) + '?</h2>' +
-          '<p>' + (d.seats.length > 1 ? 'Al tavolo ci sono solo giocatori automatici' : 'Sei l’unico al tavolo') + ': uscendo il tavolo si chiude' + (game ? ' e la partita finisce' : '') + '.</p>' +
+          '<p>' + (d.seats.length > 1 ? 'Al tavolo ci sono solo giocatori automatici' : 'Sei l’unico al tavolo') + ': uscendo il tavolo si chiude' + (game && !over ? ' e la partita finisce' : '') + '.</p>' +
           '<button type="button" class="px-opt red" data-px="close"><b>Chiudi il tavolo ed esci</b><span>Sparisce dalla lista dei tavoli.</span></button>');
         return true;
       }
       open('<h2>Uscire dal tavolo ' + esc(d.code) + '?</h2>' +
         '<p>Sei l’host: scegli cosa succede quando esci.</p>' +
         '<button type="button" class="px-opt main" data-px="pass" data-u="' + esc(nx.uid) + '"><b>Esci e lascia il comando a ' + esc(nx.nick) + '</b><span>' +
-          (game ? 'La partita continua: al tuo posto gioca l’automatico.' : 'Il tavolo resta aperto; il tuo posto si libera.') + '</span></button>' +
-        '<button type="button" class="px-opt red" data-px="close"><b>Chiudi il tavolo per tutti</b><span>' + (game ? 'La partita finisce e tutti' : 'Tutti') + ' tornano alla schermata iniziale.</span></button>');
+          (over ? 'Il tavolo resta aperto: gli altri possono giocarne un’altra.' : game ? 'La partita continua: al tuo posto gioca l’automatico.' : 'Il tavolo resta aperto; il tuo posto si libera.') + '</span></button>' +
+        '<button type="button" class="px-opt red" data-px="close"><b>Chiudi il tavolo per tutti</b><span>' + (game && !over ? 'La partita finisce e tutti' : 'Tutti') + ' tornano alla schermata iniziale.</span></button>');
       return true;
     }
-    if (!game) return false;   // sala d'attesa: chi non è host esce e basta, come sempre
+    if (!game || over) return false;   // sala d'attesa o partita finita: chi non è host esce e basta
     open('<h2>Uscire dalla partita?</h2>' +
       '<button type="button" class="px-opt main" data-px="quit"><b>Lascia la partita</b><span>Al tuo posto gioca l’automatico fino alla fine; il tuo posto non è più tuo.</span></button>' +
       '<button type="button" class="px-opt" data-px="later"><b>Esci per ora</b><span>Puoi rientrare quando vuoi; mentre sei via, al tuo turno gioca l’automatico.</span></button>');
@@ -73,7 +74,7 @@ var Exit = (function () {
     if (busy) return;
     if (k === 'close') {
       close(); App.closing = true;
-      if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); }
+      if (!Net.closeTable()) { App.closing = false; toast('Non sono riuscito a chiudere il tavolo: riprova.'); }
       return;
     }
     if (k === 'later') { close(); if (typeof leaveTable === 'function') leaveTable(); return; }

@@ -10,7 +10,10 @@ Gioco di carte western a ruoli segreti, da 4 a 7 giocatori, ognuno dal proprio t
 
 - Apri un tavolo, tocca **Invita amici** e manda il link: chi lo apre si siede al tavolo, senza registrarsi.
 - I posti vuoti si riempiono con pistoleri automatici.
-- Chi apre il tavolo (l'host) tiene la partita sul suo telefono. Se esce, dopo qualche secondo un altro giocatore può prendere il comando.
+- Chi apre il tavolo (l'host) tiene la partita sul suo telefono. Se in partita mette l'app in secondo piano il comando passa subito a chi sta guardando; se sparisce del tutto, dopo una quindicina di secondi subentra un altro giocatore. In entrambi i casi chi ha aperto il tavolo ne resta il **titolare** e riprende il comando da solo quando torna.
+- **App in secondo piano**: al tavolo lo schermo resta acceso (si spegne dal Menu del tavolo), la connessione viene tenuta viva finché il telefono lascia girare la pagina e gli altri vedono «in pausa» (pallino giallo) invece di «offline». Quando arriva il tuo turno e non hai il gioco davanti ricevi la notifica «Tocca a te» (serve l'account con le notifiche attive). Chi apre un invito mentre l'host ha l'app sospesa si siede comunque.
+- **Account**: niente email. Alla registrazione ricevi un **codice di recupero** per scegliere una nuova password se la dimentichi; dalla scheda dell'account si vedono i dispositivi collegati e si può uscire da tutti gli altri.
+- Un tavolo finito si chiude da solo quando esce l'ultimo giocatore; uno fermo da più di una settimana risulta chiuso.
 
 La sincronizzazione passa da broker MQTT pubblici e gratuiti (HiveMQ, EMQX, Mosquitto), senza server proprio né account.
 Nomi, testi e grafica delle carte sono originali. Le illustrazioni sono disegni e dipinti western di pubblico dominio

@@ -30,7 +30,18 @@ with sync_playwright() as p:
     A.screenshot(path=S + 'login.png')
     A.click('[data-pa="tab"][data-v="register"]'); A.fill('[name=u]', 'Ale'); A.fill('[name=p]', 'segreto1'); A.fill('[name=p2]', 'segreto2'); A.click('form [type=submit]'); A.wait_for_timeout(300)
     t('password diverse', 'non coincidono' in A.inner_text('.pa-sheet'))
-    A.fill('[name=p2]', 'segreto1'); A.click('form [type=submit]'); A.wait_for_load_state('load'); A.wait_for_timeout(1500)
+    t('la scelta «Mostra» fa vedere la password', A.get_attribute('[name=p]', 'type') == 'password' and (A.click('[data-pa="eye"] >> nth=0') or True) and A.get_attribute('[name=p]', 'type') == 'text' and A.input_value('[name=p]') == 'segreto1')
+    A.fill('[name=p2]', 'segreto1'); A.click('form [type=submit]'); A.wait_for_selector('.pa-code', timeout=8000)
+    codeA = A.inner_text('.pa-code').strip()
+    import re
+    t('dopo la registrazione compare il codice di recupero', bool(re.match(r'^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', codeA)), codeA)
+    A.screenshot(path=S + 'codice-recupero.png')
+    A.click('[data-pa="close"]'); A.wait_for_load_state('load')
+    try: A.wait_for_function('window.App && App.doc && App.doc.code && App.doc.seats.length === 1', timeout=15000); auto = True
+    except Exception: auto = False
+    t('dopo l’accesso il tavolo che stavo aprendo si apre da solo', auto, A.evaluate('location.href'))
+    t('…e sul mio posto c’è il nome dell’account (serve per «tocca a te»)', auto and A.evaluate("App.doc.seats[0].acct") == 'Ale')
+    A.evaluate('leaveTable()'); A.wait_for_timeout(1200)
     t('registrato e ricaricato', 'Ale' in A.inner_text('[data-pa-chip]'), A.inner_text('body')[:200])
     uidA = A.evaluate("Net.uid"); t('identità del tavolo invariata dopo l’accesso', uidA == uid0, (uid0, uidA))
     # Bea dalla home
@@ -38,7 +49,7 @@ with sync_playwright() as p:
     B.click('[data-pa="open"][data-v="login"]'); B.click('[data-pa="tab"][data-v="register"]')
     B.fill('[name=u]', 'Ale'); B.fill('[name=p]', 'segreto1'); B.fill('[name=p2]', 'segreto1'); B.click('form [type=submit]'); B.wait_for_timeout(600)
     t('nome già preso', 'già preso' in B.inner_text('.pa-sheet'))
-    B.fill('[name=u]', 'Bea'); B.click('form [type=submit]'); B.wait_for_load_state('load'); B.wait_for_timeout(1500)
+    B.fill('[name=u]', 'Bea'); B.click('form [type=submit]'); B.wait_for_selector('.pa-code', timeout=8000); B.click('[data-pa="close"]'); B.wait_for_load_state('load'); B.wait_for_timeout(1500)
     t('Bea registrata dalla home', 'Bea' in B.inner_text('#account-slot'))
     # Ale chiede l'amicizia a Bea
     A.click('[data-pa="open"][data-v="account"]'); A.wait_for_timeout(600)

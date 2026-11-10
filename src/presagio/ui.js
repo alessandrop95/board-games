@@ -370,6 +370,7 @@ function sheetBody(s) {
     var d = App.doc;
     return '<h2>Tavolo ' + esc(d.code) + '</h2><div style="display:grid;gap:8px">' +
       '<button class="btn ghost block" data-act="invite">Invita amici al tavolo</button><button class="btn ghost block" data-act="rules">Regole</button>' +
+      Awake.menuHTML('btn ghost block') +
       (d.host !== Net.uid ? '<button class="btn ghost block" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
       (d.host === Net.uid && d.phase !== 'lobby' ? '<button class="btn ghost block" data-act="rematch">Chiudi la partita e torna alla sala d’attesa</button>' : '') +
       (d.host === Net.uid ? '<button class="btn ghost block" data-act="closetable">Chiudi il tavolo per tutti</button>' : '') +

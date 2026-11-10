@@ -1,5 +1,5 @@
 // ===== Board Games: funzione «notify» (Supabase Edge Function) =====
-// Riceve dal sito: nuovo tavolo aperto, invito a un amico, richiesta di amicizia.
+// Riceve dal sito: nuovo tavolo aperto, invito a un amico, richiesta di amicizia, «tocca a te» a chi ha l'app chiusa.
 // Controlla la sessione e i permessi nel database (funzioni srv_*) e manda le notifiche Web Push.
 import { send } from '../_shared/webpush.js';
 
@@ -12,7 +12,7 @@ const KEYS = {
   subject: Deno.env.get('VAPID_SUBJECT') || SITE
 };
 const GAMES: Record<string, string> = {
-  'polvere-e-piombo': 'Bang!', 'presagio': 'Wizard', 'gattomina': 'Exploding Kittens', 'campi-acciaio': 'Scythe', 'binari-italia': 'Ticket to Ride Italy', 'catan': 'Catan', 'machiavelli': 'Machiavelli', 'unlock': 'Unlock!', 'skyjo': 'Skyjo', 'flip7': 'Flip 7', 'citadels': 'Citadels'
+  'polvere-e-piombo': 'Bang!', 'presagio': 'Wizard', 'gattomina': 'Exploding Kittens', 'campi-acciaio': 'Scythe', 'binari-italia': 'Ticket to Ride Italy', 'catan': 'Catan', 'machiavelli': 'Machiavelli', 'unlock': 'Unlock!', 'skyjo': 'Skyjo', 'flip7': 'Flip 7', 'citadels': 'Citadels', 'cabo': 'Cabo', 'nograzie': 'No Grazie!', 'sushigo': 'Sushi Go!', 'prendi6': 'Prendi 6!'
 };
 const ORIGINS = ['https://alessandrop95.github.io', 'http://localhost:8897'];
 
@@ -39,11 +39,11 @@ async function rpc(fn: string, args: Record<string, unknown>) {
 function clean(s: unknown, n: number) { return String(s ?? '').replace(/[<>]/g, '').trim().slice(0, n); }
 
 // Manda a tutti gli abbonamenti; quelli scaduti (404/410) vengono cancellati.
-async function deliver(subs: any[], msg: Record<string, unknown>, topic?: string) {
+async function deliver(subs: any[], msg: Record<string, unknown>, topic?: string, ttl?: number) {
   let sent = 0;
   await Promise.all((subs || []).slice(0, 500).map(async (s) => {
     try {
-      const st = await send(s, msg, KEYS, { topic });
+      const st = await send(s, msg, KEYS, { topic, ttl });
       if (st === 404 || st === 410) await rpc('srv_gone', { p_endpoint: s.endpoint });
       else if (st >= 200 && st < 300) sent++;
       else console.warn('push', st, new URL(s.endpoint).host);
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
     const token = String(b.token || ''), kind = String(b.kind || '');
     if (!/^[0-9a-f-]{36}$/i.test(token)) throw new Error('Accedi per usare le notifiche.');
     const game = String(b.game || ''), code = String(b.code || '').toUpperCase();
-    const needTable = kind === 'table' || kind === 'invite';
+    const needTable = kind === 'table' || kind === 'invite' || kind === 'turn';
     if (needTable && (!GAMES[game] || !/^[A-Z]{4}$/.test(code))) throw new Error('Tavolo non valido.');
     const url = needTable ? SITE + game + '/?t=' + code : SITE + '?amici=1';
     let out: Record<string, unknown> = { ok: true };
@@ -82,6 +82,10 @@ Deno.serve(async (req) => {
         url: url + (/^[a-z0-9]{8,24}$/.test(String(b.k || '')) ? '&k=' + b.k : ''), tag: 'invite-' + code, kind
       }, 'invite' + code);
       out.to = r.to;
+    } else if (kind === 'turn') {
+      // È il turno di qualcuno che non ha il gioco davanti. Se dopo mezz'ora non è ancora arrivata, non serve più.
+      const r = await rpc('srv_turn', { p_token: token, p_to: clean(b.to, 18), p_game: game, p_table: code });
+      out.sent = await deliver(r.subs, { title: 'Tocca a te!', body: GAMES[game] + ', tavolo ' + code + ': gli altri ti aspettano.', url, tag: 'turn-' + code, kind }, 'turn' + code, 1800);
     } else if (kind === 'friend') {
       const r = await rpc('srv_friend', { p_token: token, p_to: clean(b.to, 18) });
       out.state = r.state; out.to = r.to;

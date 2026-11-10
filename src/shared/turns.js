@@ -1,5 +1,6 @@
 /* ===== Timer di turno (condiviso): se un giocatore non fa niente per troppo tempo,
-   l'host lo fa giocare in automatico finché non torna. ===== */
+   l'host lo fa giocare in automatico finché non torna. L'host avvisa anche, con una notifica, chi deve giocare
+   e non ha il gioco davanti (app chiusa o in secondo piano). ===== */
 var Turns = (function () {
   var cfg = null, lastKey = null, timer = null, offKey = null;
   var DEFAULT = 60;
@@ -18,6 +19,7 @@ var Turns = (function () {
   }
   // Da chiamare a ogni nuovo stato: solo l'host arma il timer.
   function watch(doc) {
+    if (window.Awake) Awake.watch(doc);   // richiamo «tocca a te» su questo telefono, se l'app è in secondo piano
     if (!cfg) return;
     var s = secs(doc);
     if (!Net.isHost || !doc || !doc.game || doc.phase !== 'play' || !s || !doc.turnKey) { clearTimeout(timer); lastKey = null; return; }
@@ -50,10 +52,30 @@ var Turns = (function () {
       return cfg.onTimeout(cur, dd);
     });
   }
+  /* Solo sull'host: «tocca a te» a chi deve giocare e non c'è (offline, oppure con l'app in secondo piano).
+     La notifica parte dal server, quindi arriva anche ad app chiusa; serve che entrambi abbiano l'account e che
+     l'assente abbia le notifiche attive. Una sola per ogni volta che il turno lo trova assente. */
+  var PUSH_WAIT = +(new URLSearchParams(location.search).get('turnPushMs') || 12000), gone = {};
+  function turnPush(doc) {
+    if (!cfg || !Net.isHost || !Net.connected || !doc || !doc.game || doc.phase !== 'play' || doc.practice || !doc.game.players) { gone = {}; return; }
+    if (!window.Account || !Account.user() || !window.Coach || !Coach.needs || !window.Alerts || !Alerts.here) return;
+    if (/[?&]broker=/.test(location.search) && !/[?&]annunci=1/.test(location.search)) return;   // prove locali
+    var g = doc.game, now = Date.now(), live = {};
+    g.players.forEach(function (P, i) {
+      if (!P.uid || P.bot || P.uid === Net.uid) return;
+      var st = Net.presence(P.uid), seat = doc.seats.filter(function (x) { return x.uid === P.uid; })[0];
+      if (!seat || !seat.acct || (st !== 'off' && st !== 'away') || !Coach.needs(g, i)) return;
+      var e = live[P.uid] = gone[P.uid] || { since: now, sent: false };
+      if (e.sent || now - e.since < PUSH_WAIT) return;
+      e.sent = true;
+      Account.notify({ kind: 'turn', to: seat.acct, game: Alerts.here.path.replace(/\/$/, ''), code: doc.code }).catch(function () {});
+    });
+    gone = live;
+  }
   // Conto alla rovescia visibile a chi deve giocare (elemento #tt), solo negli ultimi 20 secondi.
   function tick() {
     var doc = App.doc, s = secs(doc);
-    offlineCheck(doc);
+    offlineCheck(doc); turnPush(doc);
     var el = document.getElementById('tt'); if (!el) return;
     if (!doc || !doc.turnSince || !s) { el.textContent = ''; return; }
     var rem = Math.ceil((doc.turnSince + s * 1000 - Date.now()) / 1000);

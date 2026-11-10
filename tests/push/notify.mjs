@@ -86,6 +86,19 @@ t('tavolo solo amici: avvisato solo Ale', r.status === 200 && inbox.map((m) => m
 inbox.length = 0;
 r = await call({ kind: 'table', token: B.token, game: 'binari-italia', code: 'TUTT' });
 t('tavolo aperto a tutti: avvisati anche gli altri', inbox.map((m) => m.to).sort().join() === 'ale-telefono,cleo-binari', inbox.map((m) => m.to));
+// «tocca a te» a chi non ha il gioco davanti (Ale e Bea sono amici, Cleo no)
+inbox.length = 0; sql("delete from notify_log", 'postgres');
+r = await call({ kind: 'turn', token: A.token, to: 'Bea', game: 'skyjo', code: 'turn' });
+t('tocca a te: arriva ai dispositivi di Bea', r.status === 200 && r.body.sent === 2 && inbox.length === 2 && inbox.every((m) => m.msg.title === 'Tocca a te!' && m.msg.kind === 'turn' && m.msg.url.endsWith('/skyjo/?t=TURN') && m.msg.tag === 'turn-TURN' && /Skyjo, tavolo TURN/.test(m.msg.body)), [r, inbox]);
+inbox.length = 0;
+r = await call({ kind: 'turn', token: A.token, to: 'Bea', game: 'skyjo', code: 'TURN' });
+t('…non di continuo', r.status === 200 && r.body.sent === 0 && inbox.length === 0, [r, inbox]);
+sql("delete from notify_log", 'postgres');
+r = await call({ kind: 'turn', token: C.token, to: 'Bea', game: 'skyjo', code: 'TURN' });
+t('…e non da chi non è né amico né seduto allo stesso tavolo', r.status === 200 && r.body.sent === 0 && inbox.length === 0, [r, inbox]);
+r = await call({ kind: 'turn', token: A.token, to: 'Bea', game: 'skyjo', code: 'x' }); t('tocca a te: tavolo non valido', r.status === 400, r);
+sql("delete from notify_log", 'postgres'); inbox.length = 0;
+r = await call({ kind: 'table', token: C.token, game: 'prendi6', code: 'ABCD' }); t('i giochi nuovi sono riconosciuti dalle notifiche', r.status === 200, r);
 const opt = await handler(new Request('https://f/notify', { method: 'OPTIONS', headers: { origin: 'https://alessandrop95.github.io' } }));
 t('preflight CORS', opt.status === 200 && /POST/.test(opt.headers.get('access-control-allow-methods')));
 console.log(ok + '/' + (ok + ko) + ' prove superate');
