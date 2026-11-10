@@ -31,6 +31,7 @@ var Game = (function () {
     var g = G(), me = myIdx(), mi = mainIdx(g);
     el('gv').setAttribute('data-sky', skyOf(g));
     el('gv').classList.toggle('last', g.ender != null && g.phase === 'play');
+    el('gv').classList.toggle('action', !!(g.opts && g.opts.action));
     setHTML('gv-info', '<b>Skyjo' + (g.opts.action ? ' Action' : '') + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : 'Manche ' + g.round) + (g.opts.elim ? ' · eliminazione a ' : ' · fino a ') + g.opts.target + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
     setHTML('gv-opp', opponents(g, mi));
     setHTML('gv-mid', middle(g, me));

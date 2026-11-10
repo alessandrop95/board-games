@@ -131,12 +131,17 @@ select.field { color: #13284f; }
 @keyframes drift { to { background-position: 1200px 0; } }
 
 /* ---------- schermata di gioco ---------- */
-.gv { position: fixed; inset: 0; top: env(safe-area-inset-top, 0px); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
-  grid-template-areas: 'top' 'opp' 'dock' 'mid' 'prompt' 'me'; overflow: hidden; -webkit-user-select: none; user-select: none; }
+/* la mia griglia ha sempre almeno --memin di altezza: se lo schermo è troppo basso per tutto, la schermata scorre
+   invece di schiacciare le carte fino a farle sparire. La riga degli avversari è «min-content» e non «auto»: scorre in
+   orizzontale, e con «auto» la griglia CSS la potrebbe ridurre a zero quando manca spazio. */
+.gv { position: fixed; inset: 0; top: env(safe-area-inset-top, 0px); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto min-content auto auto auto minmax(0, 1fr);
+  grid-template-areas: 'top' 'opp' 'dock' 'mid' 'prompt' 'me'; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-user-select: none; user-select: none; --memin: 300px; }
+.gv.action { --memin: 330px; }
 .gv-top { grid-area: top; } .gv-opp { grid-area: opp; } .gv > .chat-dock { grid-area: dock; } .gv-mid { grid-area: mid; } .gv-prompt { grid-area: prompt; } .gv-me { grid-area: me; }
 .gv > *:not(.sky) { position: relative; z-index: 1; }
+.gv > .gv-top { position: sticky; top: 0; z-index: 5; }
 /* il cielo: alba, giorno, tramonto, notte */
-.sky { position: absolute; inset: 0; z-index: 0; transition: background 2s; background: linear-gradient(180deg, #ff8f7a 0%, #ffc28a 25%, #9ccbf0 62%, #4a8fe0 100%); }
+.sky { position: fixed; inset: 0; z-index: 0; transition: background 2s; background: linear-gradient(180deg, #ff8f7a 0%, #ffc28a 25%, #9ccbf0 62%, #4a8fe0 100%); }
 .gv[data-sky="2"] .sky { background: linear-gradient(180deg, #2f7fe3 0%, #5fa9ee 40%, #a9d8fa 100%); }
 .gv[data-sky="3"] .sky { background: linear-gradient(180deg, #4a2f7f 0%, #c0457a 35%, #ff8c5a 70%, #ffc06a 100%); }
 .gv[data-sky="4"] .sky { background: linear-gradient(180deg, #050b26 0%, #13235a 55%, #2d3f86 100%); }
@@ -185,9 +190,10 @@ select.field { color: #13284f; }
 .opp .skc-f { filter: none; }
 .board .slot.gone { width: var(--cw, 17px); aspect-ratio: 100 / 140; border-radius: 3px; border: 1px dashed rgba(255, 255, 255, .25); }
 .opp .board .slot.gone { --cw: 17px; }
+@media (max-height: 740px) and (orientation: portrait) { .opp .board .skc, .opp .board .slot.gone { --cw: 13px; } .gv-opp { padding-block: 5px; } }
 
 /* centro: mazzo, carta in mano, scarti */
-.gv-mid { padding: 4px max(10px, env(safe-area-inset-right, 0px)) 6px max(10px, env(safe-area-inset-left, 0px)); display: grid; gap: 6px; justify-items: center; --pw: clamp(54px, 15vw, 82px); }
+.gv-mid { padding: 4px max(10px, env(safe-area-inset-right, 0px)) 6px max(10px, env(safe-area-inset-left, 0px)); display: grid; gap: 6px; justify-items: center; --pw: clamp(46px, min(15vw, 10.5vh), 82px); }
 .lastbar { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: var(--gold); color: #4a2a00; font: 800 13.5px var(--f-body); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); animation: pulse 1.6s ease-in-out infinite; }
 .piles { display: flex; gap: clamp(20px, 8vw, 40px); align-items: flex-end; justify-content: center; }
 .pile, .hand { appearance: none; background: none; border: 0; padding: 0; color: var(--ink); display: grid; justify-items: center; gap: 4px; position: relative; font: inherit; }
@@ -229,7 +235,7 @@ select.field { color: #13284f; }
 .gv-prompt .help .ic { width: 22px; height: 22px; }
 
 /* la mia griglia */
-.gv-me { min-height: 0; display: grid; place-items: center; padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); container-type: size; }
+.gv-me { min-height: var(--memin, 0px); display: grid; place-items: center; padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); container-type: size; }
 .mine { display: grid; gap: 6px; padding: 8px; border-radius: 18px; background: rgba(11, 31, 74, .45); backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, .25); --cw: min(calc((100cqw - 46px) / 4), calc((100cqh - 66px) / 3 * .714)); max-width: 100%; }
 .mine.on { border-color: var(--pc); box-shadow: 0 0 0 2px var(--pc), 0 0 30px color-mix(in srgb, var(--pc) 50%, transparent); }
 .mine.pulse { animation: minepulse .9s var(--ease); }
@@ -247,11 +253,15 @@ select.field { color: #13284f; }
 @keyframes cellcan { 0%, 100% { box-shadow: 0 0 0 2px rgba(143, 227, 255, .8); } 50% { box-shadow: 0 0 0 3px #fff, 0 0 20px rgba(143, 227, 255, .9); } }
 @keyframes cellflip { 0%, 100% { box-shadow: 0 0 0 2px rgba(255, 215, 94, .8); } 50% { box-shadow: 0 0 0 3px #fff, 0 0 20px rgba(255, 215, 94, .95); } }
 .gv.last .mine:not(.on) { opacity: .95; }
-@media (min-width: 1000px) and (min-height: 700px) {
-  .gv { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto; grid-template-areas: 'top top' 'opp opp' 'dock dock' 'mid me' 'prompt me'; }
-  .gv-mid { align-content: center; --pw: 104px; }
+/* schermi larghi (PC, tablet e telefoni in orizzontale): avversari e centro a sinistra, la mia griglia a destra a tutta altezza.
+   Si decide sulla forma dello schermo e non su un'altezza minima: su un portatile la finestra del browser è spesso
+   più bassa di 700px e con la colonna unica (più la fila delle Azioni) la griglia restava quasi senza spazio. */
+@media (min-width: 1000px), (orientation: landscape) and (min-width: 700px) {
+  .gv { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto min-content auto minmax(min-content, 1fr) auto; grid-template-areas: 'top top' 'opp me' 'dock me' 'mid me' 'prompt me'; }
+  .gv-mid { align-content: center; --pw: clamp(54px, 15vh, 104px); }
+  .gv-mid .astrip { --aw: clamp(40px, 11vh, 80px); }
   .gv-prompt { align-self: end; margin-bottom: 14px; }
-  .opp .board .skc { --cw: 22px; }
+  .opp .board .skc, .opp .board .slot.gone { --cw: clamp(15px, 2.9vh, 22px); }
 }
 
 /* animazioni: carte in volo, scintille, testi */
@@ -350,28 +360,32 @@ select.field { color: #13284f; }
 
 /* ---------- Skyjo Action: carte Azione, stelle ---------- */
 .skc.ac .skc-f { border-radius: 9%/6.5%; }
-.astrip { display: flex; gap: 6px; align-items: flex-end; justify-content: center; padding: 6px 8px; border-radius: 14px; background: rgba(36, 16, 79, .45); border: 1px solid rgba(196, 139, 255, .35); --aw: clamp(36px, 10vw, 54px); max-width: 100%; }
+.astrip { display: flex; gap: 6px; align-items: flex-end; justify-content: center; padding: 6px 8px; border-radius: 14px; background: rgba(36, 16, 79, .45); border: 1px solid rgba(196, 139, 255, .35); --aw: clamp(36px, min(10vw, 7vh), 62px); max-width: 100%; }
 .astrip.bonus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255, 215, 94, .5), 0 0 22px rgba(255, 215, 94, .45); }
 .apile, .arc { appearance: none; background: none; border: 0; padding: 0; cursor: pointer; position: relative; display: grid; justify-items: center; gap: 2px; color: var(--ink); font: inherit; }
 .apile .skc, .arc .skc { --cw: var(--aw); }
 .apile { margin-right: 4px; }
-.apile .pl { font-size: 9.5px; }
+.apile .pl { font-size: 10.5px; }
 .arc.empty { width: var(--aw); aspect-ratio: 100 / 140; border-radius: 6px; border: 1px dashed rgba(255, 255, 255, .3); }
 .arc.can .skc, .apile.can .skc { animation: glow 1.6s ease-in-out infinite; border-radius: 6px; }
 .arc:hover .skc { transform: translateY(-3px); transition: transform .15s; }
 .adisc { display: grid; justify-items: center; font: 800 11px var(--f-body); color: var(--muted); margin-left: 4px; }
 .adisc .aic { width: 20px; height: 20px; opacity: .8; } .adisc i { font-style: normal; }
-.mine.withacts { --cw: min(calc((100cqw - 46px) / 4), calc((100cqh - 104px) / 3 * .714)); }
-.ahand { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; min-height: 32px; }
-.ahand.empty { font-size: 12.5px; }
-.achip { appearance: none; border: 1px solid rgba(255, 255, 255, .35); background: color-mix(in srgb, var(--ac, #555) 75%, #0b1f4a); color: #fff; border-radius: 999px; padding: 4px 10px 4px 7px; font: 800 12.5px var(--f-body); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
-.achip .aic { width: 17px; height: 17px; }
+.mine.withacts { --cw: min(calc((100cqw - 46px) / 4), calc((100cqh - 108px) / 3 * .714)); }
+/* una sola riga (scorre in orizzontale se le carte sono tante): andando a capo usciva dallo spazio riservato sotto la griglia */
+.ahand { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; min-height: 36px; width: 0; min-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 2px 3px 2px 1px; scrollbar-width: none; }
+.ahand::-webkit-scrollbar { display: none; }
+.ahand.empty { font-size: 13px; white-space: normal; }
+.achip { appearance: none; border: 1px solid rgba(255, 255, 255, .35); background: color-mix(in srgb, var(--ac, #555) 75%, #0b1f4a); color: #fff; border-radius: 999px; padding: 5px 12px 5px 8px; font: 800 14px var(--f-body); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; flex: none; white-space: nowrap; }
+.achip .aic { width: 20px; height: 20px; }
 .achip small { font-size: 9.5px; text-transform: uppercase; background: rgba(0, 0, 0, .3); border-radius: 6px; padding: 0 4px; }
 .achip.ok { box-shadow: 0 0 0 2px rgba(255, 215, 94, .65); }
 .achip.sel { box-shadow: 0 0 0 3px #fff, 0 0 14px #fff; }
-.apen { margin-left: auto; font: 800 13px var(--f-body); color: var(--bad); }
+.apen { margin-left: auto; padding-left: 4px; font: 800 14px var(--f-body); color: var(--bad); flex: none; }
 .apen.good { margin-left: 0; color: var(--good); }
 .opp-a { display: flex; gap: 2px; flex-wrap: wrap; }
+/* carte Azione e cartellini (AUTO, assente…) sulla stessa riga: l'altezza risparmiata va alla mia griglia */
+.opp { grid-template-columns: auto auto; } .opp > * { grid-column: 1 / -1; } .opp > .opp-a { grid-column: 1; } .opp > .opp-a + .opp-t { grid-column: 2; justify-self: end; align-self: center; }
 .achip-s { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(196, 139, 255, .4); }
 .achip-s .aic { width: 13px; height: 13px; }
 .opp.out { opacity: .55; filter: grayscale(.6); }
@@ -4587,6 +4601,7 @@ var Game = (function () {
     var g = G(), me = myIdx(), mi = mainIdx(g);
     el('gv').setAttribute('data-sky', skyOf(g));
     el('gv').classList.toggle('last', g.ender != null && g.phase === 'play');
+    el('gv').classList.toggle('action', !!(g.opts && g.opts.action));
     setHTML('gv-info', '<b>Skyjo' + (g.opts.action ? ' Action' : '') + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : 'Manche ' + g.round) + (g.opts.elim ? ' · eliminazione a ' : ' · fino a ') + g.opts.target + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
     setHTML('gv-opp', opponents(g, mi));
     setHTML('gv-mid', middle(g, me));
