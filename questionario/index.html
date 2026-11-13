@@ -79,7 +79,7 @@ textarea.inp{resize:none;min-height:88px;line-height:1.5}
 .btn.block{width:100%}
 .btn[disabled]{opacity:.45;pointer-events:none}
 .linkbtn{background:none;border:0;color:var(--accent);font-weight:600;padding:0;font-size:14px}
-.features{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0 40px}
+.features{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:22px 0 40px}
 @media(max-width:560px){.features{grid-template-columns:1fr}}
 .feat{font-size:13.5px;color:var(--muted);display:flex;gap:10px;align-items:flex-start}
 .feat i{flex:none;width:28px;height:28px;border-radius:8px;background:var(--accent-soft);display:grid;place-items:center;font-style:normal;color:var(--accent);font-weight:800}
@@ -106,6 +106,16 @@ textarea.inp{resize:none;min-height:88px;line-height:1.5}
 .chip.soft{color:var(--muted);border-style:dashed}
 .chip.soft[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;border-style:solid}
 .altro{margin-top:10px}
+.glabel{font-size:12.5px;color:var(--muted);font-weight:600;display:block;margin-bottom:7px}
+.sugg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.schip{border:1px dashed #bdb5fb;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600;line-height:1.25;text-align:left}
+.schip::before{content:"+ "}
+.schip:hover{border-style:solid}
+.schip.used{background:#fff;color:var(--muted);border-color:var(--line);border-style:solid}
+.schip.used::before{content:"✓ "}
+.exbtn{margin-top:10px;font-size:13.5px}
+.example{margin-top:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 13px;font-size:14px;color:#3b3f52;white-space:pre-line}
+.example b{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;white-space:normal}
 
 .pager{display:flex;gap:10px;justify-content:space-between;padding:18px 0 48px}
 .pager .btn{min-width:130px}
@@ -181,7 +191,7 @@ footer{color:var(--muted);font-size:12.5px;text-align:center;padding:10px 0 30px
    le risposte restano solo nel browser di chi compila.
    ========================================================= */
 const CONFIG = {
-  SUPABASE_URL: "https://gwvrujyxhetbheimpsun.supabase.co/rest/v1/",
+  SUPABASE_URL: "https://gwvrujyxhetbheimpsun.supabase.co",
   SUPABASE_ANON_KEY: "sb_publishable_aBzLDvCvrHFHdGzCIMpfcA_z8iHZXAR",
   TABELLA: "questionario_gioco"
 };
@@ -395,6 +405,70 @@ const SECTIONS = [
  ]}
 ];
 
+/* Spunti per le domande aperte (s) ed esempi di risposta (ex).
+   Gli esempi descrivono un gioco inventato, solo per mostrare il tipo di risposta. */
+const GUIDE = {
+  pitch: { s: ["È un gioco di…", "in cui il giocatore…", "con l'obiettivo di…"], ex: "È un platform 2D in cui un gatto ladro scala i tetti di una città steampunk per rubare gli ingranaggi che la tengono in vita." },
+  racconto: { s: ["L'idea è nata quando…", "Immagino una scena in cui…", "Il momento più bello è…", "Mi piacerebbe che…"], ex: "L'idea è nata guardando i tetti della città di notte. Immagino un posto pieno di vapore e orologi giganti, e un gatto che corre tra camini e grondaie. Il momento più bello è la fuga dalle guardie, saltando da un tetto all'altro mentre suona l'allarme." },
+  azione: { s: ["Per la maggior parte del tempo il giocatore…", "Ogni tanto deve anche…", "La cosa più divertente da fare è…"], ex: "Salta e si arrampica sui tetti, evita le guardie e cerca passaggi segreti. Ogni tanto deve scassinare una serratura con un minigioco." },
+  gancio: { s: ["A differenza di altri giochi…", "La novità è…", "Nessun gioco ha mai…"] },
+  ispirazioni: { s: ["Gioco:", "Film o serie:", "Anime o fumetto:", "Libro:", "Da questo prendo…"], ex: "Gioco: Hollow Knight → l'esplorazione e l'atmosfera\nFilm: Il castello errante di Howl → la città a vapore\nGioco: Dishonored → la libertà di scegliere come entrare nei posti" },
+  evitare: { s: ["Non voglio che sia…", "Non sopporto quando nei giochi…", "Niente…"] },
+  titolo: { s: ["Titolo provvisorio:", "Alternative:"] },
+  successo: { s: ["Per me è un successo se…", "Numero di giocatori:", "Mi basterebbe…"] },
+  cuore: { s: ["Terrei…", "perché…"] },
+  mix: { s: ["La base è…", "a cui aggiungo…", "Il secondo genere serve a…"] },
+  piattaforma_1: { s: ["PC", "Android", "iOS", "Browser", "perché…"] },
+  educativo: { s: ["Sì, insegna…", "No, è solo per divertimento", "Potrebbe allenare…"] },
+  loop: { s: ["1.", "2.", "3.", "4.", "Poi si ricomincia con…"], ex: "1. Entri in un nuovo quartiere\n2. Studi i giri delle guardie\n3. Rubi l'ingranaggio\n4. Scappi e vendi il bottino\n5. Compri attrezzi nuovi e passi al quartiere successivo" },
+  obiettivi: { s: ["Breve termine (pochi minuti):", "Medio termine (qualche ora):", "Lungo termine (fine del gioco):"] },
+  meccaniche_desc: { s: ["Meccanica 1:", "Meccanica 2:", "Meccanica 3:", "Funziona così…"], ex: "Meccanica 1: arrampicata, ti aggrappi a tubi e grondaie e la stamina cala\nMeccanica 2: furtività, nell'ombra le guardie non ti vedono\nMeccanica 3: scasso, un minigioco a tempo per aprire le serrature" },
+  unica: { s: ["La meccanica è…", "Funziona così…", "È speciale perché…"] },
+  vittoria: { s: ["Si vince quando…", "Si perde quando…", "Game over se…"] },
+  scelte: { s: ["Scelta:", "Conseguenza:", "Esempio:"] },
+  comandi: { s: ["Movimento:", "Salto:", "Attacco:", "Interagire:", "Abilità speciale:", "Pausa:"], ex: "Movimento: frecce o levetta sinistra\nSalto: Spazio o tasto A\nArrampicata: tenere premuto Shift o R2\nInteragire: E o tasto X" },
+  combat_desc: { s: ["Il giocatore attacca con…", "Si difende con…", "I nemici reagiscono…", "Una mossa speciale è…"] },
+  armi: { s: ["Arma o abilità 1:", "Arma o abilità 2:", "Come si sbloccano:", "Quante in tutto:"] },
+  nemici: { s: ["Nemico 1:", "Nemico 2:", "Nemico 3:", "Comportamento:", "Punto debole:"], ex: "Guardia con lanterna: pattuglia e illumina i tetti; punto debole: alle spalle\nCane meccanico: segue il tuo odore, veloce ma rumoroso\nCecchino sulla torre: ti colpisce da lontano se resti fermo" },
+  boss: { s: ["Boss 1:", "Dove si trova:", "Come si sconfigge:", "Cosa lo rende speciale:"] },
+  enigmi: { s: ["Tipo di enigma:", "Esempio:", "Difficoltà:"] },
+  classi: { s: ["Classe 1:", "Classe 2:", "Differenza principale:", "Nessuna classe, perché…"] },
+  valute: { s: ["Valuta:", "Si guadagna…", "Si spende per…"] },
+  ambientazione: { s: ["Luogo:", "Epoca:", "Reale o inventato:", "Atmosfera:"], ex: "Luogo: Ferrovento, città sospesa su enormi ingranaggi\nEpoca: un Ottocento alternativo con macchine a vapore\nInventato, ispirato alle città industriali europee" },
+  regole: { s: ["Nel mondo esiste…", "Funziona così…", "Non esiste…", "Il limite è…"] },
+  luoghi: { s: ["Luogo 1:", "Luogo 2:", "Luogo 3:", "Cosa si fa lì:"] },
+  fazioni: { s: ["Fazione 1:", "Fazione 2:", "Cosa vogliono:", "Rapporti tra loro:"] },
+  lore: { s: ["Tanto tempo fa…", "L'evento chiave è…", "Oggi le conseguenze sono…"] },
+  trama: { s: ["Inizio:", "Sviluppo:", "Colpo di scena:", "Finale:"], ex: "Inizio: il gatto ruba per sopravvivere\nSviluppo: scopre che gli ingranaggi servono al Sindaco per un piano segreto\nColpo di scena: il suo vecchio maestro lavora per il Sindaco\nFinale: deve scegliere se salvare la città o fuggire" },
+  secondarie: { s: ["Missione:", "Chi la affida:", "Ricompensa:"] },
+  protagonista: { s: ["Nome:", "Aspetto:", "Età:", "Carattere:", "Cosa vuole:", "Abilità speciale:"], ex: "Nome: Rufus\nAspetto: gatto grigio con occhialoni da aviatore e sciarpa rossa\nCarattere: sarcastico ma generoso\nCosa vuole: ripagare un debito e lasciare la città\nAbilità speciale: vede al buio" },
+  antagonista: { s: ["Nome:", "Chi è:", "Cosa vuole:", "Perché:", "Come si scontra con il protagonista:"] },
+  comprimari: { s: ["Personaggio:", "Ruolo:", "Rapporto con il protagonista:"] },
+  arco: { s: ["All'inizio è…", "Durante il gioco impara…", "Alla fine è…"] },
+  temi_livelli: { s: ["Livello 1:", "Livello 2:", "Livello 3:", "Novità introdotta:"] },
+  rif_visivi: { s: ["Gioco:", "Film o animazione:", "Artista:", "Mi piace per…"] },
+  suoni: { s: ["Suono:", "Quando si sente:", "Che sensazione deve dare:"] },
+  lingua_voci: { s: ["Italiano", "Inglese", "Giapponese", "Nessuna voce"] },
+  menu: { s: ["Nuova partita", "Continua", "Opzioni", "Extra o galleria", "Crediti", "Sullo sfondo si vede…"] },
+  impostazioni: { s: ["Volume", "Grafica", "Comandi", "Lingua", "Sottotitoli", "Salva ed esci"] },
+  cheat: { s: ["Controlli automatici", "Segnalazioni dei giocatori", "Sospensioni temporanee", "Non è un problema perché…"] },
+  linguaggi: { s: ["JavaScript", "Python", "C#", "C++", "GDScript", "Nessuno"] },
+  ruoli: { s: ["Nome – ruolo:", "Io mi occupo di…", "Ci serve ancora…"] },
+  data_prototipo: { s: ["Entro 1 mese", "Entro 3 mesi", "Entro 6 mesi", "Data precisa:"] },
+  data_finale: { s: ["Entro 6 mesi", "Entro 1 anno", "Entro 2 anni", "Nessuna fretta"] },
+  prototipo: { s: ["Un livello con…", "Il personaggio può…", "Almeno un nemico che…", "Escluso per ora:"], ex: "Un solo quartiere con 3 tetti, il gatto che salta e si arrampica, una guardia che pattuglia e un ingranaggio da rubare. Per ora niente storia e niente menu." },
+  prezzo_valore: { s: ["Sotto 5 €", "5–15 €", "15–30 €", "Più di 30 €"] },
+  escludi: { s: ["Niente pubblicità…", "Niente acquisti che…", "Niente…"] },
+  studio: { s: ["Nome:", "Alternative:"] },
+  scena: { s: ["Dove siamo:", "Cosa succede:", "Cosa fa il giocatore:", "Cosa si vede e si sente:"] },
+  primo_minuto: { s: ["Appena si apre il gioco…", "Il giocatore vede…", "La prima cosa che fa è…", "Dopo un minuto ha capito che…"] },
+  altro_importante: { s: ["Una cosa importante è…", "Non dimentichiamo…"] },
+  dubbi: { s: ["Sono indeciso tra…", "Non so se…", "Ho paura che…"] },
+  top3: { s: ["1.", "2.", "3."], ex: "1. La sensazione di velocità sui tetti\n2. L'atmosfera della città\n3. La libertà di scegliere come entrare in ogni posto" },
+  materiale: { s: ["Disegni di…", "Appunti su…", "Mappe di…", "Musiche o riferimenti:"] }
+};
+const suggCore = s => s.endsWith("…") ? s.slice(0, -1).trim() : s;
+
 const ALLQ = []; const QMAP = {};
 SECTIONS.forEach((s, si) => s.qs.forEach(q => { q.n = ALLQ.length + 1; q.sec = si; ALLQ.push(q); QMAP[q.id] = q; }));
 const ESSENTIAL = ALLQ.filter(q => q.e);
@@ -445,7 +519,8 @@ const Store = {
       s.onload = res; s.onerror = () => rej(new Error("Impossibile caricare Supabase"));
       document.head.appendChild(s);
     });
-    this.sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    const url = CONFIG.SUPABASE_URL.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
+    this.sb = window.supabase.createClient(url, CONFIG.SUPABASE_ANON_KEY.trim());
   },
   async save(row) {
     if (!REMOTE) { const all = ls.get("qg_local_rows") || {}; all[row.id] = Object.assign({}, all[row.id] || { created_at: row.updated_at }, row); ls.set("qg_local_rows", all); return; }
@@ -530,6 +605,7 @@ function renderWelcome(resume) {
     </div>`}
     <div class="features">
       <div class="feat"><i>✓</i><span>Salvataggio automatico: puoi chiudere e riprendere quando vuoi da questo dispositivo.</span></div>
+      <div class="feat"><i>+</i><span>Nelle domande aperte trovi spunti da toccare per costruire la risposta, e spesso un esempio.</span></div>
       <div class="feat"><i>?</i><span>Nessuna risposta è obbligatoria. Se non sai, scegli “Da decidere” o lascia vuoto.</span></div>
       <div class="feat"><i>★</i><span>Le domande “Essenziale” sono quelle più importanti per partire.</span></div>
     </div>`;
@@ -560,8 +636,11 @@ function chipsHtml(q) {
 function qHtml(q) {
   const a = st.risposte;
   let ctl;
-  if (q.t === "t") ctl = `<input class="inp" data-q="${q.id}" value="${esc(a[q.id] || "")}" placeholder="Scrivi qui…">`;
-  else if (q.t === "l") ctl = `<textarea class="inp" data-q="${q.id}" rows="3" placeholder="Scrivi qui…">${esc(a[q.id] || "")}</textarea>`;
+  const g = GUIDE[q.id], cur = String(a[q.id] || "");
+  const sugg = g ? `<span class="glabel">Tocca uno spunto per aggiungerlo e completalo</span><div class="sugg" data-s="${q.id}">${g.s.map((s, i) => `<button type="button" class="schip ${cur.includes(suggCore(s)) ? "used" : ""}" data-i="${i}">${esc(s)}</button>`).join("")}</div>` : "";
+  const ex = g && g.ex ? `<button type="button" class="linkbtn exbtn" data-ex="${q.id}">Vedi un esempio di risposta</button><div class="example hidden" id="ex-${q.id}"><b>Esempio (gioco inventato)</b>${esc(g.ex)}</div>` : "";
+  if (q.t === "t") ctl = sugg + `<input class="inp" data-q="${q.id}" value="${esc(cur)}" placeholder="Scrivi qui…">` + ex;
+  else if (q.t === "l") ctl = sugg + `<textarea class="inp" data-q="${q.id}" rows="3" placeholder="Scrivi qui o parti dagli spunti…">${esc(cur)}</textarea>` + ex;
   else ctl = chipsHtml(q);
   const type = q.t === "m" ? "Più scelte possibili" : q.t === "s" ? "Una scelta" : "Risposta aperta";
   return `<div class="q ${isAnswered(q, a) ? "answered" : ""}" id="q-${q.id}">
@@ -621,11 +700,31 @@ function refreshQ(id) {
     });
     const alt = box.querySelector(".altro"), altOn = q.t === "s" ? v === ALTRO : Array.isArray(v) && v.includes(ALTRO);
     alt.classList.toggle("hidden", !altOn);
+  } else if (GUIDE[id]) {
+    const cur = String(st.risposte[id] || "");
+    box.querySelectorAll(".schip").forEach(c => c.classList.toggle("used", cur.includes(suggCore(GUIDE[id].s[+c.dataset.i]))));
   }
   renderNav();
 }
 document.addEventListener("click", e => {
-  const chip = e.target.closest(".chips .chip"); if (!chip || !st) return;
+  if (!st) return;
+  const exb = e.target.closest("[data-ex]");
+  if (exb) { const box = $("#ex-" + exb.dataset.ex); const open = box.classList.toggle("hidden") === false; exb.textContent = open ? "Nascondi l'esempio" : "Vedi un esempio di risposta"; return; }
+  const sc = e.target.closest(".schip");
+  if (sc) {
+    const id = sc.parentElement.dataset.s, q = QMAP[id], s = GUIDE[id].s[+sc.dataset.i];
+    const el = document.querySelector(`[data-q="${id}"]`);
+    const piece = s.endsWith("…") ? s.slice(0, -1).trim() + " " : s.endsWith(":") || /^\d+\.$/.test(s) ? s + " " : s;
+    let v = el.value;
+    if (q.t === "l") { if (v && !v.endsWith("\n")) v = v.replace(/[ \t]+$/, "") + "\n"; v += piece; }
+    else { if (v.trim()) v = v.replace(/\s+$/, "") + (/:$/.test(v.trim()) ? " " : ", "); v += piece; }
+    el.value = v; st.risposte[id] = v;
+    if (el.tagName === "TEXTAREA") autosize(el);
+    el.focus(); try { el.setSelectionRange(v.length, v.length); } catch (_) {}
+    refreshQ(id); scheduleSave();
+    return;
+  }
+  const chip = e.target.closest(".chips .chip"); if (!chip) return;
   const id = chip.parentElement.dataset.q, q = QMAP[id], k = chip.dataset.k;
   const val = k === "a" ? ALTRO : k === "n" ? NONSO : q.o[+k];
   const a = st.risposte;
