@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questionario di Game Design</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6fa; --card:#ffffff; --ink:#151726; --muted:#666b7f; --line:#e3e5ee;
+  --accent:#5a48e8; --accent-2:#7b6cff; --accent-soft:#efedff; --ok:#14935a; --ok-soft:#e5f6ed;
+  --warn:#b4610b; --warn-soft:#fdf1e2; --err:#c43838; --radius:16px;
+  --shadow:0 1px 2px rgba(20,22,40,.04),0 4px 16px rgba(20,22,40,.05);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.wrap{max-width:780px;margin:0 auto;padding:0 18px}
+.hidden{display:none!important}
+
+/* Top bar */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(245,246,250,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar .row{display:flex;align-items:center;gap:12px;padding:12px 0}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;flex:none}
+.logo svg{width:20px;height:20px}
+.brand{font-weight:800;font-size:15px;line-height:1.2}
+.brand small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.spacer{flex:1}
+.brand{min-width:0}
+.brand small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:520px){.brand{font-size:14px}.topbar .row{padding:10px 0}}
+.status{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.status .dot{width:8px;height:8px;border-radius:50%;background:#c2c5d3}
+.status.saved .dot{background:var(--ok)}
+.status.saving .dot{background:var(--accent);animation:pulse 1s infinite}
+.status.error{color:var(--err)} .status.error .dot{background:var(--err)}
+@keyframes pulse{50%{opacity:.3}}
+.pbar{height:4px;background:var(--line);border-radius:4px;overflow:hidden}
+.pbar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .35s}
+.topbar .pbar{margin-bottom:10px}
+.secnav{display:flex;gap:6px;overflow-x:auto;padding:0 0 12px;scrollbar-width:none}
+.secnav::-webkit-scrollbar{display:none}
+.secnav button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--muted);display:flex;gap:6px;align-items:center}
+.secnav button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.secnav button .c{font-weight:500;opacity:.75;font-size:12px}
+.secnav button.done:not(.on){color:var(--ok);border-color:#bfe5cf;background:var(--ok-soft)}
+
+/* Banner */
+.banner{background:var(--warn-soft);color:var(--warn);border:1px solid #f3d6b0;border-radius:12px;padding:10px 14px;font-size:13.5px;margin:16px 0 0}
+
+/* Hero / cards */
+.hero{padding:40px 0 8px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:6px 12px;border-radius:999px}
+h1{font-size:clamp(28px,6vw,40px);line-height:1.12;letter-spacing:-.02em;margin:16px 0 12px;font-weight:800}
+.lead{color:var(--muted);font-size:17px;margin:0 0 8px;max-width:600px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px}
+.field label{display:block;font-weight:700;font-size:14px;margin-bottom:8px}
+.inp{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;outline:none;transition:border-color .15s,box-shadow .15s;font-size:16px}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(90,72,232,.12)}
+textarea.inp{resize:none;min-height:88px;line-height:1.5}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+@media(max-width:560px){.modes{grid-template-columns:1fr}}
+.mode{text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:14px;padding:16px;transition:.15s}
+.mode b{display:block;font-size:16px;margin-bottom:2px}
+.mode span{font-size:13.5px;color:var(--muted)}
+.mode span{display:block}
+.mode .tag{display:table;margin-top:10px;font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 10px}
+.mode.on{border-color:var(--accent);box-shadow:0 0 0 4px rgba(90,72,232,.12)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:13px 22px;font-weight:700;font-size:15px;background:var(--accent);color:#fff;transition:transform .08s,background .15s}
+.btn:hover{background:#4c3bd9}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn.ghost:hover{background:#fff}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.linkbtn{background:none;border:0;color:var(--accent);font-weight:600;padding:0;font-size:14px}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0 40px}
+@media(max-width:560px){.features{grid-template-columns:1fr}}
+.feat{font-size:13.5px;color:var(--muted);display:flex;gap:10px;align-items:flex-start}
+.feat i{flex:none;width:28px;height:28px;border-radius:8px;background:var(--accent-soft);display:grid;place-items:center;font-style:normal;color:var(--accent);font-weight:800}
+
+/* Section page */
+.sechead{padding:28px 0 6px}
+.sechead .kicker{font-size:13px;font-weight:700;color:var(--accent)}
+.sechead h2{font-size:clamp(24px,5vw,30px);margin:4px 0 6px;letter-spacing:-.015em;line-height:1.2}
+.sechead p{margin:0;color:var(--muted)}
+.qlist{display:flex;flex-direction:column;gap:14px;padding:18px 0 8px}
+.q{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 20px;box-shadow:var(--shadow);transition:border-color .2s}
+.q.answered{border-left:4px solid var(--accent)}
+.qhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.qnum{font-size:12px;font-weight:800;color:var(--muted);background:var(--bg);border-radius:6px;padding:2px 8px}
+.badge{font-size:11.5px;font-weight:700;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:2px 8px}
+.qtype{font-size:11.5px;color:var(--muted);margin-left:auto}
+.qtext{font-weight:700;font-size:16.5px;line-height:1.4;display:block}
+.hint{color:var(--muted);font-size:14px;margin:4px 0 0}
+.q .ctl{margin-top:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font-size:14px;font-weight:600;color:#3b3f52;transition:.12s;line-height:1.25;text-align:left}
+.chip:hover{border-color:#c8c3fb}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.soft{color:var(--muted);border-style:dashed}
+.chip.soft[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;border-style:solid}
+.altro{margin-top:10px}
+
+.pager{display:flex;gap:10px;justify-content:space-between;padding:18px 0 48px}
+.pager .btn{min-width:130px}
+
+/* Summary */
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.stat b{display:block;font-size:24px;letter-spacing:-.02em}
+.stat span{font-size:12.5px;color:var(--muted)}
+.misslist{margin:8px 0 0;padding:0;list-style:none}
+.misslist li{padding:9px 0;border-top:1px solid var(--line);font-size:14.5px;display:flex;gap:10px;align-items:flex-start}
+.misslist li button{margin-left:auto;flex:none}
+.done-ico{width:64px;height:64px;border-radius:20px;background:var(--ok-soft);display:grid;place-items:center;margin-bottom:8px}
+
+/* Dashboard */
+.dash-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;padding:30px 0 10px}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ok);background:var(--ok-soft);border-radius:999px;padding:5px 11px}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.6s infinite}
+.live.off{color:var(--muted);background:#ececf2}.live.off i{background:#a9adbd;animation:none}
+.rlist{display:flex;flex-direction:column;gap:10px;padding:8px 0 40px}
+.rcard{display:flex;gap:14px;align-items:center;text-align:left;width:100%;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.rcard:hover{border-color:#c8c3fb}
+.avatar{width:42px;height:42px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:800;flex:none}
+.rcard .meta{flex:1;min-width:0}
+.rcard .name{font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rcard .sub{font-size:13px;color:var(--muted)}
+.rcard .pbar{margin-top:8px}
+.pill{font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 8px;background:#ececf2;color:var(--muted)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.prog{background:var(--accent-soft);color:var(--accent)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 4px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);user-select:none;cursor:pointer}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.ansec{margin:22px 0 0}
+.ansec h3{font-size:17px;margin:0 0 10px}
+.ans{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:8px}
+.ans .aq{font-size:13.5px;color:var(--muted);font-weight:600;margin-bottom:4px}
+.ans .av{white-space:pre-wrap;word-wrap:break-word;font-size:15.5px}
+.ans .av.empty{color:#a9adbd;font-style:italic}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px}
+.tagrow span{background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:13.5px;border-radius:999px;padding:4px 11px}
+.empty-state{text-align:center;color:var(--muted);padding:50px 20px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+footer{color:var(--muted);font-size:12.5px;text-align:center;padding:10px 0 30px}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="row">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r=".6" fill="#fff"/><circle cx="18" cy="13.5" r=".6" fill="#fff"/></svg></div>
+      <div class="brand">Questionario di Game Design<small id="brandSub">Raccontaci il gioco da sviluppare</small></div>
+      <div class="spacer"></div>
+      <div class="status" id="status"><span class="dot"></span><span id="statusTxt"></span></div>
+    </div>
+    <div id="formNav" class="hidden">
+      <div class="pbar"><i id="pfill"></i></div>
+      <div class="secnav" id="secnav"></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="app"></main>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   CONFIGURAZIONE — inserisci i dati del tuo progetto Supabase
+   (Supabase → Project Settings → API: "Project URL" e "anon public key").
+   Se li lasci vuoti la pagina funziona in modalità anteprima:
+   le risposte restano solo nel browser di chi compila.
+   ========================================================= */
+const CONFIG = {
+  SUPABASE_URL: "https://gwvrujyxhetbheimpsun.supabase.co/rest/v1/",
+  SUPABASE_ANON_KEY: "sb_publishable_aBzLDvCvrHFHdGzCIMpfcA_z8iHZXAR",
+  TABELLA: "questionario_gioco"
+};
+
+/* ---------------- Domande ---------------- */
+const NONSO = "__nonso", ALTRO = "__altro";
+const L = (id, q, h, e) => ({ id, t: "l", q, h, e });
+const T = (id, q, h, e) => ({ id, t: "t", q, h, e });
+const S = (id, q, o, h, e) => ({ id, t: "s", q, o: o.split("|"), h, e });
+const M = (id, q, o, h, e) => ({ id, t: "m", q, o: o.split("|"), h, e });
+const E = true;
+
+const SECTIONS = [
+ { id: "visione", title: "Visione e concept", intro: "L'idea di base: cosa vuoi creare e perché.", qs: [
+  L("pitch", "Descrivi l'idea del gioco in una sola frase.", "Come la racconteresti a un amico in 10 secondi.", E),
+  L("racconto", "Ora raccontala liberamente: com'è nata, cosa vedi quando la immagini?", "Scrivi tutto quello che ti viene in mente, anche in disordine.", E),
+  L("azione", "Cosa fa concretamente il giocatore per la maggior parte del tempo?", null, E),
+  M("emozioni", "Quali emozioni deve provare chi gioca?", "Adrenalina e tensione|Meraviglia e scoperta|Sensazione di potenza|Relax|Divertimento e risate|Paura|Soddisfazione strategica|Commozione|Competizione|Libertà creativa", null, E),
+  L("gancio", "Cosa lo rende diverso dai giochi già esistenti? Qual è il “gancio”?"),
+  L("ispirazioni", "A quali giochi, film, anime o libri si ispira? Cosa prendi da ciascuno?", null, E),
+  L("evitare", "A cosa NON deve assomigliare? Cosa vuoi evitare a tutti i costi?"),
+  T("titolo", "Hai già un titolo? Scrivi anche eventuali alternative."),
+  M("tono", "Che tono generale deve avere?", "Serio|Epico|Comico|Cupo|Rilassante|Satirico|Misterioso|Fiabesco"),
+  M("scopo", "Qual è lo scopo del progetto?", "Hobby e divertimento|Imparare a sviluppare giochi|Portfolio|Venderlo|Farlo giocare ad amici e conoscenti|Avviare uno studio o un'attività"),
+  L("successo", "Cosa sarebbe per te un successo?", "Finirlo, un certo numero di giocatori, guadagnare, ricevere complimenti…"),
+  L("cuore", "Se dovessi tagliare tutto tranne una cosa, cosa terresti?")
+ ]},
+ { id: "genere", title: "Genere, piattaforme e pubblico", intro: "Che tipo di gioco è, dove si gioca e per chi.", qs: [
+  M("genere", "Qual è il genere principale?", "Platform|Azione/avventura|Gioco di ruolo (RPG)|Picchiaduro|Sparatutto|Strategia|Puzzle|Roguelike/roguelite|Survival|Simulazione/gestionale|Avventura narrativa|Sport/corse|Horror|Carte/deckbuilding|Sandbox/costruzione|Ritmo/musicale|Party game", "Puoi sceglierne più di uno.", E),
+  L("mix", "Se mescola più generi, come si combinano tra loro?"),
+  S("dimensione", "2D o 3D?", "2D|2.5D (grafica 3D, movimento 2D)|3D", null, E),
+  S("visuale", "Che visuale ha?", "Laterale|Dall'alto|Isometrica|Prima persona|Terza persona|Telecamera libera"),
+  M("piattaforme", "Su quali piattaforme deve uscire?", "PC|Browser web|Android|iOS|Console (PlayStation, Xbox, Switch)|Realtà virtuale", null, E),
+  T("piattaforma_1", "Da quale piattaforma vuoi partire?"),
+  S("giocatori", "Giocatore singolo o multigiocatore?", "Solo giocatore singolo|Solo multigiocatore|Entrambi", null, E),
+  S("eta", "A che età si rivolge?", "Bambini (6–12)|Ragazzi (13–17)|Adulti|Tutti", null, E),
+  S("esperienza", "Che tipo di giocatore hai in mente?", "Occasionale|Abituale|Esperto/hardcore|Tutti"),
+  S("sessione", "Quanto dura una sessione di gioco tipica?", "Meno di 5 minuti|5–15 minuti|15–45 minuti|Più di un'ora"),
+  S("offline", "Deve funzionare anche senza internet?", "Sì, sempre|No, può richiedere internet|Solo alcune modalità"),
+  M("contenuti", "Quali contenuti sensibili ci saranno?", "Violenza leggera/cartoon|Violenza realistica|Sangue|Linguaggio forte|Temi adulti|Nessuno di questi"),
+  L("educativo", "Oltre al divertimento, ha uno scopo educativo o di allenamento?")
+ ]},
+ { id: "gameplay", title: "Gameplay e meccaniche", intro: "Il cuore del gioco: cosa si fa e come funziona.", qs: [
+  L("loop", "Descrivi il ciclo di gioco passo per passo.", "Esempio: esplora → combatti → raccogli → potenzia → ripeti.", E),
+  S("fine", "Il gioco ha una fine?", "Sì, ha un finale|No, è infinito (punteggio/record)|Ha un finale ma si continua a giocare dopo", null, E),
+  L("obiettivi", "Quali obiettivi ha il giocatore a breve, medio e lungo termine?"),
+  M("meccaniche", "Quali sono le azioni principali del giocatore?", "Muoversi e saltare|Combattere|Sparare|Esplorare|Raccogliere oggetti|Costruire|Risolvere enigmi|Parlare con i personaggi|Guidare veicoli|Gestire risorse|Agire di nascosto|Arrampicarsi|Pianificare|Collezionare", null, E),
+  L("meccaniche_desc", "Descrivi con parole tue le 3–5 meccaniche più importanti."),
+  M("secondarie", "Meccaniche secondarie?", "Creare oggetti (crafting)|Pesca|Cucina|Minigiochi|Agricoltura|Commercio|Creature da allevare|Corse|Enigmi ambientali"),
+  L("unica", "C'è una meccanica tutta tua che altri giochi non hanno?"),
+  L("vittoria", "Come si vince e come si perde?"),
+  S("morte", "Cosa succede quando il giocatore muore o perde?", "Riparte dall'ultimo checkpoint|Perde parte dei progressi o degli oggetti|Ricomincia tutto da capo|Non si può morire"),
+  M("tempo", "Che ruolo ha il tempo?", "Timer|Giorno e notte|Stagioni|Turni|Tempo reale|Il tempo non conta"),
+  S("fisica", "Quanto conta la fisica?", "Realistica|Arcade/esagerata|Quasi assente"),
+  L("scelte", "Il giocatore fa scelte che cambiano qualcosa? Cosa?")
+ ]},
+ { id: "controlli", title: "Controlli e sensazioni", intro: "Come si controlla il gioco e come deve “sentirsi” in mano.", qs: [
+  M("input", "Con cosa si gioca?", "Tastiera e mouse|Controller|Touch|Giroscopio/movimento", null, E),
+  L("comandi", "Elenca i comandi principali e cosa fanno."),
+  S("feel", "Come devono sentirsi i controlli?", "Precisi e scattanti|Pesanti e realistici|Morbidi e fluttuanti"),
+  S("ritmo", "Che ritmo ha il gioco?", "Frenetico|Ragionato|A turni|Alternato"),
+  M("movimenti", "Quali movimenti può fare il personaggio?", "Camminare|Correre|Saltare|Doppio salto|Scatto|Arrampicarsi|Nuotare|Volare|Planare|Guidare veicoli|Teletrasporto"),
+  S("camera", "Come si comporta la telecamera?", "Fissa|Segue il personaggio|La controlla il giocatore|Dinamica, cinematografica")
+ ]},
+ { id: "sfida", title: "Sfida, combattimento e nemici", intro: "Difficoltà, scontri e comportamento dei nemici.", qs: [
+  S("combattimento", "C'è combattimento? Di che tipo?", "Nessun combattimento|Corpo a corpo|A distanza|Magie/poteri|Misto", null, E),
+  S("tempo_combat", "Il combattimento è…", "In tempo reale|A turni|Ibrido"),
+  M("azioni_combat", "Quali azioni di combattimento servono?", "Attacco leggero|Attacco pesante|Parata|Schivata|Contrattacco|Combo|Mosse speciali|Prese e lanci|Mira libera|Aggancio del bersaglio"),
+  L("combat_desc", "Descrivi il combattimento nel dettaglio."),
+  L("armi", "Armi, abilità o stili di combattimento: quali e quanti?"),
+  M("statistiche", "Quali statistiche servono?", "Vita|Energia/mana|Stamina|Difesa|Attacco|Velocità|Colpi critici|Fortuna"),
+  S("difficolta", "Quanto deve essere difficile?", "Facile e accessibile|Media e bilanciata|Difficile|Molto punitiva", null, E),
+  S("diff_scelta", "La difficoltà si può scegliere?", "Sì, a livelli|No, uguale per tutti|Si adatta da sola al giocatore"),
+  M("diff_cresce", "Come aumenta la difficoltà andando avanti?", "Nemici più forti|Nemici più numerosi|Nemici più veloci|Nuove regole o meccaniche|Livelli più complessi"),
+  L("nemici", "Che tipi di nemici ci sono? Fai 3–5 esempi con il loro comportamento."),
+  L("boss", "Ci sono boss? Quanti, come sono, cosa li rende speciali?"),
+  M("ia", "Come si comportano i nemici?", "Pattugliano|Inseguono|Si nascondono|Attaccano in gruppo|Fuggono se feriti|Si adattano al giocatore|Tendono imboscate"),
+  S("alleati", "Ci sono alleati?", "Nessuno|Compagni guidati dal computer|Un animale o una creatura|Una squadra da comandare"),
+  L("enigmi", "Ci sono enigmi o puzzle? Di che tipo?"),
+  S("salvataggi", "Come funzionano i salvataggi?", "Automatici|Manuali in ogni momento|In punti fissi|Nessun salvataggio")
+ ]},
+ { id: "progressione", title: "Progressione ed economia", intro: "Come cresce il giocatore e cosa lo spinge a continuare.", qs: [
+  M("crescita", "Come migliora il giocatore nel tempo?", "Livelli ed esperienza|Nuove abilità|Equipaggiamento migliore|Statistiche da potenziare|Solo la sua bravura", null, E),
+  S("albero", "C'è un albero delle abilità?", "Sì|No|Forse"),
+  L("classi", "Ci sono classi o stili di gioco diversi? Quali?"),
+  L("valute", "Ci sono valute di gioco? Come si guadagnano e come si spendono?"),
+  M("negozi", "Come si ottengono gli oggetti?", "Negozi|Mercanti viaggianti|Scambi tra giocatori|Bottino dai nemici|Forzieri|Ricompense delle missioni"),
+  S("inventario", "Com'è l'inventario?", "Illimitato|A caselle|A peso|Nessun inventario"),
+  M("oggetti", "Che tipi di oggetti esistono?", "Consumabili|Armi|Armature/vestiti|Chiavi e oggetti di missione|Collezionabili|Materiali|Oggetti con rarità"),
+  S("crafting", "Si possono creare o potenziare oggetti?", "Sì, creare|Sì, potenziare|Entrambi|No"),
+  M("motivazione", "Cosa spinge a continuare a giocare?", "Sbloccare contenuti|Costumi e skin|Scoprire la storia|Battere record|Collezionare|Diventare più forte|Sfidare altri giocatori"),
+  M("trofei", "Obiettivi e sfide extra?", "Trofei/obiettivi|Sfide giornaliere|Sfide settimanali|Eventi a tempo|Nessuno"),
+  M("personalizza", "Cosa si può personalizzare del personaggio?", "Aspetto fisico|Nome|Colori|Vestiti/armature|Voce|Niente"),
+  S("base", "C'è una base, casa o territorio da costruire o migliorare?", "Sì|No")
+ ]},
+ { id: "mondo", title: "Mondo e ambientazione", intro: "Dove si svolge il gioco e quali sono le sue regole.", qs: [
+  L("ambientazione", "Dove e quando è ambientato? Luogo reale o inventato?", null, E),
+  M("stile_mondo", "Che tipo di mondo è?", "Fantasy|Fantascienza|Storico|Moderno|Post-apocalittico|Onirico/surreale|Mitologico|Steampunk|Cyberpunk"),
+  L("regole", "Quali regole ha il mondo? Magia, tecnologia, superpoteri, divinità…"),
+  S("struttura_mondo", "Com'è strutturato il mondo?", "Mondo aperto|Livelli separati|Area centrale da cui partono i livelli|Generato casualmente|Misto"),
+  L("luoghi", "Quali sono i luoghi principali? Descrivili."),
+  L("fazioni", "Ci sono fazioni, regni, clan o culture? Che rapporti hanno?"),
+  L("lore", "Cosa è successo nel passato del mondo che è importante sapere?")
+ ]},
+ { id: "storia", title: "Storia e personaggi", intro: "Trama, protagonisti, antagonisti e modo di raccontare.", qs: [
+  S("storia_peso", "Quanto conta la storia?", "È centrale|È di sfondo|Non c'è storia", null, E),
+  L("trama", "Riassumi la trama: inizio, sviluppo, finale."),
+  M("temi", "Quali temi tocca?", "Amicizia|Vendetta|Crescita|Perdita|Onore|Libertà|Amore|Sopravvivenza|Redenzione|Mistero"),
+  M("narrazione", "Come viene raccontata la storia?", "Filmati|Dialoghi|Testi e documenti|Attraverso gli ambienti|Voce narrante|Tavole in stile fumetto"),
+  S("finali", "Quanti finali?", "Uno solo|Finali multipli|Nessun finale"),
+  S("dialoghi", "Come sono i dialoghi?", "A scelta multipla|Lineari|Non ci sono dialoghi"),
+  S("voci", "I personaggi parlano con voci doppiate?", "Sì, doppiati|Solo testo|Versi e suoni senza parole"),
+  L("secondarie", "Ci sono missioni secondarie? Fai qualche esempio."),
+  L("protagonista", "Chi è il protagonista? Nome, aspetto, età, carattere, motivazione.", null, E),
+  S("personaggi_giocabili", "Quanti personaggi giocabili?", "Uno solo|Più personaggi a scelta|Lo crea il giocatore"),
+  S("muto", "Il protagonista parla?", "Sì, parla|È muto"),
+  L("antagonista", "Chi è l'antagonista principale? Cosa vuole e perché?"),
+  L("comprimari", "Personaggi secondari importanti: alleati, maestri, rivali, mercanti…"),
+  L("arco", "Il protagonista cambia o cresce durante il gioco? Come?")
+ ]},
+ { id: "livelli", title: "Livelli, contenuti e durata", intro: "Quanto gioco c'è e perché rigiocarlo.", qs: [
+  S("n_livelli", "Quanti livelli, aree o missioni, più o meno?", "1–5|6–15|16–30|Più di 30|Infiniti/generati", null, E),
+  S("costruzione", "Come sono costruiti i livelli?", "Fatti a mano|Generati casualmente|Misto"),
+  S("struttura_livelli", "Che struttura hanno?", "Lineare|A scelta libera|Mappa da esplorare che si sblocca piano piano|Mondo aperto"),
+  L("temi_livelli", "Ogni livello introduce un tema o una meccanica nuova? Fai esempi."),
+  M("segreti", "Cosa c'è di nascosto?", "Aree segrete|Scorciatoie|Easter egg|Collezionabili segreti|Finali segreti|Niente"),
+  S("tutorial", "Come impara a giocare chi inizia?", "Testi a schermo|Un livello guidato|Scoperta libera|Un personaggio che spiega"),
+  S("durata", "Quanto dura il gioco per finirlo?", "Meno di 2 ore|2–10 ore|10–30 ore|Più di 30 ore|Non ha fine", null, E),
+  M("modalita", "Quali modalità di gioco?", "Storia|Arcade|Sopravvivenza|Contro il tempo|Sandbox|Sfide|Allenamento"),
+  M("rigiocabilita", "Perché rigiocarlo?", "Nuova partita potenziata|Partite sempre diverse|Classifiche|Finali diversi|Personaggi diversi"),
+  S("editor", "I giocatori possono creare livelli propri?", "Sì|No|Più avanti"),
+  M("aggiornamenti", "Aggiornamenti dopo l'uscita?", "Nuovi livelli|Eventi stagionali|Espansioni|Nuovi personaggi|Nessuno")
+ ]},
+ { id: "grafica", title: "Grafica e audio", intro: "Lo stile visivo e sonoro.", qs: [
+  S("stile", "Che stile grafico?", "Pixel art|Cartoon|Anime/manga|Cel-shading|Low-poly|Realistico|Disegnato a mano|Voxel", null, E),
+  L("rif_visivi", "Riferimenti visivi: giochi, film, artisti o immagini che ti piacciono."),
+  M("colori", "Colori e atmosfera?", "Vivaci|Pastello|Cupi|Neon|Desaturati|Caldi|Freddi"),
+  S("proporzioni", "Come sono i personaggi?", "Realistici|Stilizzati|Buffi e tondeggianti (chibi)"),
+  S("dettaglio", "Livello di dettaglio grafico?", "Minimal|Medio|Molto dettagliato"),
+  S("animazioni", "Come devono essere le animazioni?", "Fluide|A scatti in stile retrò|Esagerate ed espressive"),
+  M("effetti", "Effetti visivi importanti?", "Particelle|Esplosioni|Luci dinamiche|Meteo|Rallentatore|Schermo che trema|Scie di movimento"),
+  M("chi_grafica", "Chi crea la grafica?", "Io|Un artista|Risorse già pronte|Intelligenza artificiale"),
+  M("musica", "Che musica immagini?", "Orchestrale|Chiptune/8-bit|Elettronica|Rock/metal|Tradizionale/etnica|Lo-fi|Ambient|Jazz|Hip-hop", null, E),
+  S("musica_dinamica", "La musica cambia in base a cosa succede?", "Sì|No"),
+  L("suoni", "Ci sono effetti sonori importanti o caratteristici?"),
+  T("lingua_voci", "Se ci sono voci doppiate, in che lingua?"),
+  M("chi_audio", "Chi crea musica ed effetti sonori?", "Io|Un musicista|Risorse già pronte|Intelligenza artificiale")
+ ]},
+ { id: "interfaccia", title: "Interfaccia e accessibilità", intro: "Menu, informazioni a schermo, lingue.", qs: [
+  L("menu", "Cosa c'è nella schermata iniziale e nel menu principale?"),
+  M("hud", "Cosa si vede sempre a schermo mentre giochi?", "Vita|Mappa/minimappa|Munizioni/energia|Obiettivi|Timer|Punteggio|Valuta|Niente"),
+  S("hud_stile", "L'interfaccia a schermo deve essere…", "Minimal|Ricca di informazioni"),
+  S("ui_stile", "Stile dei menu", "Integrato nel mondo di gioco|Pulito e moderno|Retrò"),
+  L("impostazioni", "Cosa serve nel menu di pausa e nelle impostazioni?"),
+  M("accessibilita", "Opzioni di accessibilità?", "Sottotitoli|Modalità per daltonici|Tasti personalizzabili|Testo grande|Aiuti/difficoltà assistita|Vibrazione regolabile"),
+  M("lingue", "In quali lingue?", "Italiano|Inglese|Spagnolo|Francese|Tedesco|Giapponese|Portoghese|Cinese", null, E),
+  S("suggerimenti", "Suggerimenti durante il gioco?", "Tanti|Pochi|Disattivabili")
+ ]},
+ { id: "multiplayer", title: "Multigiocatore e online", intro: "Se il gioco è solo per giocatore singolo, rispondi alla prima domanda e passa oltre.", qs: [
+  S("mp_tipo", "Che tipo di multigiocatore?", "Non c'è multigiocatore|Cooperativo|Competitivo|Entrambi", null, E),
+  S("mp_numero", "Quanti giocatori per partita?", "2|3–4|5–8|Più di 8|Centinaia (massivo)"),
+  M("mp_dove", "Dove si gioca insieme?", "Stesso schermo|Rete locale|Online"),
+  M("mp_trovare", "Come ci si trova?", "Partite casuali|Stanze con codice|Lista amici|Invito con link"),
+  M("mp_classifiche", "Classifiche e competizione?", "Classifiche|Gradi|Stagioni|Tornei|Nessuna"),
+  M("mp_chat", "Come comunicano i giocatori?", "Chat scritta|Chat vocale|Emote e messaggi rapidi|Nessuna"),
+  M("account", "Come si accede?", "Email|Google|Apple|Accesso come ospite|Nessun account"),
+  S("cloud", "Progressi salvati online e sincronizzati tra dispositivi?", "Sì|No"),
+  M("condivisione", "Cosa si può condividere?", "Screenshot|Replay|Inviti agli amici|Post sui social"),
+  L("cheat", "Come gestire chi bara o si comporta male?")
+ ]},
+ { id: "sviluppo", title: "Tecnologia, team e tempi", intro: "Con quali mezzi e in quanto tempo si costruisce.", qs: [
+  S("programmazione", "Che esperienza hai di programmazione?", "Mai programmato|Base|Intermedia|Avanzata", null, E),
+  T("linguaggi", "Quali linguaggi conosci?"),
+  S("motore", "Che motore di gioco vuoi usare?", "Unity|Unreal Engine|Godot|GameMaker|Web (JavaScript)|Consigliamelo tu", null, E),
+  M("competenze", "Quali altre competenze hai già?", "Grafica 2D|Modellazione 3D|Animazione|Musica|Effetti sonori|Scrittura|Nessuna"),
+  S("team", "Lavori da solo o con altri?", "Da solo|Con 1–2 persone|Piccolo team (3–5)|Più di 5 persone", null, E),
+  L("ruoli", "Se lavori con altri, chi fa cosa?"),
+  S("ore", "Quante ore a settimana puoi dedicarci?", "Meno di 5|5–10|10–20|Più di 20"),
+  T("data_prototipo", "Entro quando vorresti una prima versione giocabile?", null, E),
+  T("data_finale", "Entro quando vorresti la versione finale?"),
+  S("budget", "Che budget hai?", "Zero|Fino a 500 €|500–5.000 €|Oltre 5.000 €"),
+  M("budget_per", "Su cosa spenderesti?", "Grafica|Musica e audio|Licenze e software|Server|Pubblicità|Niente"),
+  S("computer", "Su che computer sviluppi?", "Windows|Mac|Linux"),
+  S("leggero", "Deve girare anche su dispositivi poco potenti?", "Sì|No|Non è importante"),
+  M("risorse", "Cosa sei disposto a usare?", "Risorse grafiche già pronte|Plugin|IA per il codice|IA per la grafica|IA per l'audio|Nulla: tutto originale"),
+  S("server", "Servono server online?", "Sì|No|Non lo so"),
+  L("prototipo", "Cosa deve contenere la prima versione minima giocabile?", "Il minimo indispensabile per capire se il gioco è divertente.")
+ ]},
+ { id: "pubblicazione", title: "Pubblicazione e marketing", intro: "Come arriva ai giocatori e se/come guadagna.", qs: [
+  S("prezzo", "Gratis o a pagamento?", "Gratis|A pagamento|Gratis con acquisti interni", null, E),
+  T("prezzo_valore", "Se a pagamento, a che prezzo circa?"),
+  M("monetizzazione", "Quali forme di guadagno?", "Acquisti estetici|Acquisti che danno vantaggi|Pubblicità|Abbonamento|Pass stagionale|Espansioni a pagamento|Nessuna"),
+  L("escludi", "Cosa escludi assolutamente?"),
+  M("negozi_app", "Dove lo pubblichi?", "Steam|itch.io|Epic Games Store|Google Play|App Store|Sito web|Console"),
+  M("anticipo", "Prima dell'uscita?", "Accesso anticipato|Demo gratuita|Beta chiusa|Niente"),
+  T("studio", "Hai un nome per il tuo studio o marchio?"),
+  M("promozione", "Come lo fai conoscere?", "TikTok|Instagram|YouTube|Discord|Reddit|Fiere|Streamer|X/Twitter"),
+  S("devlog", "Vuoi raccontare lo sviluppo pubblicamente (diario di sviluppo)?", "Sì|No"),
+  M("community", "Che rapporto con la community?", "Server Discord|Tester|Sondaggi|Newsletter"),
+  M("materiali", "Quali materiali promozionali serviranno?", "Trailer|Sito web|Materiale per la stampa"),
+  S("marchio", "Vuoi registrare il nome come marchio?", "Sì|No")
+ ]},
+ { id: "chiusura", title: "Ultime domande", intro: "Spazio libero per tutto quello che non è emerso.", qs: [
+  L("scena", "Descrivi una scena del gioco che hai già chiara in testa, come se fosse un video."),
+  L("primo_minuto", "Il primo minuto di gioco: cosa vede e cosa fa il giocatore?"),
+  L("altro_importante", "C'è qualcosa di fondamentale che non ti è stato chiesto?"),
+  L("dubbi", "Su quali parti dell'idea sei ancora indeciso?"),
+  L("top3", "Le 3 cose più importanti del gioco, in ordine di priorità.", null, E),
+  L("materiale", "Hai già materiale pronto? Disegni, appunti, mappe, musica…", "Descrivilo qui e invialo a parte."),
+  M("prossimo", "Cosa ti serve come passo successivo?", "Documento di game design completo|Scelta del motore|Piano di sviluppo|Prototipo giocabile|Concept grafici")
+ ]}
+];
+
+const ALLQ = []; const QMAP = {};
+SECTIONS.forEach((s, si) => s.qs.forEach(q => { q.n = ALLQ.length + 1; q.sec = si; ALLQ.push(q); QMAP[q.id] = q; }));
+const ESSENTIAL = ALLQ.filter(q => q.e);
+
+/* ---------------- Utilità ---------------- */
+const $ = s => document.querySelector(s);
+const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }));
+const ls = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return ls._m[k] ?? null; } },
+  set(k, v) { ls._m[k] = v; try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { delete ls._m[k]; try { localStorage.removeItem(k); } catch (e) {} },
+  _m: {}
+};
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2200); }
+function ago(iso) {
+  if (!iso) return "";
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "adesso";
+  if (s < 3600) return Math.floor(s / 60) + " min fa";
+  if (s < 86400) return Math.floor(s / 3600) + " h fa";
+  return new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+function isAnswered(q, a) {
+  const v = a[q.id];
+  if (q.t === "t" || q.t === "l") return !!(v && String(v).trim());
+  if (q.t === "s") return !!v;
+  return Array.isArray(v) && v.length > 0;
+}
+function countAnswered(a, list) { return list.filter(q => isAnswered(q, a || {})).length; }
+function formatAnswer(q, a) {
+  const v = a[q.id]; const other = (a[q.id + ALTRO] || "").trim();
+  const lab = x => x === NONSO ? "Da decidere" : x === ALTRO ? ("Altro" + (other ? ": " + other : "")) : x;
+  if (q.t === "s") return v ? [lab(v)] : [];
+  if (q.t === "m") return Array.isArray(v) ? v.map(lab) : [];
+  return v && String(v).trim() ? String(v) : "";
+}
+
+/* ---------------- Archivio dati ---------------- */
+const REMOTE = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+const Store = {
+  sb: null,
+  async init() {
+    if (!REMOTE) return;
+    await new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      s.onload = res; s.onerror = () => rej(new Error("Impossibile caricare Supabase"));
+      document.head.appendChild(s);
+    });
+    this.sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  },
+  async save(row) {
+    if (!REMOTE) { const all = ls.get("qg_local_rows") || {}; all[row.id] = Object.assign({}, all[row.id] || { created_at: row.updated_at }, row); ls.set("qg_local_rows", all); return; }
+    const { error } = await this.sb.from(CONFIG.TABELLA).upsert(row);
+    if (error) throw error;
+  },
+  async get(id) {
+    if (!REMOTE) return (ls.get("qg_local_rows") || {})[id] || null;
+    const { data, error } = await this.sb.from(CONFIG.TABELLA).select("*").eq("id", id).maybeSingle();
+    if (error) throw error; return data;
+  },
+  async list() {
+    if (!REMOTE) return Object.values(ls.get("qg_local_rows") || {}).sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+    const { data, error } = await this.sb.from(CONFIG.TABELLA).select("*").order("updated_at", { ascending: false });
+    if (error) throw error; return data || [];
+  },
+  subscribe(cb, onStatus) {
+    if (!REMOTE) { onStatus(false); return; }
+    this.sb.channel("qg-live").on("postgres_changes", { event: "*", schema: "public", table: CONFIG.TABELLA }, cb)
+      .subscribe(st => onStatus(st === "SUBSCRIBED"));
+  }
+};
+
+/* ---------------- Stato compilazione ---------------- */
+let st = null; // {id,nome,modalita,risposte,completato,sezione}
+let view = "welcome";
+function visibleQs(si) { const qs = SECTIONS[si].qs; return st && st.modalita === "rapida" ? qs.filter(q => q.e) : qs; }
+function visibleSections() { return SECTIONS.map((s, i) => i).filter(i => visibleQs(i).length > 0); }
+function visibleAll() { return st && st.modalita === "rapida" ? ESSENTIAL : ALLQ; }
+
+function setStatus(kind, txt) {
+  const el = $("#status"); el.className = "status " + kind;
+  $("#statusTxt").textContent = txt;
+}
+let saveT = null, saving = false, again = false;
+function scheduleSave() { setStatus("saving", "Salvataggio…"); clearTimeout(saveT); saveT = setTimeout(flush, 700); }
+async function flush() {
+  clearTimeout(saveT);
+  if (!st) return;
+  if (saving) { again = true; return; }
+  saving = true;
+  const row = { id: st.id, nome: st.nome, modalita: st.modalita, risposte: st.risposte, completato: st.completato,
+    risposte_date: countAnswered(st.risposte, ALLQ), updated_at: new Date().toISOString() };
+  try { await Store.save(row); setStatus("saved", "Salvato"); ls.set("qg_session", { id: st.id, sezione: st.sezione }); }
+  catch (e) { console.error(e); setStatus("error", "Non salvato");  toast("Salvataggio non riuscito: controlla la connessione"); }
+  saving = false;
+  if (again) { again = false; flush(); }
+}
+window.addEventListener("beforeunload", () => { if (saveT) flush(); });
+
+/* ---------------- Viste: compilazione ---------------- */
+function previewBanner() {
+  return REMOTE ? "" : `<div class="banner"><b>Modalità anteprima.</b> Il collegamento a Supabase non è ancora configurato: le risposte restano solo su questo dispositivo.</div>`;
+}
+
+function renderWelcome(resume) {
+  view = "welcome";
+  $("#formNav").classList.add("hidden");
+  const mode = renderWelcome.mode || "rapida";
+  $("#app").innerHTML = `
+    ${previewBanner()}
+    <section class="hero">
+      <span class="eyebrow">🎮 Progetto videogioco</span>
+      <h1>Raccontaci il gioco che hai in mente</h1>
+      <p class="lead">Un questionario guidato per definire il gioco a 360°: idea, gameplay, mondo, storia, grafica, tecnologia e pubblicazione. Le risposte si salvano da sole mentre scrivi.</p>
+    </section>
+    ${resume ? `
+    <div class="card" style="margin-top:18px">
+      <div class="field"><label>Bentornato, ${esc(resume.nome)}</label></div>
+      <p style="margin:0 0 16px;color:var(--muted)">Hai già risposto a ${countAnswered(resume.risposte, ALLQ)} domande. Riprendi da dove eri rimasto.</p>
+      <button class="btn block" id="resumeBtn">Riprendi il questionario →</button>
+      <div style="text-align:center;margin-top:14px"><button class="linkbtn" id="newBtn">Non sono ${esc(resume.nome)}: inizia da capo</button></div>
+    </div>` : `
+    <div class="card" style="margin-top:18px">
+      <div class="field"><label for="nome">Come ti chiami?</label><input class="inp" id="nome" maxlength="60" placeholder="Il tuo nome" autocomplete="given-name"></div>
+      <div class="modes">
+        <button class="mode ${mode === "rapida" ? "on" : ""}" data-mode="rapida"><b>Versione rapida</b><span>Solo le ${ESSENTIAL.length} domande essenziali per capire subito l'idea.</span><div class="tag">≈ 15 minuti</div></button>
+        <button class="mode ${mode === "completa" ? "on" : ""}" data-mode="completa"><b>Versione completa</b><span>Tutte le ${ALLQ.length} domande, per un progetto definito nei dettagli.</span><div class="tag">≈ 60–90 minuti</div></button>
+      </div>
+      <button class="btn block" id="startBtn" disabled>Inizia →</button>
+      <p style="font-size:13px;color:var(--muted);text-align:center;margin:12px 0 0">Puoi passare dalla versione rapida a quella completa in qualsiasi momento.</p>
+    </div>`}
+    <div class="features">
+      <div class="feat"><i>✓</i><span>Salvataggio automatico: puoi chiudere e riprendere quando vuoi da questo dispositivo.</span></div>
+      <div class="feat"><i>?</i><span>Nessuna risposta è obbligatoria. Se non sai, scegli “Da decidere” o lascia vuoto.</span></div>
+      <div class="feat"><i>★</i><span>Le domande “Essenziale” sono quelle più importanti per partire.</span></div>
+    </div>`;
+  if (resume) {
+    $("#resumeBtn").onclick = () => { st = { ...resume, risposte: resume.risposte || {}, sezione: (ls.get("qg_session") || {}).sezione || 0 }; renderSection(st.sezione); };
+    $("#newBtn").onclick = () => { ls.del("qg_session"); renderWelcome(null); };
+  } else {
+    const nome = $("#nome"), start = $("#startBtn");
+    nome.oninput = () => { start.disabled = !nome.value.trim(); };
+    document.querySelectorAll(".mode").forEach(b => b.onclick = () => { renderWelcome.mode = b.dataset.mode; document.querySelectorAll(".mode").forEach(x => x.classList.toggle("on", x === b)); });
+    start.onclick = () => {
+      st = { id: uid(), nome: nome.value.trim(), modalita: renderWelcome.mode || "rapida", risposte: {}, completato: false, sezione: 0 };
+      flush(); renderSection(0);
+    };
+    nome.onkeydown = e => { if (e.key === "Enter" && !start.disabled) start.click(); };
+  }
+}
+
+function chipsHtml(q) {
+  const a = st.risposte, v = a[q.id];
+  const on = x => q.t === "s" ? v === x : Array.isArray(v) && v.includes(x);
+  const opts = q.o.map((o, i) => `<button type="button" class="chip" data-k="${i}" aria-pressed="${on(o)}">${esc(o)}</button>`).join("");
+  return `<div class="chips" data-q="${q.id}">${opts}
+    <button type="button" class="chip soft" data-k="a" aria-pressed="${on(ALTRO)}">Altro…</button>
+    <button type="button" class="chip soft" data-k="n" aria-pressed="${on(NONSO)}">Da decidere</button></div>
+    <input class="inp altro ${on(ALTRO) ? "" : "hidden"}" data-altro="${q.id}" placeholder="Specifica…" value="${esc(a[q.id + ALTRO] || "")}">`;
+}
+function qHtml(q) {
+  const a = st.risposte;
+  let ctl;
+  if (q.t === "t") ctl = `<input class="inp" data-q="${q.id}" value="${esc(a[q.id] || "")}" placeholder="Scrivi qui…">`;
+  else if (q.t === "l") ctl = `<textarea class="inp" data-q="${q.id}" rows="3" placeholder="Scrivi qui…">${esc(a[q.id] || "")}</textarea>`;
+  else ctl = chipsHtml(q);
+  const type = q.t === "m" ? "Più scelte possibili" : q.t === "s" ? "Una scelta" : "Risposta aperta";
+  return `<div class="q ${isAnswered(q, a) ? "answered" : ""}" id="q-${q.id}">
+    <div class="qhead"><span class="qnum">${q.n}</span>${q.e ? `<span class="badge">★ Essenziale</span>` : ""}<span class="qtype">${type}</span></div>
+    <span class="qtext">${esc(q.q)}</span>${q.h ? `<p class="hint">${esc(q.h)}</p>` : ""}
+    <div class="ctl">${ctl}</div></div>`;
+}
+
+function renderNav() {
+  const secs = visibleSections();
+  $("#secnav").innerHTML = secs.map(si => {
+    const qs = visibleQs(si), done = countAnswered(st.risposte, qs);
+    return `<button data-sec="${si}" class="${si === st.sezione && view === "form" ? "on" : ""} ${done === qs.length ? "done" : ""}">${esc(SECTIONS[si].title)}<span class="c">${done}/${qs.length}</span></button>`;
+  }).join("") + `<button data-sec="end" class="${view === "summary" ? "on" : ""}">Riepilogo</button>`;
+  const all = visibleAll();
+  $("#pfill").style.width = (countAnswered(st.risposte, all) / all.length * 100) + "%";
+  $("#brandSub").textContent = `${st.nome} · ${st.modalita === "rapida" ? "versione rapida" : "versione completa"}`;
+  const on = $("#secnav .on"); if (on) on.scrollIntoView({ block: "nearest", inline: "center" });
+}
+$("#secnav").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.sec === "end") renderSummary(); else renderSection(+b.dataset.sec);
+});
+
+function renderSection(si) {
+  view = "form"; st.sezione = si;
+  $("#formNav").classList.remove("hidden");
+  const secs = visibleSections(), pos = secs.indexOf(si);
+  const sec = SECTIONS[si], qs = visibleQs(si);
+  $("#app").innerHTML = `
+    ${previewBanner()}
+    <div class="sechead"><div class="kicker">Sezione ${pos + 1} di ${secs.length}</div><h2>${esc(sec.title)}</h2><p>${esc(sec.intro)}</p></div>
+    <div class="qlist">${qs.map(qHtml).join("")}</div>
+    <div class="pager">
+      <button class="btn ghost" id="prevBtn" ${pos === 0 ? "disabled" : ""}>← Indietro</button>
+      <button class="btn" id="nextBtn">${pos === secs.length - 1 ? "Vai al riepilogo →" : "Avanti →"}</button>
+    </div>
+    <footer>${st.modalita === "rapida" ? `Stai usando la versione rapida. <button class="linkbtn" id="toFull">Mostra tutte le ${ALLQ.length} domande</button>` : `<button class="linkbtn" id="toQuick">Mostra solo le domande essenziali</button>`}</footer>`;
+  document.querySelectorAll("textarea.inp").forEach(autosize);
+  $("#prevBtn").onclick = () => renderSection(secs[pos - 1]);
+  $("#nextBtn").onclick = () => pos === secs.length - 1 ? renderSummary() : renderSection(secs[pos + 1]);
+  const tf = $("#toFull"), tq = $("#toQuick");
+  if (tf) tf.onclick = () => { st.modalita = "completa"; scheduleSave(); renderSection(si); };
+  if (tq) tq.onclick = () => { st.modalita = "rapida"; scheduleSave(); const v = visibleSections(); renderSection(v.includes(si) ? si : v[0]); };
+  renderNav(); window.scrollTo({ top: 0 });
+  ls.set("qg_session", { id: st.id, sezione: si });
+}
+function autosize(t) { t.style.height = "auto"; t.style.height = Math.max(88, t.scrollHeight + 2) + "px"; }
+function refreshQ(id) {
+  const q = QMAP[id], box = $("#q-" + id); if (!box) return;
+  box.classList.toggle("answered", isAnswered(q, st.risposte));
+  if (q.t === "s" || q.t === "m") {
+    const v = st.risposte[id];
+    box.querySelectorAll(".chip").forEach(c => {
+      const k = c.dataset.k, val = k === "a" ? ALTRO : k === "n" ? NONSO : q.o[+k];
+      c.setAttribute("aria-pressed", q.t === "s" ? String(v === val) : String(Array.isArray(v) && v.includes(val)));
+    });
+    const alt = box.querySelector(".altro"), altOn = q.t === "s" ? v === ALTRO : Array.isArray(v) && v.includes(ALTRO);
+    alt.classList.toggle("hidden", !altOn);
+  }
+  renderNav();
+}
+document.addEventListener("click", e => {
+  const chip = e.target.closest(".chips .chip"); if (!chip || !st) return;
+  const id = chip.parentElement.dataset.q, q = QMAP[id], k = chip.dataset.k;
+  const val = k === "a" ? ALTRO : k === "n" ? NONSO : q.o[+k];
+  const a = st.risposte;
+  if (q.t === "s") a[id] = a[id] === val ? "" : val;
+  else {
+    let arr = Array.isArray(a[id]) ? a[id].slice() : [];
+    if (arr.includes(val)) arr = arr.filter(x => x !== val);
+    else if (val === NONSO) arr = [NONSO];
+    else { arr = arr.filter(x => x !== NONSO); arr.push(val); }
+    a[id] = arr;
+  }
+  refreshQ(id); scheduleSave();
+  if (val === ALTRO && chip.getAttribute("aria-pressed") === "true") { const alt = $("#q-" + id + " .altro"); if (alt) alt.focus(); }
+});
+document.addEventListener("input", e => {
+  const t = e.target; if (!st) return;
+  if (t.dataset.q) { st.risposte[t.dataset.q] = t.value; if (t.tagName === "TEXTAREA") autosize(t); refreshQ(t.dataset.q); scheduleSave(); }
+  else if (t.dataset.altro) { st.risposte[t.dataset.altro + ALTRO] = t.value; scheduleSave(); }
+});
+
+function renderSummary() {
+  view = "summary";
+  $("#formNav").classList.remove("hidden");
+  const all = visibleAll(), done = countAnswered(st.risposte, all);
+  const missE = ESSENTIAL.filter(q => !isAnswered(q, st.risposte));
+  $("#app").innerHTML = `
+    ${previewBanner()}
+    <div class="sechead"><div class="kicker">Riepilogo</div><h2>${st.completato ? "Questionario inviato" : "Quasi fatto!"}</h2>
+    <p>${st.completato ? "Puoi ancora modificare le risposte: ogni cambiamento viene salvato subito." : "Controlla cosa manca, poi invia il questionario."}</p></div>
+    <div class="statgrid">
+      <div class="stat"><b>${done}/${all.length}</b><span>domande con risposta</span></div>
+      <div class="stat"><b>${ESSENTIAL.length - missE.length}/${ESSENTIAL.length}</b><span>essenziali completate</span></div>
+      <div class="stat"><b>${Math.round(done / all.length * 100)}%</b><span>completamento</span></div>
+    </div>
+    ${missE.length ? `<div class="card"><b>Domande essenziali ancora vuote</b>
+      <ul class="misslist">${missE.map(q => `<li><span><b>${q.n}.</b> ${esc(q.q)}</span><button class="linkbtn" data-go="${q.id}">Rispondi</button></li>`).join("")}</ul></div>` : ""}
+    <div class="pager">
+      <button class="btn ghost" id="backBtn">← Torna alle domande</button>
+      <button class="btn" id="sendBtn">${st.completato ? "Aggiorna invio ✓" : "Invia questionario ✓"}</button>
+    </div>
+    ${st.modalita === "rapida" ? `<footer>Hai tempo per approfondire? <button class="linkbtn" id="toFull2">Passa alla versione completa</button></footer>` : ""}`;
+  $("#backBtn").onclick = () => renderSection(st.sezione);
+  $("#sendBtn").onclick = async () => { st.completato = true; await flush(); renderThanks(); };
+  document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+    const q = QMAP[b.dataset.go]; renderSection(q.sec);
+    setTimeout(() => { const el = $("#q-" + q.id); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); } }, 60);
+  });
+  const tf = $("#toFull2"); if (tf) tf.onclick = () => { st.modalita = "completa"; scheduleSave(); renderSection(0); };
+  renderNav(); window.scrollTo({ top: 0 });
+}
+function renderThanks() {
+  view = "thanks";
+  $("#formNav").classList.add("hidden");
+  $("#app").innerHTML = `
+    ${previewBanner()}
+    <section class="hero" style="text-align:center">
+      <div class="done-ico" style="margin:0 auto 8px"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#14935a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <h1>Grazie, ${esc(st.nome)}!</h1>
+      <p class="lead" style="margin:0 auto">Le risposte sono state inviate. Se ti viene in mente altro, puoi riaprire questa pagina da questo dispositivo e modificarle quando vuoi.</p>
+      <div style="margin-top:24px"><button class="btn ghost" id="editBtn">Modifica le risposte</button></div>
+    </section>`;
+  $("#editBtn").onclick = () => renderSection(st.sezione || 0);
+}
+
+/* ---------------- Vista: risposte (per chi crea il gioco) ---------------- */
+let rows = [], dashSel = null, showEmpty = false, liveOn = false;
+async function loadRows() {
+  try { rows = await Store.list(); renderDash(); }
+  catch (e) { console.error(e); $("#app").innerHTML = `<div class="empty-state">Non riesco a leggere le risposte. Controlla la configurazione di Supabase.<br><small>${esc(e.message || e)}</small></div>`; }
+}
+function respondentAll(r) { return r.modalita === "rapida" ? ESSENTIAL : ALLQ; }
+function renderDash() {
+  $("#formNav").classList.add("hidden");
+  $("#brandSub").textContent = "Risposte ricevute";
+  setStatus(liveOn ? "saved" : "", liveOn ? "In diretta" : (REMOTE ? "Aggiornamento ogni 15 s" : "Anteprima locale"));
+  if (dashSel) return renderDetail(rows.find(r => r.id === dashSel));
+  $("#app").innerHTML = `
+    ${previewBanner()}
+    <div class="dash-head"><div><span class="eyebrow">Area risposte</span><h1 style="margin-bottom:0">Risposte al questionario</h1></div>
+      <div class="spacer"></div><span class="live ${liveOn ? "" : "off"}"><i></i>${liveOn ? "Aggiornamento in diretta" : "Aggiornamento periodico"}</span></div>
+    ${rows.length ? `<div class="rlist">${rows.map(r => {
+      const a = r.risposte || {}, all = respondentAll(r), d = countAnswered(a, all), de = countAnswered(a, ESSENTIAL);
+      return `<button class="rcard" data-r="${esc(r.id)}"><div class="avatar">${esc((r.nome || "?").trim().charAt(0).toUpperCase())}</div>
+        <div class="meta"><div class="name">${esc(r.nome || "Senza nome")} ${r.completato ? `<span class="pill ok">Inviato</span>` : `<span class="pill prog">In compilazione</span>`}<span class="pill">${r.modalita === "rapida" ? "Rapida" : "Completa"}</span></div>
+        <div class="sub">${d}/${all.length} risposte · essenziali ${de}/${ESSENTIAL.length} · ${ago(r.updated_at)}</div>
+        <div class="pbar"><i style="width:${d / all.length * 100}%"></i></div></div></button>`;
+    }).join("")}</div>` : `<div class="empty-state card" style="margin-top:16px">Nessuna risposta ancora.<br>Condividi il link del questionario: appena qualcuno inizia a compilarlo lo vedrai comparire qui.</div>`}`;
+  document.querySelectorAll("[data-r]").forEach(b => b.onclick = () => { dashSel = b.dataset.r; renderDash(); window.scrollTo({ top: 0 }); });
+}
+function answerText(r) {
+  const a = r.risposte || {};
+  let out = `QUESTIONARIO DI GAME DESIGN — ${r.nome || ""}\n`;
+  SECTIONS.forEach(s => {
+    const lines = s.qs.filter(q => isAnswered(q, a)).map(q => { const f = formatAnswer(q, a); return `${q.n}. ${q.q}\n→ ${Array.isArray(f) ? f.join(", ") : f}`; });
+    if (lines.length) out += `\n## ${s.title}\n` + lines.join("\n\n") + "\n";
+  });
+  return out;
+}
+function renderDetail(r) {
+  if (!r) { dashSel = null; return renderDash(); }
+  const a = r.risposte || {};
+  $("#app").innerHTML = `
+    ${previewBanner()}
+    <div style="padding-top:22px"><button class="linkbtn" id="backList">← Tutte le risposte</button></div>
+    <div class="dash-head" style="padding-top:12px"><div><h1 style="margin:0">${esc(r.nome || "Senza nome")}</h1>
+      <div style="color:var(--muted);font-size:14px;margin-top:4px">${countAnswered(a, ALLQ)} risposte · ${r.completato ? "inviato" : "in compilazione"} · aggiornato ${ago(r.updated_at)}</div></div>
+      <div class="spacer"></div><span class="live ${liveOn ? "" : "off"}"><i></i>${liveOn ? "In diretta" : "Periodico"}</span></div>
+    <div class="toolbar"><button class="btn" id="copyBtn">Copia tutto come testo</button>
+      <label class="toggle"><input type="checkbox" id="emptyT" ${showEmpty ? "checked" : ""}> Mostra anche le domande senza risposta</label></div>
+    ${SECTIONS.map(s => {
+      const qs = s.qs.filter(q => showEmpty || isAnswered(q, a)); if (!qs.length) return "";
+      return `<div class="ansec"><h3>${esc(s.title)}</h3>${qs.map(q => {
+        const f = formatAnswer(q, a);
+        const body = Array.isArray(f) ? (f.length ? `<div class="tagrow">${f.map(x => `<span>${esc(x)}</span>`).join("")}</div>` : `<div class="av empty">Nessuna risposta</div>`)
+          : (f ? `<div class="av">${esc(f)}</div>` : `<div class="av empty">Nessuna risposta</div>`);
+        return `<div class="ans"><div class="aq">${q.n}. ${esc(q.q)} ${q.e ? "★" : ""}</div>${body}</div>`;
+      }).join("")}</div>`;
+    }).join("") || `<div class="empty-state">Ancora nessuna risposta inserita.</div>`}
+    <div style="height:40px"></div>`;
+  $("#backList").onclick = () => { dashSel = null; renderDash(); };
+  $("#emptyT").onchange = e => { showEmpty = e.target.checked; renderDetail(r); };
+  $("#copyBtn").onclick = async () => {
+    const txt = answerText(r);
+    try { await navigator.clipboard.writeText(txt); toast("Risposte copiate"); }
+    catch (e) { const ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("Risposte copiate"); } catch (_) { toast("Copia non riuscita"); } ta.remove(); }
+  };
+}
+
+/* ---------------- Avvio ---------------- */
+async function start() {
+  try { await Store.init(); }
+  catch (e) { $("#app").innerHTML = `<div class="empty-state">Non riesco a collegarmi al server. Ricarica la pagina tra poco.</div>`; return; }
+  if (location.hash === "#risposte") {
+    await loadRows();
+    let t = null;
+    const refresh = () => { clearTimeout(t); t = setTimeout(loadRows, 300); };
+    Store.subscribe(refresh, ok => { liveOn = ok; renderDash(); });
+    setInterval(loadRows, 15000);
+    return;
+  }
+  setStatus("", "");
+  const sess = ls.get("qg_session");
+  let resume = null;
+  if (sess && sess.id) { try { resume = await Store.get(sess.id); } catch (e) { console.error(e); } }
+  renderWelcome(resume);
+}
+window.addEventListener("hashchange", () => location.reload());
+start();
+</script>
+</body>
+</html>
