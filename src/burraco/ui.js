@@ -258,7 +258,8 @@ function driveBots() {
 /* ---------- stato in arrivo ---------- */
 function onDoc() {
   var g = G(), me = myIdx();
-  if (App.gidSeen && App.doc.gid !== App.gid) resetLocal();
+  // partita nuova sullo stesso tavolo (rivincita): gli effetti ripartono da zero, compreso il primo
+  if (App.gidSeen && App.doc.gid !== App.gid) { resetLocal(); App.lastFxN = 0; }
   App.gid = App.doc.gid; App.gidSeen = true;
   if (!g && App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
   if (App.screen !== 'table') { driveBots(); Turns.watch(App.doc); paintCur(); return; }

@@ -32,8 +32,8 @@ var Game = (function () {
 
   /* ---------- la lavagna ---------- */
   function fit() {
-    if (!cv) return;
-    var w = el('bwrap').clientWidth, h = el('bwrap').clientHeight, r = window.devicePixelRatio || 1;
+    var bw = el('bwrap'); if (!cv || !bw || !bw.contains(cv)) return;
+    var w = bw.clientWidth, h = bw.clientHeight, r = window.devicePixelRatio || 1;
     if (!w || !h) return;
     cv.width = Math.round(w * r); cv.height = Math.round(h * r); paint();
   }

@@ -135,7 +135,7 @@ var DGEngine = (function () {
   }
   // chi può scrivere le risposte adesso
   function canGuess(g, p) {
-    if (p === g.drawer || !g.players[p]) return false;
+    if (g.drawer == null || p === g.drawer || !g.players[p]) return false;
     var dt = g.players[g.drawer].team, t = g.players[p].team;
     return g.phase === 'draw' ? t === dt : g.phase === 'steal' ? t !== dt : false;
   }

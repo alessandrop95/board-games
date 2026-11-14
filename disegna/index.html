@@ -482,7 +482,7 @@ var DGEngine = (function () {
   }
   // chi può scrivere le risposte adesso
   function canGuess(g, p) {
-    if (p === g.drawer || !g.players[p]) return false;
+    if (g.drawer == null || p === g.drawer || !g.players[p]) return false;
     var dt = g.players[g.drawer].team, t = g.players[p].team;
     return g.phase === 'draw' ? t === dt : g.phase === 'steal' ? t !== dt : false;
   }
@@ -3690,7 +3690,8 @@ setInterval(function () {
 /* ---------- stato in arrivo ---------- */
 function onDoc() {
   var g = G(), me = myIdx();
-  if (App.gidSeen && App.doc.gid !== App.gid) resetLocal();
+  // partita nuova sullo stesso tavolo (rivincita): gli effetti ripartono da zero, compreso il primo
+  if (App.gidSeen && App.doc.gid !== App.gid) { resetLocal(); App.lastFxN = 0; }
   App.gid = App.doc.gid; App.gidSeen = true;
   if (!g && App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
   if (g && g.clock !== App.clock) { App.clock = g.clock; App.off = g.clock - Date.now(); }
@@ -3806,8 +3807,8 @@ var Game = (function () {
 
   /* ---------- la lavagna ---------- */
   function fit() {
-    if (!cv) return;
-    var w = el('bwrap').clientWidth, h = el('bwrap').clientHeight, r = window.devicePixelRatio || 1;
+    var bw = el('bwrap'); if (!cv || !bw || !bw.contains(cv)) return;
+    var w = bw.clientWidth, h = bw.clientHeight, r = window.devicePixelRatio || 1;
     if (!w || !h) return;
     cv.width = Math.round(w * r); cv.height = Math.round(h * r); paint();
   }
