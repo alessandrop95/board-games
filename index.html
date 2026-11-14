@@ -30,6 +30,12 @@ p { margin: 0; color: var(--muted); }
 .game .meta { font-size: 14px; color: var(--brass); margin-top: 6px; }
 .install { justify-self: start; appearance: none; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; min-height: 42px; padding: 8px 18px; font: inherit; }
 .install:hover, .install:focus-visible { border-color: var(--brass); outline: none; }
+.cats { display: flex; gap: 8px; flex-wrap: wrap; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; padding: 8px 0; background: linear-gradient(var(--bg) 70%, transparent); }
+.cats a { color: var(--text); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 14px; background: var(--panel); }
+.cats a:hover, .cats a:focus-visible { border-color: var(--brass); outline: none; }
+.cat { display: grid; gap: 12px; scroll-margin-top: 64px; }
+.cat-h h2 { font: 400 28px/1.1 'Sancreek', Georgia, serif; margin: 0; color: var(--brass); }
+.cat-h p { font-size: 15px; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -47,126 +53,209 @@ p { margin: 0; color: var(--muted); }
     <div id="account-slot"></div>
     <div id="alerts-slot"></div>
   </section>
-  <a class="game" href="polvere-e-piombo/">
-    <img src="polvere-e-piombo/icon-180.png" alt="">
-    <div>
-      <h2>Bang!</h2>
-      <p>Gioco di carte western a ruoli segreti: Sceriffo, Vice, Fuorilegge e Rinnegato. Con Dodge City e gli eventi di Mezzogiorno di Fuoco e Per un Pugno di Carte.</p>
-      <div class="meta">4–8 giocatori · 20–40 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="presagio/">
-    <img src="presagio/icon-180.png" alt="">
-    <div>
-      <h2>Wizard</h2>
-      <p>Gioco di carte a prese: prevedi quante ne farai, poi fanne esattamente quelle. Con Arcimaghi e Giullari.</p>
-      <div class="meta">3–6 giocatori · 30–60 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="gattomina/">
-    <img src="gattomina/icon-180.png" alt="">
-    <div>
-      <h2>Exploding Kittens</h2>
-      <p>Gioco di carte esplosivo: pesca senza far scoppiare la Gattomina, soffia sulle mosse altrui e resta l’ultimo intero.</p>
-      <div class="meta">2–5 giocatori · 10–20 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="campi-acciaio/">
-    <img src="campi-acciaio/icon-180.png" alt="">
-    <div>
-      <h2>Scythe</h2>
-      <p>Strategia dieselpunk: cinque fazioni con mech e personaggi si contendono le campagne intorno a una vecchia Fabbrica.</p>
-      <div class="meta">2–5 giocatori · 60–120 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="binari-italia/">
-    <img src="binari-italia/icon-180.png" alt="">
-    <div>
-      <h2>Ticket to Ride Italy</h2>
-      <p>Treni sulla mappa d’Italia: conquista le tratte, attraversa il mare con le carte Traghetto, raggiungi i Paesi confinanti e unisci più regioni possibili.</p>
-      <div class="meta">2–5 giocatori · 30–60 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="catan/">
-    <img src="catan/icon-180.png" alt="">
-    <div>
-      <h2>Catan</h2>
-      <p>Coloni su un’isola da scoprire: raccogli legname, argilla, lana, grano e minerale, commercia e costruisci strade, colonie e città.</p>
-      <div class="meta">3–4 giocatori · 60–90 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="machiavelli/">
-    <img src="machiavelli/icon-180.png" alt="">
-    <div>
-      <h2>Machiavelli</h2>
-      <p>Il gioco di carte italiano in cui il tavolo è di tutti: cala tris, poker e scale, smonta e rimonta le combinazioni e liberati per primo delle carte.</p>
-      <div class="meta">2–5 giocatori · 15–40 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="skyjo/">
-    <img src="skyjo/icon-180.png" alt="">
-    <div>
-      <h2>Skyjo</h2>
-      <p>Dodici carte coperte a testa: scambiale, scoprile, fai sparire le colonne di tre carte uguali e chiudi la manche con meno punti di tutti. Con le varianti Skyjo Action (stelle e carte Azione) ed eliminazione.</p>
-      <div class="meta">2–8 giocatori · 20–45 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="cabo/">
-    <img src="cabo/icon-180.png" alt="">
-    <div>
-      <h2>Cabo</h2>
-      <p>Quattro carte coperte e ne conosci solo due: ricordale, sbircia, spia gli altri, scambia le carte e chiama «Cabo» quando pensi di avere meno punti di tutti.</p>
-      <div class="meta">2–6 giocatori · 20–40 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="nograzie/">
-    <img src="nograzie/icon-180.png" alt="">
-    <div>
-      <h2>No Grazie!</h2>
-      <p>Una carta alla volta: la prendi o paghi un gettone e dici «No grazie!». Le carte in scala contano solo per la più bassa e chi prende la carta si porta via anche i gettoni.</p>
-      <div class="meta">3–7 giocatori · 10–20 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="sushigo/">
-    <img src="sushigo/icon-180.png" alt="">
-    <div>
-      <h2>Sushi Go!</h2>
-      <p>Tutti insieme scegliete una carta e passate la mano al vicino: tris di sashimi, coppie di tempura, gyoza, maki e nigiri sul wasabi. Tre manche veloci, senza mai aspettare il proprio turno.</p>
-      <div class="meta">2–5 giocatori · 15–20 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="prendi6/">
-    <img src="prendi6/icon-180.png" alt="">
-    <div>
-      <h2>Prendi 6!</h2>
-      <p>Tutti insieme giocate una carta e le carte si mettono in fila dalla più bassa: chi mette la sesta in una fila se la prende, con tutte le sue teste di toro. Fino a 10 giocatori!</p>
-      <div class="meta">2–10 giocatori · 20–45 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="flip7/">
-    <img src="flip7/icon-180.png" alt="">
-    <div>
-      <h2>Flip 7</h2>
-      <p>Pesca carte una alla volta e fermati prima del doppione: sette numeri diversi valgono il Flip 7. Congela gli amici o costringili a rischiare con le azioni a sorpresa.</p>
-      <div class="meta">2–8 giocatori · 15–30 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="citadels/">
-    <img src="citadels/icon-180.png" alt="">
-    <div>
-      <h2>Citadels</h2>
-      <p>Ogni round scegli in segreto un personaggio: Assassino, Ladro, Re, Mercante… Raccogli oro, costruisci i quartieri e manda all’aria i piani degli altri. Vince la città più ricca.</p>
-      <div class="meta">4–7 giocatori · 40–70 minuti</div>
-    </div>
-  </a>
-  <a class="game" href="unlock/">
-    <img src="unlock/icon-180.png" alt="">
-    <div>
-      <h2>Unlock!</h2>
-      <p>Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate codici e fate funzionare le macchine prima che scada il tempo.</p>
-      <div class="meta">1–6 giocatori · 10–60 minuti</div>
-    </div>
-  </a>
+  <nav class="cats" aria-label="Categorie"><a href="#parole">Parole e feste a squadre</a><a href="#italiane">Carte italiane</a><a href="#famiglia">Carte veloci per tutti</a><a href="#bluff">Bluff e ruoli segreti</a><a href="#strategia">Strategia da tavolo</a><a href="#coop">Avventure cooperative</a></nav>
+  <section class="cat" id="parole">
+    <div class="cat-h"><h2>Parole e feste a squadre</h2><p>Per gruppi grandi, anche a distanza: si gioca a squadre, ognuno dal proprio telefono.</p></div>
+    <a class="game" href="nomicose/">
+      <img src="nomicose/icon-180.png" alt="">
+      <div>
+        <h2>Nomi, cose, città</h2>
+        <p>Esce una lettera e con la tua squadra riempite insieme il foglio: nome, cosa, città, animale… ognuno dal proprio telefono, anche a distanza. Le parole che nessun altro ha scritto valgono di più.</p>
+        <div class="meta">2–12 giocatori · a squadre · 15–25 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="disegna/">
+      <img src="disegna/icon-180.png" alt="">
+      <div>
+        <h2>Disegna e indovina</h2>
+        <p>A turno uno disegna con il dito e i compagni indovinano la parola, mentre gli avversari guardano il disegno in diretta pronti a rubarla. Si gioca anche a distanza.</p>
+        <div class="meta">4–12 giocatori · a squadre · 15–30 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="sintonia/">
+      <img src="sintonia/icon-180.png" alt="">
+      <div>
+        <h2>Sintonia</h2>
+        <p>Esce un tema («Un frutto rosso») e ognuno scrive di nascosto la prima cosa che gli viene in mente: la squadra fa punti quando i compagni scrivono la stessa parola. Vietato mettersi d’accordo!</p>
+        <div class="meta">3–12 giocatori · a squadre · 10–15 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="fune/">
+      <img src="fune/icon-180.png" alt="">
+      <div>
+        <h2>Tiro alla fune</h2>
+        <p>Una griglia di lettere uguale per tutti: trova parole con lettere vicine e ogni parola tira la corda verso la tua squadra, in diretta. Più è lunga, più tira!</p>
+        <div class="meta">2–12 giocatori · due squadre · 5–15 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="conquista/">
+      <img src="conquista/icon-180.png" alt="">
+      <div>
+        <h2>Conquista l’Italia</h2>
+        <p>Domande di cultura generale e stime: chi risponde giusto per primo conquista una regione per la sua squadra. Finite le regioni libere, si strappano quelle degli avversari!</p>
+        <div class="meta">2–12 giocatori · a squadre · 10–20 minuti</div>
+      </div>
+    </a>
+  </section>
+  <section class="cat" id="italiane">
+    <div class="cat-h"><h2>Carte italiane</h2><p>I classici da tavola di casa, uno contro uno o in coppia.</p></div>
+    <a class="game" href="briscola/">
+      <img src="briscola/icon-180.png" alt="">
+      <div>
+        <h2>Briscola</h2>
+        <p>Il classico con le carte italiane: asso, tre, re, cavallo e fante. Uno contro uno o due contro due, con i segni al compagno che gli avversari non vedono.</p>
+        <div class="meta">2 o 4 giocatori · a coppie · 5–15 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="scopa/">
+      <img src="scopa/icon-180.png" alt="">
+      <div>
+        <h2>Scopa</h2>
+        <p>Prendi le carte dalla tavola, fai scopa e conquista settebello, denari e primiera. Uno contro uno o due contro due, anche a Scopone scientifico.</p>
+        <div class="meta">2 o 4 giocatori · a coppie · 15–30 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="burraco/">
+      <img src="burraco/icon-180.png" alt="">
+      <div>
+        <h2>Burraco</h2>
+        <p>Scale, tris, pinelle e jolly: cala le combinazioni con il tuo compagno, fai burraco, prendi il pozzetto e chiudi. Uno contro uno o due contro due.</p>
+        <div class="meta">2 o 4 giocatori · a coppie · 30–60 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="machiavelli/">
+      <img src="machiavelli/icon-180.png" alt="">
+      <div>
+        <h2>Machiavelli</h2>
+        <p>Il gioco di carte italiano in cui il tavolo è di tutti: cala tris, poker e scale, smonta e rimonta le combinazioni e liberati per primo delle carte.</p>
+        <div class="meta">2–5 giocatori · 15–40 minuti</div>
+      </div>
+    </a>
+  </section>
+  <section class="cat" id="famiglia">
+    <div class="cat-h"><h2>Carte veloci per tutti</h2><p>Partite brevi, regole che si imparano in un minuto.</p></div>
+    <a class="game" href="skyjo/">
+      <img src="skyjo/icon-180.png" alt="">
+      <div>
+        <h2>Skyjo</h2>
+        <p>Dodici carte coperte a testa: scambiale, scoprile, fai sparire le colonne di tre carte uguali e chiudi la manche con meno punti di tutti. Con le varianti Skyjo Action (stelle e carte Azione) ed eliminazione.</p>
+        <div class="meta">2–8 giocatori · 20–45 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="flip7/">
+      <img src="flip7/icon-180.png" alt="">
+      <div>
+        <h2>Flip 7</h2>
+        <p>Pesca carte una alla volta e fermati prima del doppione: sette numeri diversi valgono il Flip 7. Congela gli amici o costringili a rischiare con le azioni a sorpresa.</p>
+        <div class="meta">2–8 giocatori · 15–30 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="nograzie/">
+      <img src="nograzie/icon-180.png" alt="">
+      <div>
+        <h2>No Grazie!</h2>
+        <p>Una carta alla volta: la prendi o paghi un gettone e dici «No grazie!». Le carte in scala contano solo per la più bassa e chi prende la carta si porta via anche i gettoni.</p>
+        <div class="meta">3–7 giocatori · 10–20 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="prendi6/">
+      <img src="prendi6/icon-180.png" alt="">
+      <div>
+        <h2>Prendi 6!</h2>
+        <p>Tutti insieme giocate una carta e le carte si mettono in fila dalla più bassa: chi mette la sesta in una fila se la prende, con tutte le sue teste di toro. Fino a 10 giocatori!</p>
+        <div class="meta">2–10 giocatori · 20–45 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="sushigo/">
+      <img src="sushigo/icon-180.png" alt="">
+      <div>
+        <h2>Sushi Go!</h2>
+        <p>Tutti insieme scegliete una carta e passate la mano al vicino: tris di sashimi, coppie di tempura, gyoza, maki e nigiri sul wasabi. Tre manche veloci, senza mai aspettare il proprio turno.</p>
+        <div class="meta">2–5 giocatori · 15–20 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="cabo/">
+      <img src="cabo/icon-180.png" alt="">
+      <div>
+        <h2>Cabo</h2>
+        <p>Quattro carte coperte e ne conosci solo due: ricordale, sbircia, spia gli altri, scambia le carte e chiama «Cabo» quando pensi di avere meno punti di tutti.</p>
+        <div class="meta">2–6 giocatori · 20–40 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="gattomina/">
+      <img src="gattomina/icon-180.png" alt="">
+      <div>
+        <h2>Exploding Kittens</h2>
+        <p>Gioco di carte esplosivo: pesca senza far scoppiare la Gattomina, soffia sulle mosse altrui e resta l’ultimo intero.</p>
+        <div class="meta">2–5 giocatori · 10–20 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="presagio/">
+      <img src="presagio/icon-180.png" alt="">
+      <div>
+        <h2>Wizard</h2>
+        <p>Gioco di carte a prese: prevedi quante ne farai, poi fanne esattamente quelle. Con Arcimaghi e Giullari.</p>
+        <div class="meta">3–6 giocatori · 30–60 minuti</div>
+      </div>
+    </a>
+  </section>
+  <section class="cat" id="bluff">
+    <div class="cat-h"><h2>Bluff e ruoli segreti</h2><p>Chi sta mentendo? Personaggi nascosti e alleanze.</p></div>
+    <a class="game" href="polvere-e-piombo/">
+      <img src="polvere-e-piombo/icon-180.png" alt="">
+      <div>
+        <h2>Bang!</h2>
+        <p>Gioco di carte western a ruoli segreti: Sceriffo, Vice, Fuorilegge e Rinnegato. Con Dodge City e gli eventi di Mezzogiorno di Fuoco e Per un Pugno di Carte.</p>
+        <div class="meta">4–8 giocatori · 20–40 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="citadels/">
+      <img src="citadels/icon-180.png" alt="">
+      <div>
+        <h2>Citadels</h2>
+        <p>Ogni round scegli in segreto un personaggio: Assassino, Ladro, Re, Mercante… Raccogli oro, costruisci i quartieri e manda all’aria i piani degli altri. Vince la città più ricca.</p>
+        <div class="meta">4–7 giocatori · 40–70 minuti</div>
+      </div>
+    </a>
+  </section>
+  <section class="cat" id="strategia">
+    <div class="cat-h"><h2>Strategia da tavolo</h2><p>Mappe, risorse e partite più lunghe.</p></div>
+    <a class="game" href="catan/">
+      <img src="catan/icon-180.png" alt="">
+      <div>
+        <h2>Catan</h2>
+        <p>Coloni su un’isola da scoprire: raccogli legname, argilla, lana, grano e minerale, commercia e costruisci strade, colonie e città.</p>
+        <div class="meta">3–4 giocatori · 60–90 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="binari-italia/">
+      <img src="binari-italia/icon-180.png" alt="">
+      <div>
+        <h2>Ticket to Ride Italy</h2>
+        <p>Treni sulla mappa d’Italia: conquista le tratte, attraversa il mare con le carte Traghetto, raggiungi i Paesi confinanti e unisci più regioni possibili.</p>
+        <div class="meta">2–5 giocatori · 30–60 minuti</div>
+      </div>
+    </a>
+    <a class="game" href="campi-acciaio/">
+      <img src="campi-acciaio/icon-180.png" alt="">
+      <div>
+        <h2>Scythe</h2>
+        <p>Strategia dieselpunk: cinque fazioni con mech e personaggi si contendono le campagne intorno a una vecchia Fabbrica.</p>
+        <div class="meta">2–5 giocatori · 60–120 minuti</div>
+      </div>
+    </a>
+  </section>
+  <section class="cat" id="coop">
+    <div class="cat-h"><h2>Avventure cooperative</h2><p>Tutti insieme contro il gioco.</p></div>
+    <a class="game" href="unlock/">
+      <img src="unlock/icon-180.png" alt="">
+      <div>
+        <h2>Unlock!</h2>
+        <p>Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate codici e fate funzionare le macchine prima che scada il tempo.</p>
+        <div class="meta">1–6 giocatori · 10–60 minuti</div>
+      </div>
+    </a>
+  </section>
 </main>
 <script src="src/shared/install.js"></script>
 <script>function paintInstall() { document.getElementById('install-slot').innerHTML = PWA.buttonHTML('install'); } paintInstall(); PWA.onChange(paintInstall);</script>

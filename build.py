@@ -154,9 +154,73 @@ def build_p6():
         'Prendi 6!', 'Il gioco delle teste di toro: tutti insieme giocate una carta e chi mette la sesta in una fila se la prende. Vince chi prende meno teste. Da 2 a 10 giocatori, ognuno dal proprio telefono.', '#4f7a2a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(p6, 'style.css'), p6_js, 'Prendi 6!'))
 
+def build_nc():
+    d = 'src/nomicose/'
+    js = "window.GAME_PREFIX = 'nomicose/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'nomicose'), exist_ok=True)
+    open(os.path.join(ROOT, 'nomicose', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Nomi, cose, città", "Il gioco di carta e penna a squadre: esce una lettera e con i compagni riempite il foglio prima degli altri, ognuno dal proprio telefono, anche a distanza. Da 2 a 12 giocatori.", '#1b3f63',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Nomi cose città"))
+
+def build_dg():
+    d = 'src/disegna/'
+    js = "window.GAME_PREFIX = 'disegna/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'disegna'), exist_ok=True)
+    open(os.path.join(ROOT, 'disegna', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Disegna e indovina", "A squadre: uno disegna col dito sul telefono e i compagni indovinano la parola, mentre gli avversari guardano pronti a rubarla. Anche a distanza. Da 4 a 12 giocatori.", '#c2364a',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Disegna"))
+
+def build_br():
+    d = 'src/briscola/'
+    js = "window.GAME_PREFIX = 'briscola/v1/';\n" + '\n'.join(r(d, f) for f in ['../carte/art.js', 'engine.js', 'bot.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'briscola'), exist_ok=True)
+    open(os.path.join(ROOT, 'briscola', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Briscola", "La briscola con le carte italiane, uno contro uno o due contro due con i segni al compagno, ognuno dal proprio telefono anche a distanza.", '#1b5e36',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Briscola"))
+
+def build_sc():
+    d = 'src/scopa/'
+    js = "window.GAME_PREFIX = 'scopa/v1/';\n" + '\n'.join(r(d, f) for f in ['../carte/art.js', 'engine.js', 'bot.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'scopa'), exist_ok=True)
+    open(os.path.join(ROOT, 'scopa', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Scopa", "La scopa con le carte italiane, uno contro uno o due contro due, anche a Scopone scientifico, ognuno dal proprio telefono anche a distanza.", '#1b4f86',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Scopa"))
+
+def build_bu():
+    d = 'src/burraco/'
+    js = "window.GAME_PREFIX = 'burraco/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'burraco'), exist_ok=True)
+    open(os.path.join(ROOT, 'burraco', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Burraco", "Il burraco a coppie con due mazzi e i jolly: scale, tris, pinelle, pozzetto e chiusura, uno contro uno o due contro due, ognuno dal proprio telefono anche a distanza.", '#6a1f2a',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Burraco"))
+
+def build_st():
+    d = 'src/sintonia/'
+    js = "window.GAME_PREFIX = 'sintonia/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'sintonia'), exist_ok=True)
+    open(os.path.join(ROOT, 'sintonia', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Sintonia", "Esce un tema e ognuno scrive di nascosto la prima cosa che gli viene in mente: la squadra fa punti quando i compagni scrivono la stessa parola. Da 3 a 12 giocatori, anche a distanza.", '#5a2fa0',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Sintonia"))
+
+def build_fn():
+    d = 'src/fune/'
+    js = "window.GAME_PREFIX = 'fune/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'fune'), exist_ok=True)
+    open(os.path.join(ROOT, 'fune', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Tiro alla fune", "Una griglia di lettere uguale per tutti: trova parole con lettere vicine e tira la corda verso la tua squadra, in diretta, ognuno dal proprio telefono anche a distanza. Da 2 a 12 giocatori.", '#7a4a1a',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Tiro alla fune"))
+
+def build_cq():
+    d = 'src/conquista/'
+    js = "window.GAME_PREFIX = 'conquista/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'conquista'), exist_ok=True)
+    open(os.path.join(ROOT, 'conquista', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Conquista l’Italia", "Il quiz a squadre sulla mappa: chi risponde giusto per primo conquista una regione, finite quelle libere si strappano agli avversari. Da 2 a 12 giocatori, anche a distanza.", '#1f6fa8',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Conquista"))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

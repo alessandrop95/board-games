@@ -17,6 +17,14 @@ var Alerts = (function () {
     { p: 'nograzie/v1/', path: 'nograzie/', n: 'No Grazie!' },
     { p: 'sushigo/v1/', path: 'sushigo/', n: 'Sushi Go!' },
     { p: 'prendi6/v1/', path: 'prendi6/', n: 'Prendi 6!' },
+    { p: 'conquista/v1/', path: 'conquista/', n: 'Conquista l’Italia' },
+    { p: 'fune/v1/', path: 'fune/', n: 'Tiro alla fune' },
+    { p: 'sintonia/v1/', path: 'sintonia/', n: 'Sintonia' },
+    { p: 'burraco/v1/', path: 'burraco/', n: 'Burraco' },
+    { p: 'scopa/v1/', path: 'scopa/', n: 'Scopa' },
+    { p: 'briscola/v1/', path: 'briscola/', n: 'Briscola' },
+    { p: 'disegna/v1/', path: 'disegna/', n: 'Disegna e indovina' },
+    { p: 'nomicose/v1/', path: 'nomicose/', n: 'Nomi, cose, città' },
     { p: 'flip7/v1/', path: 'flip7/', n: 'Flip 7' },
     { p: 'citadels/v1/', path: 'citadels/', n: 'Citadels' }
   ];
@@ -315,7 +323,7 @@ var Alerts = (function () {
   }
 
   /* --- home: «Continua la partita», i tavoli dove sei seduto in qualsiasi gioco --- */
-  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table', 'unlock/': 'ul-table', 'skyjo/': 'sk-table', 'flip7/': 'f7-table', 'citadels/': 'cd-table', 'cabo/': 'cb-table', 'nograzie/': 'ng-table', 'sushigo/': 'sg-table', 'prendi6/': 'p6-table' };
+  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table', 'unlock/': 'ul-table', 'skyjo/': 'sk-table', 'flip7/': 'f7-table', 'citadels/': 'cd-table', 'cabo/': 'cb-table', 'nograzie/': 'ng-table', 'sushigo/': 'sg-table', 'prendi6/': 'p6-table', 'nomicose/': 'nc-table' };
   function mountContinue(el) {
     if (!el || typeof Net === 'undefined' || !Net.peekAt) return;
     var box = el.closest('section') || el, cards = {};

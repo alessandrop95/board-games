@@ -99,6 +99,7 @@ t('…e non da chi non è né amico né seduto allo stesso tavolo', r.status ===
 r = await call({ kind: 'turn', token: A.token, to: 'Bea', game: 'skyjo', code: 'x' }); t('tocca a te: tavolo non valido', r.status === 400, r);
 sql("delete from notify_log", 'postgres'); inbox.length = 0;
 r = await call({ kind: 'table', token: C.token, game: 'prendi6', code: 'ABCD' }); t('i giochi nuovi sono riconosciuti dalle notifiche', r.status === 200, r);
+r = await call({ kind: 'table', token: C.token, game: 'conquista', code: 'ABCE' }); t('anche quelli a squadre (Conquista l’Italia)', r.status === 200, r);
 const opt = await handler(new Request('https://f/notify', { method: 'OPTIONS', headers: { origin: 'https://alessandrop95.github.io' } }));
 t('preflight CORS', opt.status === 200 && /POST/.test(opt.headers.get('access-control-allow-methods')));
 console.log(ok + '/' + (ok + ko) + ' prove superate');

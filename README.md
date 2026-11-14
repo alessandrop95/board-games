@@ -166,6 +166,68 @@ Il gioco dei personaggi segreti, da 4 a 7 giocatori (se siete in meno, i posti m
 - Presentazione alla prima partita, regole complete, giocatori automatici che scelgono il personaggio più utile, mirano Assassino e Ladro su chi è in testa e usano il Condottiero contro chi sta per completare la città.
 - Citadels usa per ora tre brani già presenti nel sito.
 
+## Nomi, cose, città
+
+Il gioco di carta e penna a squadre (o ognuno per sé), da 2 a 12 giocatori, anche a distanza.
+
+**Gioca:** https://alessandrop95.github.io/board-games/nomicose/
+
+- Esce una lettera e ci sono 6 categorie (classiche o a sorpresa). Ogni squadra ha un foglio solo che i compagni riempiono insieme, in diretta; chi riempie tutto può dire «Stop!».
+- Controllo finale: le risposte vuote o con la lettera sbagliata non valgono, quelle dubbie si contestano e si votano. 20 punti alla risposta unica, 10 all’originale, 5 al doppione.
+
+## Disegna e indovina
+
+A squadre, da 4 a 12 giocatori: uno disegna col dito, i compagni indovinano, gli avversari possono rubare la parola a tempo scaduto.
+
+**Gioca:** https://alessandrop95.github.io/board-games/disegna/
+
+- Parola facile (1 punto) o difficile (2), +1 se indovinata in fretta. Colori, spessori, gomma, annulla e cancella.
+- Il disegno arriva agli altri in diretta (canale «live» di `net.js`, senza passare dall’host) ed è salvato anche nel tavolo per chi arriva dopo. I giocatori automatici indovinano ma non disegnano.
+
+## Briscola
+
+Con le carte italiane (disegnate da zero, in `src/carte/`), uno contro uno o due contro due.
+
+**Gioca:** https://alessandrop95.github.io/board-games/briscola/
+
+- Partita a una mano o a chi vince 2 o 3 mani. In coppia: segni al compagno (se l’host li permette) e carte del compagno scoperte a mazzo finito.
+
+## Scopa
+
+Con le carte italiane, uno contro uno o due contro due, anche a Scopone scientifico.
+
+**Gioca:** https://alessandrop95.github.io/board-games/scopa/
+
+- Presa obbligata della carta uguale, scelta tra più combinazioni toccando la tavola, scope, carte, denari, settebello e primiera. Partita a 11 o 21.
+
+## Burraco
+
+Due mazzi francesi con 4 jolly, uno contro uno o due contro due.
+
+**Gioca:** https://alessandrop95.github.io/board-games/burraco/
+
+- Scale e tris con al massimo una matta (jolly o pinella; la pinella al suo posto è una carta normale), burraco pulito e sporco, pozzetto preso al volo o scartando, chiusura con il burraco. Partita a 1005, 1505 o 2005.
+
+## Sintonia
+
+Da 3 a 12 giocatori, a squadre o ognuno per sé: esce un tema e vince chi scrive la stessa cosa dei compagni, senza mettersi d’accordo.
+
+**Gioca:** https://alessandrop95.github.io/board-games/sintonia/
+
+## Tiro alla fune
+
+Due squadre, una griglia di 5×5 lettere: ogni parola trovata tira la corda in diretta. Al meglio di 1, 3 o 5 round.
+
+**Gioca:** https://alessandrop95.github.io/board-games/fune/
+
+- Le parole conosciute dal gioco valgono subito, le altre a fine round si possono contestare e votare.
+
+## Conquista l’Italia
+
+Quiz a squadre sulla mappa delle 20 regioni: chi risponde giusto per primo (o stima più vicino) conquista una regione confinante; finite le libere si strappano agli avversari.
+
+**Gioca:** https://alessandrop95.github.io/board-games/conquista/
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).

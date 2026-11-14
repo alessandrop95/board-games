@@ -1,0 +1,39 @@
+{
+ "id": "./",
+ "name": "Nomi, cose, città",
+ "short_name": "Nomi cose città",
+ "description": "Il gioco di carta e penna a squadre: esce una lettera e con i compagni riempite il foglio prima degli altri, ognuno dal proprio telefono, anche a distanza. Da 2 a 12 giocatori.",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#1b3f63",
+ "theme_color": "#1b3f63",
+ "lang": "it",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "icon.svg",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
+  }
+ ]
+}

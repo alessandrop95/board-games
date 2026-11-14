@@ -44,6 +44,14 @@ gstep nograzie "Regole di No Grazie!" node tests/rules/nograzie.js
 gstep nograzie "Partite intere tra bot (No Grazie!)" node tests/rules/nograzie_bots.js 20
 gstep sushigo "Regole e partite tra bot di Sushi Go!" node tests/rules/sushigo.js 20
 gstep prendi6 "Regole e partite tra bot di Prendi 6!" node tests/rules/prendi6.js 10
+gstep nomicose "Regole e partite tra bot di Nomi, cose, città" node tests/rules/nomicose.js 10
+gstep disegna "Regole e partite tra bot di Disegna e indovina" node tests/rules/disegna.js 10
+gstep briscola "Regole e partite tra bot di Briscola" node tests/rules/briscola.js 10
+gstep scopa "Regole e partite tra bot di Scopa" node tests/rules/scopa.js 10
+gstep burraco "Regole e partite tra bot di Burraco" node tests/rules/burraco.js 10
+gstep sintonia "Regole e partite tra bot di Sintonia" node tests/rules/sintonia.js 10
+gstep fune "Regole e partite tra bot di Tiro alla fune" node tests/rules/fune.js 10
+gstep conquista "Regole e partite tra bot di Conquista l’Italia" node tests/rules/conquista.js 10
 gstep polvere-e-piombo "Regole di Bang! con le espansioni" node tests/rules/pp_rules.js
 gstep polvere-e-piombo "Partite intere tra bot (Bang!, tutte le combinazioni di espansioni)" node tests/rules/pp_bots.js
 gstep comuni "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs

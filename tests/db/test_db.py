@@ -110,6 +110,7 @@ o = admin("select _game_ok('skyjo')"); t('Skyjo è tra i giochi riconosciuti', o
 o = admin("select _game_ok('flip7')"); t('Flip 7 è tra i giochi riconosciuti', o == 't', o)
 o = admin("select _game_ok('citadels')"); t('Citadels è tra i giochi riconosciuti', o == 't', o)
 o = admin("select _game_ok('cabo'), _game_ok('nograzie'), _game_ok('sushigo'), _game_ok('prendi6')"); t('Cabo, No Grazie!, Sushi Go! e Prendi 6! sono tra i giochi riconosciuti', o == 't|t|t|t', o)
+o = admin("select " + ', '.join("_game_ok('%s')" % x for x in ('nomicose', 'disegna', 'briscola', 'scopa', 'burraco', 'sintonia', 'fune', 'conquista'))); t('i giochi a squadre e di carte italiane sono tra i giochi riconosciuti', o == '|'.join(['t'] * 8), o)
 
 # ---------- codice di recupero ----------
 import re

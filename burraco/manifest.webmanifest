@@ -1,0 +1,39 @@
+{
+ "id": "./",
+ "name": "Burraco",
+ "short_name": "Burraco",
+ "description": "Il burraco a coppie con due mazzi e i jolly: scale, tris, pinelle, pozzetto e chiusura, uno contro uno o due contro due, ognuno dal proprio telefono anche a distanza.",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#6a1f2a",
+ "theme_color": "#6a1f2a",
+ "lang": "it",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "icon.svg",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
+  }
+ ]
+}

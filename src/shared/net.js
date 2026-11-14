@@ -371,7 +371,7 @@ var Net = (function () {
     T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, stops: [], graceUntil: 0, chat: [], chatIds: {},
       seen: {}, hid: {}, visSince: {}, lost: {}, upSince: Date.now(), lastHb: 0, sentHid: null, resync: false, unpub: false, hostRev: 0 };
     var me = T;
-    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tVis = topic(code, 'vis'), tReact = topic(code, 'react');
+    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tVis = topic(code, 'vis'), tReact = topic(code, 'react'), tLive = topic(code, 'live');
     me.handler = function (t, p) {
       if (T !== me) return;
       if (t === tState) {
@@ -397,6 +397,8 @@ var Net = (function () {
       } else if (t === tChat) {
         var cm = safeParse(p); if (cm && cm.uid) heard(me, String(cm.uid).slice(0, 40), false);
         if (addChat(me, cm, false) && me.isHost) saveChatLog(me);
+      } else if (t === tLive) {
+        var lm = safeParse(p); if (lm && lm.uid && lm.uid !== uid && liveCb && T === me) liveCb(lm);
       } else if (t === tReact) {
         var rm = safeParse(p); if (rm && rm.uid) { heard(me, String(rm.uid).slice(0, 40), false); if (reactCb) reactCb(rm); }
       } else if (t === tLog) {
@@ -423,7 +425,7 @@ var Net = (function () {
       if (onStatus) onStatus();
     };
     c.onStatus(me.statusFn);
-    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tVis); c.subscribe(tReact);
+    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tVis); c.subscribe(tReact); c.subscribe(tLive);
     accept(f.doc);
     heartbeat(me, true);
     if (bc) { try { bc.postMessage({ k: 'open', key: PREFIX + code, tab: TAB }); } catch (e) {} }
@@ -827,7 +829,13 @@ var Net = (function () {
 
   /* --- Chat del tavolo: i messaggi passano direttamente tra i giocatori (arrivano anche se l'host è assente);
      l'host conserva gli ultimi messaggi come cronologia per chi entra dopo. --- */
-  var chatCb = null, reactCb = null;
+  var chatCb = null, reactCb = null, liveCb = null;
+  // Messaggi «in diretta» tra i giocatori, senza passare dall'host e senza essere salvati (es. i tratti di un disegno):
+  // chi entra dopo non li riceve, quindi lo stato vero va comunque tenuto nel documento del tavolo.
+  function sendLive(data) {
+    if (!T || !T.up) return false;
+    return T.c.publish(topic(T.code, 'live'), JSON.stringify({ uid: uid, d: data }), false);
+  }
   function sendReact(e, nick) {
     if (!T || !T.up) return false;
     return T.c.publish(topic(T.code, 'react'), JSON.stringify({ uid: uid, nick: String(nick || '').slice(0, 18), e: String(e).slice(0, 8), ts: Date.now() }), false);
@@ -875,14 +883,14 @@ var Net = (function () {
     Beat.boost(false);
     me.stops.forEach(function (f) { f(); });
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
-    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'vis', 'react'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'vis', 'react', 'live'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
     me.c.handlers = me.c.handlers.filter(function (h) { return h !== me.handler; });
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
     create: create, open: open, send: send, newInvite: newInvite, keyFor: keyFor, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
-    sendChat: sendChat, onChat: function (f) { chatCb = f; }, sendReact: sendReact, onReact: function (f) { reactCb = f; }, peekAt: peekAt, get prefix() { return PREFIX; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
+    sendChat: sendChat, onChat: function (f) { chatCb = f; }, sendReact: sendReact, onReact: function (f) { reactCb = f; }, sendLive: sendLive, onLive: function (f) { liveCb = f; }, peekAt: peekAt, get prefix() { return PREFIX; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },
     setOnTakeover: function (f) { onTakeover = f; },
