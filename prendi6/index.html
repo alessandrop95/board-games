@@ -1737,6 +1737,40 @@ var Net = (function () {
   };
 })();
 
+/* ===== Risparmio energetico (condiviso da tutti i giochi e dalla home) =====
+   Le animazioni decorative che girano all'infinito (onde, nuvole, bagliori, pulsazioni) costringono il telefono a
+   ridisegnare lo schermo di continuo e consumano batteria anche quando nessuno lo tocca. Dopo 20 secondi senza
+   tocchi (e sempre con la pagina nascosta) si fermano dove sono; ripartono al primo tocco o quando arriva il tuo
+   turno (Calm.wake()). Le animazioni brevi (carte che volano, testi che salgono) non vengono toccate.
+   In più si tolgono i pezzi di animazione rimasti appesi alla pagina per errore: con il tempo rallenterebbero
+   tutto, soprattutto su iPhone. */
+var Calm = (function () {
+  var IDLE = 20000, STALE = 12000, last = Date.now(), calm = false, seen = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+  var LEFTOVERS = 'body > .flyer, body > .burst, body > .floatxt, body > .banner, body > .confetti, body > .ball, body > .popcard';
+  function infinite() {
+    if (!document.getAnimations) return [];
+    return document.getAnimations().filter(function (a) {
+      try { var t = a.effect && a.effect.getComputedTiming && a.effect.getComputedTiming(); return !!t && t.iterations === Infinity; } catch (e) { return false; }
+    });
+  }
+  function pauseAll() { infinite().forEach(function (a) { try { if (a.playState === 'running') a.pause(); } catch (e) {} }); }
+  function resumeAll() { infinite().forEach(function (a) { try { if (a.playState === 'paused') a.play(); } catch (e) {} }); }
+  function setCalm(on) { calm = on; document.documentElement.classList.toggle('calm', on); if (on) pauseAll(); else resumeAll(); }
+  function wake() { last = Date.now(); if (calm && !document.hidden) setCalm(false); }
+  ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, wake, { capture: true, passive: true }); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) setCalm(true); else wake(); });
+  function sweep() {
+    var now = Date.now();
+    if (!calm && (document.hidden || now - last > IDLE)) setCalm(true);
+    else if (calm) pauseAll();   // le animazioni nate nel frattempo (un giocatore ha mosso) si fermano anche loro
+    if (seen) Array.prototype.forEach.call(document.querySelectorAll(LEFTOVERS), function (n) {
+      var t = seen.get(n); if (!t) seen.set(n, now); else if (now - t > STALE) n.remove();
+    });
+  }
+  setInterval(sweep, 4000);
+  return { wake: wake, get calm() { return calm; }, get lastInput() { return last; } };
+})();
+
 /* ===== Schermo acceso al tavolo e richiamo «tocca a te» (condivisi da tutti i giochi) =====
    Schermo: mentre sei seduto a un tavolo (in attesa o in partita) il telefono non spegne lo schermo da solo. È lo
    spegnimento automatico, quasi sempre, a «scollegare» chi aspetta il suo turno: a schermo spento il telefono ferma
@@ -1751,10 +1785,14 @@ var Awake = (function () {
   function supported() { return !!(navigator.wakeLock && navigator.wakeLock.request); }
   function enabled() { return get(KEY) !== 'off'; }
   function seated(d) { return !!(d && d.seats && window.Net && (d.host === Net.uid || d.seats.some(function (s) { return s.uid === Net.uid; }))); }
+  // Dopo 4 minuti senza toccare lo schermo (e se non tocca a te) il telefono può spegnerlo da solo: lo schermo
+  // acceso è la cosa che consuma più batteria. Quando arriva il tuo turno si riaccende la richiesta.
+  var IDLE_MS = 4 * 60 * 1000;
+  function active(d) { return !window.Calm || Date.now() - Calm.lastInput < IDLE_MS || myTurn(d); }
   function wanted() {
     var d = window.App && App.doc;
     return enabled() && supported() && document.visibilityState === 'visible' && !!d && App.screen === 'table' && !!Net.tableCode &&
-      (d.phase === 'lobby' || d.phase === 'play') && seated(d);
+      (d.phase === 'lobby' || d.phase === 'play') && seated(d) && active(d);
   }
   function release() { var l = lock; lock = null; if (l) { try { l.release().catch(function () {}); } catch (e) {} } }
   function sync() {
@@ -1809,6 +1847,7 @@ var Awake = (function () {
   function watch(doc) {
     var mine = myTurn(doc);
     if (mine && !wasMine && document.visibilityState === 'hidden') call(doc);
+    if (mine && !wasMine && window.Calm) Calm.wake();   // tocca a te: le animazioni che indicano cosa fare ripartono
     if (!mine || document.visibilityState === 'visible') calm();
     wasMine = mine;
   }
@@ -2663,7 +2702,7 @@ var Reactions = (function () {
    Le preferenze (musica / effetti) valgono per questo telefono. Il suono parte solo dopo il primo tocco (regole dei browser). */
 var Sound = (function () {
   var ctx = null, master = null, sfxBus = null, musicBus = null, buffers = {}, loading = {}, cfg = { tracks: [], samples: {}, synth: {}, musicVol: .32 };
-  var musicOn = read('bg-music', true), sfxOn = read('bg-sfx', true), unlocked = false, wantMusic = false;
+  var musicOn = read('bg-music', false), sfxOn = read('bg-sfx', true), unlocked = false, wantMusic = false;
   var audioEl = null, trackIdx = 0, lastPlay = {};
   function read(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v === '1'; } catch (e) { return d; } }
   function write(k, v) { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) {} }
@@ -2687,7 +2726,7 @@ var Sound = (function () {
   ['pointerdown', 'keydown', 'touchend'].forEach(function (ev) { document.addEventListener(ev, unlock, { capture: true, passive: true }); });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { if (audioEl) audioEl.pause(); if (ctx && ctx.state === 'running') ctx.suspend(); }
-    else { if (ctx && unlocked) ctx.resume(); if (audioEl && musicOn && wantMusic && unlocked) audioEl.play().catch(function () {}); }
+    else { if (audioEl && musicOn && wantMusic && unlocked) audioEl.play().catch(function () {}); }   // gli effetti si riaccendono al primo suono
   });
 
   /* ---------- campioni registrati ---------- */
@@ -2704,7 +2743,7 @@ var Sound = (function () {
     var src = ctx.createBufferSource(); src.buffer = b;
     src.playbackRate.value = (o.rate || 1) * (1 + (o.vary == null ? .06 : o.vary) * (Math.random() * 2 - 1));
     var g = ctx.createGain(); g.gain.value = (s.vol || 1) * (o.vol || 1);
-    src.connect(g); g.connect(sfxBus);
+    src.connect(g); g.connect(sfxBus); src.onended = function () { try { src.disconnect(); g.disconnect(); } catch (e) {} };
     var off = s.start || 0, dur = o.dur || s.dur;
     src.start(ctx.currentTime + (o.at || 0), off, dur);
     if (dur) { g.gain.setValueAtTime(g.gain.value, ctx.currentTime + (o.at || 0) + dur * .8); g.gain.linearRampToValueAtTime(0, ctx.currentTime + (o.at || 0) + dur); }
@@ -2731,6 +2770,7 @@ var Sound = (function () {
     var out = g;
     if (o.lp) { var fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = o.lp; g.connect(fl); out = fl; }
     osc.connect(g); out.connect(sfxBus);
+    osc.onended = function () { try { osc.disconnect(); g.disconnect(); if (out !== g) out.disconnect(); } catch (e) {} };
     osc.start(t); osc.stop(t + (o.a || .005) + (o.dur || .2) + .05);
   }
   // rumore filtrato: tipo filtro, frequenza (o [da, a]), q, dur, vol
@@ -2742,6 +2782,7 @@ var Sound = (function () {
     fl.frequency.setValueAtTime(f[0], t); fl.frequency.exponentialRampToValueAtTime(f[1], t + (o.dur || .2));
     env(g, t, o.a || .005, o.dur || .2, o.vol || .3);
     src.connect(fl); fl.connect(g); g.connect(sfxBus);
+    src.onended = function () { try { src.disconnect(); fl.disconnect(); g.disconnect(); } catch (e) {} };
     src.start(t, Math.random()); src.stop(t + (o.a || .005) + (o.dur || .2) + .05);
   }
   // campanella: parziali inarmonici (vetro, cristallo, campana)
@@ -2765,14 +2806,22 @@ var Sound = (function () {
     win: function () { arp([N.C5, N.E5, N.G5, N.C6], { type: 'triangle', step: .12, dur: .5, vol: .2 }); arp([N.C6, N.E6, N.G6], { bell: true, at: .5, step: .06, vol: .12, dur: 1.4 }); },
     lose: function () { arp([N.G4, N.Ds4, N.C4], { type: 'triangle', step: .22, dur: .6, vol: .18 }); }
   };
+  // In silenzio il motore audio si spegne: acceso consuma batteria anche senza suonare (soprattutto su iPhone).
+  var offTimer = null;
+  function sleepLater() { clearTimeout(offTimer); offTimer = setTimeout(function () { if (ctx && ctx.state === 'running') ctx.suspend().catch(function () {}); }, 4000); }
   function play(name, o) {
-    if (!sfxOn || !unlocked || !ensure() || ctx.state !== 'running') return;
+    if (!sfxOn || !unlocked || !ensure() || document.hidden) return;
     var now = performance.now(); if (lastPlay[name] && now - lastPlay[name] < 45) return; lastPlay[name] = now; // niente raffiche identiche
-    try {
-      var f = cfg.synth[name] || BASE[name];
-      if (f) f(o || {}, api);
-      else if (cfg.samples[name]) sample(name, o);
-    } catch (e) {}
+    function go() {
+      try {
+        var f = cfg.synth[name] || BASE[name];
+        if (f) f(o || {}, api);
+        else if (cfg.samples[name]) sample(name, o);
+      } catch (e) {}
+      sleepLater();
+    }
+    if (ctx.state === 'running') go();
+    else if (ctx.state === 'suspended') ctx.resume().then(function () { if (performance.now() - now < 400) go(); }, function () {});
   }
 
   /* ---------- musica ---------- */

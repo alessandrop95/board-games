@@ -3,7 +3,7 @@
    Le preferenze (musica / effetti) valgono per questo telefono. Il suono parte solo dopo il primo tocco (regole dei browser). */
 var Sound = (function () {
   var ctx = null, master = null, sfxBus = null, musicBus = null, buffers = {}, loading = {}, cfg = { tracks: [], samples: {}, synth: {}, musicVol: .32 };
-  var musicOn = read('bg-music', true), sfxOn = read('bg-sfx', true), unlocked = false, wantMusic = false;
+  var musicOn = read('bg-music', false), sfxOn = read('bg-sfx', true), unlocked = false, wantMusic = false;
   var audioEl = null, trackIdx = 0, lastPlay = {};
   function read(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v === '1'; } catch (e) { return d; } }
   function write(k, v) { try { localStorage.setItem(k, v ? '1' : '0'); } catch (e) {} }
@@ -27,7 +27,7 @@ var Sound = (function () {
   ['pointerdown', 'keydown', 'touchend'].forEach(function (ev) { document.addEventListener(ev, unlock, { capture: true, passive: true }); });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { if (audioEl) audioEl.pause(); if (ctx && ctx.state === 'running') ctx.suspend(); }
-    else { if (ctx && unlocked) ctx.resume(); if (audioEl && musicOn && wantMusic && unlocked) audioEl.play().catch(function () {}); }
+    else { if (audioEl && musicOn && wantMusic && unlocked) audioEl.play().catch(function () {}); }   // gli effetti si riaccendono al primo suono
   });
 
   /* ---------- campioni registrati ---------- */
@@ -44,7 +44,7 @@ var Sound = (function () {
     var src = ctx.createBufferSource(); src.buffer = b;
     src.playbackRate.value = (o.rate || 1) * (1 + (o.vary == null ? .06 : o.vary) * (Math.random() * 2 - 1));
     var g = ctx.createGain(); g.gain.value = (s.vol || 1) * (o.vol || 1);
-    src.connect(g); g.connect(sfxBus);
+    src.connect(g); g.connect(sfxBus); src.onended = function () { try { src.disconnect(); g.disconnect(); } catch (e) {} };
     var off = s.start || 0, dur = o.dur || s.dur;
     src.start(ctx.currentTime + (o.at || 0), off, dur);
     if (dur) { g.gain.setValueAtTime(g.gain.value, ctx.currentTime + (o.at || 0) + dur * .8); g.gain.linearRampToValueAtTime(0, ctx.currentTime + (o.at || 0) + dur); }
@@ -71,6 +71,7 @@ var Sound = (function () {
     var out = g;
     if (o.lp) { var fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = o.lp; g.connect(fl); out = fl; }
     osc.connect(g); out.connect(sfxBus);
+    osc.onended = function () { try { osc.disconnect(); g.disconnect(); if (out !== g) out.disconnect(); } catch (e) {} };
     osc.start(t); osc.stop(t + (o.a || .005) + (o.dur || .2) + .05);
   }
   // rumore filtrato: tipo filtro, frequenza (o [da, a]), q, dur, vol
@@ -82,6 +83,7 @@ var Sound = (function () {
     fl.frequency.setValueAtTime(f[0], t); fl.frequency.exponentialRampToValueAtTime(f[1], t + (o.dur || .2));
     env(g, t, o.a || .005, o.dur || .2, o.vol || .3);
     src.connect(fl); fl.connect(g); g.connect(sfxBus);
+    src.onended = function () { try { src.disconnect(); fl.disconnect(); g.disconnect(); } catch (e) {} };
     src.start(t, Math.random()); src.stop(t + (o.a || .005) + (o.dur || .2) + .05);
   }
   // campanella: parziali inarmonici (vetro, cristallo, campana)
@@ -105,14 +107,22 @@ var Sound = (function () {
     win: function () { arp([N.C5, N.E5, N.G5, N.C6], { type: 'triangle', step: .12, dur: .5, vol: .2 }); arp([N.C6, N.E6, N.G6], { bell: true, at: .5, step: .06, vol: .12, dur: 1.4 }); },
     lose: function () { arp([N.G4, N.Ds4, N.C4], { type: 'triangle', step: .22, dur: .6, vol: .18 }); }
   };
+  // In silenzio il motore audio si spegne: acceso consuma batteria anche senza suonare (soprattutto su iPhone).
+  var offTimer = null;
+  function sleepLater() { clearTimeout(offTimer); offTimer = setTimeout(function () { if (ctx && ctx.state === 'running') ctx.suspend().catch(function () {}); }, 4000); }
   function play(name, o) {
-    if (!sfxOn || !unlocked || !ensure() || ctx.state !== 'running') return;
+    if (!sfxOn || !unlocked || !ensure() || document.hidden) return;
     var now = performance.now(); if (lastPlay[name] && now - lastPlay[name] < 45) return; lastPlay[name] = now; // niente raffiche identiche
-    try {
-      var f = cfg.synth[name] || BASE[name];
-      if (f) f(o || {}, api);
-      else if (cfg.samples[name]) sample(name, o);
-    } catch (e) {}
+    function go() {
+      try {
+        var f = cfg.synth[name] || BASE[name];
+        if (f) f(o || {}, api);
+        else if (cfg.samples[name]) sample(name, o);
+      } catch (e) {}
+      sleepLater();
+    }
+    if (ctx.state === 'running') go();
+    else if (ctx.state === 'suspended') ctx.resume().then(function () { if (performance.now() - now < 400) go(); }, function () {});
   }
 
   /* ---------- musica ---------- */

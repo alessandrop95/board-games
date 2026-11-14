@@ -215,7 +215,7 @@ var Game = (function () {
     if (g.fxN <= App.lastFxN) return;
     var news = (g.fx || []).filter(function (e) { return e.n > App.lastFxN; }); App.lastFxN = g.fxN;
     // troppe cose arretrate (telefono in pausa): niente animazioni, solo lo stato
-    if (Q.length > 6 || news.length > 12) { Q = []; App.hide = {}; applyHide(); news = news.filter(function (e) { return e.k === 'roundEnd' || e.k === 'over'; }); }
+    if (Q.length > 6 || news.length > 12) { Q = []; App.hide = {}; Array.prototype.forEach.call(document.querySelectorAll('body > .flyer'), function (n) { n.remove(); }); applyHide(); news = news.filter(function (e) { return e.k === 'roundEnd' || e.k === 'over'; }); }
     news.forEach(function (e) { plan(g, me, e); });
     applyHide();
   }

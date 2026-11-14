@@ -12,10 +12,14 @@ var Awake = (function () {
   function supported() { return !!(navigator.wakeLock && navigator.wakeLock.request); }
   function enabled() { return get(KEY) !== 'off'; }
   function seated(d) { return !!(d && d.seats && window.Net && (d.host === Net.uid || d.seats.some(function (s) { return s.uid === Net.uid; }))); }
+  // Dopo 4 minuti senza toccare lo schermo (e se non tocca a te) il telefono può spegnerlo da solo: lo schermo
+  // acceso è la cosa che consuma più batteria. Quando arriva il tuo turno si riaccende la richiesta.
+  var IDLE_MS = 4 * 60 * 1000;
+  function active(d) { return !window.Calm || Date.now() - Calm.lastInput < IDLE_MS || myTurn(d); }
   function wanted() {
     var d = window.App && App.doc;
     return enabled() && supported() && document.visibilityState === 'visible' && !!d && App.screen === 'table' && !!Net.tableCode &&
-      (d.phase === 'lobby' || d.phase === 'play') && seated(d);
+      (d.phase === 'lobby' || d.phase === 'play') && seated(d) && active(d);
   }
   function release() { var l = lock; lock = null; if (l) { try { l.release().catch(function () {}); } catch (e) {} } }
   function sync() {
@@ -70,6 +74,7 @@ var Awake = (function () {
   function watch(doc) {
     var mine = myTurn(doc);
     if (mine && !wasMine && document.visibilityState === 'hidden') call(doc);
+    if (mine && !wasMine && window.Calm) Calm.wake();   // tocca a te: le animazioni che indicano cosa fare ripartono
     if (!mine || document.visibilityState === 'visible') calm();
     wasMine = mine;
   }
