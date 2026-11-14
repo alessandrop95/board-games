@@ -227,7 +227,7 @@ function onDoc() {
     // la carta scelta resta valida solo se ce l'ho ancora in mano
     if (App.card != null && (!P || P.hand.indexOf(App.card) < 0)) App.card = null;
     if (App.sheet && App.sheet.kind === 'card' && App.card == null) App.sheet = null;
-    var intro = App.sheet && App.sheet.kind === 'intro';
+    var intro = App.sheet && (App.sheet.kind === 'intro' || App.sheet.kind === 'seecard' || App.sheet.kind === 'catalog' || App.sheet.kind === 'rules' || App.sheet.kind === 'help');
     var ask = g.phase === 'play' && g.pend && g.pend.who === me;
     if (ask && !intro && (!App.sheet || App.sheet.kind !== 'resp')) App.sheet = { kind: 'resp' };
     if (!ask && App.sheet && App.sheet.kind === 'resp') App.sheet = null;

@@ -50,10 +50,14 @@ with sync_playwright() as p:
     t('ognuno vede il proprio ruolo', names[ra] in A.inner_text('.mrole') and names[rb] in B.inner_text('.mrole'))
     hidden_b = ra != 'AL' and rb != 'AL'
     if hidden_b:
-        t('il ruolo di Bea è segreto sul telefono di Ale', A.locator('.opp[data-p="%d"] .rb.unk' % b).count() == 1)
+        t('il ruolo di Bea è segreto sul telefono di Ale', A.locator('.seat[data-p="%d"] .rb.unk' % b).count() == 1)
     al = [i for i, P in enumerate(g['players']) if P['role'] == 'AL'][0]
-    if al != a: t('l’Ammiraglio di Levante è scoperto per tutti', A.locator('.opp[data-p="%d"] .rb.r-AL' % al).count() == 1)
+    if al != a: t('l’Ammiraglio di Levante è scoperto per tutti', A.locator('.seat[data-p="%d"] .rb.r-AL' % al).count() == 1)
     A.screenshot(path=os.path.join(OUT, 'forziere-tavolo.png'))
+    t('il tavolo: un posto per ogni giocatore, tu in basso', A.locator('.felt .seat').count() == 5 and A.locator('.felt .seat.mine').count() == 1)
+    click(A, '[data-act=catalog]'); A.wait_for_selector('.sh-catalog .citem', timeout=5000)
+    t('il catalogo mostra tutte le carte con le regole', A.locator('.sh-catalog button.citem').count() == 23 and 'Virata' in A.inner_text('.sh-catalog'))
+    click(A, '.sh-catalog [data-act=close]')
 
     # una Bordata dalla mano, scegliendo il bersaglio: Bea non ha difese
     turn_of(A, a, "clear(%d);clear(%d);g.players[%d].ship=4;g.players[%d].eq=[];g.players[%d].eq=[];g.players[%d].cap=1;g.players[%d].cap=5;give(%d,'bordata',0);g.players[%d].bar=3" % (a, b, a, a, b, a, b, a, b))
@@ -63,6 +67,7 @@ with sync_playwright() as p:
     t('la carta mostra chi si può colpire', A.locator('.sh-card .tgtb[data-p="%d"]' % b).count() == 1)
     click(A, '.sh-card .tgtb[data-p="%d"]' % b)
     B.wait_for_function('G().players[myIdx()].bar === 2', timeout=10000)
+    t('al centro del tavolo tutti vedono la carta giocata', B.locator('.tmid .midc').count() == 1 and 'Bordata' in B.inner_text('.tmid'))
     t('Bea perde un barile', js(B, 'G().players[myIdx()].bar') == 2 and 'Bordata' in js(A, "G().log.slice(-3).map(function(l){return l.t}).join(' ')"))
 
     # risposta fuori turno: Bea ha una Virata
@@ -101,7 +106,7 @@ with sync_playwright() as p:
     host(A, "g.turn=%d;g.step='play';g.pend=null;g.gorgo=null;g.spectre={on:%d};clear(%d);give(%d,'rum',1);clear(%d);" % (pre, b, pre, pre, b) +
          "var xs=g.deck.filter(function(i){return E.CARDS[i].s==='X'});var top=xs[0],mine=xs[1];g.deck.splice(g.deck.indexOf(top),1);g.deck.push(top);g.deck.splice(g.deck.indexOf(mine),1);g.players[%d].hand.push(mine);E.act(g,%d,{a:'end'})" % (b, pre))
     B.wait_for_selector('.sh-spectre', timeout=10000)
-    t('il Vascello spettrale chiede a Bea di rispondere', 'Vascello spettrale' in B.inner_text('.sh-spectre') and B.locator('.sh-spectre [data-act=answer]').count() >= 1)
+    t('il Vascello spettrale chiede a Bea di rispondere', 'vascello spettrale' in B.inner_text('.sh-spectre').lower() and B.locator('.sh-spectre [data-act=answer]').count() >= 1)
     click(B, '.sh-spectre [data-act=noanswer]')
     B.wait_for_function('G().step === "play" && !G().spectre', timeout=10000)
     t('chi non risponde perde 2 barili', js(B, 'G().players[myIdx()].bar') == max(0, barB - 2) or js(B, 'G().players[myIdx()].ship') is None)

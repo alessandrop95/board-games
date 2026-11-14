@@ -26,7 +26,7 @@ function sheetBody(s) {
   if (s.kind === 'menu' && App.doc) {
     var d = App.doc;
     return '<h2>Tavolo ' + esc(d.code) + '</h2><div style="display:grid;gap:8px">' +
-      '<button class="btn ghost block" data-act="invite">Invita amici al tavolo</button><button class="btn ghost block" data-act="rules">Regole</button><button class="btn ghost block" data-act="intro">Rivedi la presentazione</button>' +
+      '<button class="btn ghost block" data-act="invite">Invita amici al tavolo</button><button class="btn ghost block" data-act="catalog">Tutte le carte, i capitani e le navi</button><button class="btn ghost block" data-act="rules">Regole</button><button class="btn ghost block" data-act="intro">Rivedi la presentazione</button>' +
       (g ? '<button class="btn ghost block" data-act="port">Le navi in porto</button><button class="btn ghost block" data-act="log">Diario di bordo (tutte le mosse)</button>' : '') +
       Awake.menuHTML('btn ghost block') +
       (d.host !== Net.uid ? '<button class="btn ghost block" data-act="takehost">Prendi il comando del tavolo (se l’host se n’è andato)</button>' : '') +
@@ -37,18 +37,19 @@ function sheetBody(s) {
   if (s.kind === 'closeconfirm' && App.doc) return '<h2>Chiudere il tavolo ' + esc(App.doc.code) + '?</h2><p class="lead">Il tavolo sparisce dalla lista' + (App.doc.game && App.doc.phase === 'play' ? ', la partita in corso finisce' : '') + ' e tutti tornano alla schermata iniziale. Non si può annullare.</p>' +
     '<button class="btn block red" data-act="closeyes">Chiudi per tutti</button>' + closeBtn('Annulla');
   if (s.kind === 'intro') return introBody(s);
+  if (s.kind === 'catalog') return catalogBody(s);
   if (!g) return '';
   var P = me >= 0 ? g.players[me] : null;
   if (s.kind === 'log') return '<h2>Diario di bordo</h2><div class="loglist">' + g.log.slice().reverse().map(function (l) { var c = l.p != null && g.players[l.p] ? pcol(g, l.p) : 'rgba(242,193,78,.5)'; return '<div class="fl k-' + l.k + '" style="border-left-color:' + c + '">' + esc(l.t) + '</div>'; }).join('') + '</div>' + closeBtn();
   if (s.kind === 'port') return '<h2>Navi in porto</h2><p class="lead">Chi resta senza nave, al suo turno, ne prende una di queste tre oppure la prima del mazzo delle navi (' + g.ships.length + ' rimaste, coperte).</p><div class="ships">' + g.row.map(function (sh) { return ART.shipCard(sh); }).join('') + '</div>' + closeBtn();
-  if (s.kind === 'seecard') return cardInfo(s.id) + closeBtn();
+  if (s.kind === 'seecard') return cardInfo(s.id) + '<p class="lead muted">Si può giocare ' + (E.kind(s.id) === 'def' ? 'solo fuori dal proprio turno, in risposta.' : E.kind(s.id) === 'multi' ? 'come Attacco nel proprio turno o come Difesa fuori turno.' : E.kind(s.id) === 'eq' ? 'nel proprio turno: resta davanti al giocatore.' : 'nel proprio turno.') + '</p>' + closeBtn(s.back ? 'Indietro' : 'Chiudi');
   if (s.kind === 'player') {
     var Q = g.players[s.p]; if (!Q) return '';
     var r = roleOf(g, s.p), C = E.CAPS[Q.cap];
     return '<div class="phead" style="--pc:' + pcol(g, s.p) + '"><span class="pv big">' + esc(Q.nick.charAt(0).toUpperCase()) + '</span><div><div class="kicker">' + (s.p === me ? 'Tu' : 'Capitano') + '</div><h2>' + Net.dot(Q.uid) + esc(Q.nick) + '</h2>' + ART.roleBadge(r, { long: true }) + '</div></div>' +
       '<div class="pcap">' + ART.capFace(Q.cap, pcol(g, s.p)) + '<span><b>' + esc(C.n) + '</b><br><span class="muted">' + esc(C.d) + '</span></span></div>' +
       (Q.ship != null ? ART.shipCard(Q.ship) + '<p class="lead">Barili: ' + ART.barrels(Q.bar, E.maxBar(g, s.p)) + (me >= 0 && s.p !== me && P.ship != null ? ' · distanza da te: <b>' + E.distance(g, me, s.p) + '</b>' : '') + '</p>' : '<p class="lead">Al momento è senza nave: non può essere bersaglio.</p>') +
-      (Q.eq.length ? '<h3>Equipaggiamenti</h3><div class="eqlist">' + Q.eq.map(function (id) { return '<div class="eqrow"><b>' + esc(E.T[E.ty(id)].n) + '</b> <span class="muted">' + esc(E.T[E.ty(id)].d) + '</span></div>'; }).join('') + '</div>' : '') +
+      (Q.eq.length ? '<h3>Equipaggiamenti</h3><div class="eqlist">' + Q.eq.map(function (id) { return '<button class="citem" data-act="seecard" data-id="' + id + '"><span class="ci-c">' + ART.card(id) + '</span><span><b>' + esc(E.T[E.ty(id)].n) + '</b><br>' + esc(E.T[E.ty(id)].d) + '</span></button>'; }).join('') + '</div>' : '') +
       '<div class="tags"><span class="gc">' + IC('cards') + ' ' + Q.hand.length + ' carte in mano</span><span class="gc">' + IC('coin') + ' ' + Q.dbl + ' dobloni' + (Q.up ? '' : ' + 1 del ruolo coperto') + '</span></div>' +
       (App.doc.host === Net.uid && s.p !== me && g.phase !== 'over' ? '<button class="btn ghost block" data-act="auto" data-p="' + s.p + '">' + (Q.bot ? 'Ridai il controllo al giocatore' : 'Fallo giocare in automatico (se è assente)') + '</button>' : '') + closeBtn();
   }
@@ -71,9 +72,10 @@ function sheetBody(s) {
   }
   if (s.kind === 'resp' && P && g.pend && g.pend.who === me) {
     var ans = E.answers(g, me), pd = g.pend;
-    return '<div class="kicker">Fuori dal tuo turno</div><h2>' + (pd.k === 'shot' ? 'Ti arriva un colpo!' : pd.k === 'duel' ? 'Sfida a sciabole' : pd.k === 'need' ? 'Il Mostro degli abissi' : esc(pd.label)) + '</h2><p class="lead">' + Game.pendText(g, me) + '</p>' +
+    return '<div class="kicker">Fuori dal tuo turno</div><h2>' + (pd.k === 'shot' ? 'Ti arriva un colpo!' : pd.k === 'duel' ? 'Sfida a sciabole' : pd.k === 'need' ? 'Il Mostro degli abissi' : esc(pd.label)) + '</h2>' +
+      (pd.card != null ? '<div class="cinfo small"><button class="cbig" data-act="seecard" data-id="' + pd.card + '">' + ART.card(pd.card) + '</button><p class="lead">' + Game.pendText(g, me) + '<br><small class="muted">' + esc(E.T[E.ty(pd.card)].d) + '</small></p></div>' : '<p class="lead">' + Game.pendText(g, me) + '</p>') +
       (P.ship != null ? '<p class="lead">La tua nave: ' + ART.barrels(P.bar, E.maxBar(g, me)) + '</p>' : '') +
-      '<div class="resp">' + ans.map(function (id) { return '<button class="hc can" data-act="resp" data-id="' + id + '">' + ART.card(id) + '<small>' + esc(E.T[E.ty(id)].n) + '</small></button>'; }).join('') + '</div>' +
+      (ans.length ? '<h3>Puoi rispondere con</h3>' : '') + '<div class="resp">' + ans.map(function (id) { return '<button class="hc can" data-act="resp" data-id="' + id + '">' + ART.card(id) + '<small>Gioca ' + esc(E.T[E.ty(id)].n) + '</small></button>'; }).join('') + '</div>' +
       '<button class="btn block red" data-act="take">' + (pd.k === 'card' ? 'Lascia fare' : 'Subisci (−' + (pd.k === 'shot' ? pd.dmg : 1) + ((pd.k === 'shot' ? pd.dmg : 1) > 1 ? ' barili)' : ' barile)')) + '</button>';
   }
   if (s.kind === 'ships' && P && g.turn === me && g.step === 'ship') {
@@ -89,6 +91,30 @@ function sheetBody(s) {
   }
   if (s.kind === 'over' && g.phase === 'over') return overBody(g, me);
   return '';
+}
+function firstOf(t) { for (var i = 0; i < E.CARDS.length; i++) if (E.CARDS[i].t === t) return i; return 0; }
+function catalogBody(s) {
+  var tab = s.tab || 'cards', g = G();
+  var tabs = '<div class="ctabs">' + [['cards', 'Carte (72)'], ['caps', 'Capitani'], ['ships', 'Navi'], ['syms', 'Simboli']].map(function (x) { return '<button class="chip' + (tab === x[0] ? ' on' : '') + '" data-act="cattab" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>';
+  var h = '';
+  if (tab === 'cards') {
+    var kinds = [['atk', 'Attacco: si giocano nel tuo turno, contano nelle munizioni'], ['multi', 'Attacco o Difesa'], ['def', 'Difesa: si giocano fuori dal tuo turno, quando ti attaccano'], ['act', 'Azione: fai quello che dice, poi la scarti'], ['eq', 'Equipaggiamento: resta davanti a te e funziona sempre']];
+    h = kinds.map(function (k) {
+      var list = E.ORDER.filter(function (t) { return E.T[t].k === k[0]; });
+      return '<h3 class="ck k-' + k[0] + '">' + k[1] + '</h3><div class="clist">' + list.map(function (t) {
+        var id = firstOf(t);
+        return '<button class="citem" data-act="seecard" data-id="' + id + '"><span class="ci-c">' + ART.card(id) + '</span><span><b>' + esc(E.T[t].n) + '</b> <small>×' + E.T[t].c + '</small><br>' + esc(E.T[t].d) + '</span></button>';
+      }).join('') + '</div>';
+    }).join('');
+  } else if (tab === 'caps') {
+    var inGame = g ? g.players.map(function (P) { return P.cap; }) : [];
+    h = '<div class="clist">' + E.CAPS.map(function (C, i) { var who = g ? g.players.filter(function (P) { return P.cap === i; })[0] : null; return '<div class="citem">' + ART.capFace(i, who ? pcol(g, g.players.indexOf(who)) : null) + '<span><b>' + esc(C.n) + '</b>' + (who ? ' <small>· ' + esc(who.nick) + '</small>' : '') + '<br>' + esc(C.d) + '<br><small>Nave di partenza: ' + esc(E.SHIPS[C.s].n) + '</small></span></div>'; }).join('') + '</div>';
+  } else if (tab === 'ships') {
+    h = '<p class="lead">' + IC('chest') + ' valore (passi del Forziere se affonda) · ' + IC('range') + ' gittata · ' + IC('ammo') + ' munizioni (attacchi per turno) · ' + IC('barrel') + ' barili</p><div class="ships">' + E.SHIPS.map(function (S, i) { return ART.shipCard(i); }).join('') + '</div>';
+  } else {
+    h = RU.section('spectre') + '<p class="lead">Quanti sono nel mazzo: ' + ['A', 'T', 'X', 'P'].map(function (k) { return ART.sym(k) + ' ' + E.SYM[k] + ' ' + E.CARDS.filter(function (c) { return c.s === k; }).length; }).join(' · ') + '</p>';
+  }
+  return '<h2>Tutte le carte</h2>' + tabs + h + closeBtn();
 }
 function cardBody(g, me, id) {
   var t = E.ty(id), P = g.players[me], myTurn = g.phase === 'play' && g.turn === me && !g.pend && g.step === 'play', h = cardInfo(id), opts = [];
@@ -167,7 +193,7 @@ document.addEventListener('click', function (ev) {
     case 'introprev': s.page--; renderSheet(); break;
     case 'introdone': lsSet('fz-intro-done', '1'); App.sheet = null; renderSheet(); if (App.doc) onDoc(); break;
     case 'showover': App.sheet = { kind: 'over' }; renderSheet(); break;
-    case 'close': if (s && s.kind === 'help' && s.back) App.sheet = s.back; else { App.sheet = null; if (s && (s.kind === 'card' || s.kind === 'pick')) App.card = null; } renderSheet(); if (G()) Game.render(); break;
+    case 'close': if (s && (s.kind === 'help' || s.kind === 'seecard') && s.back) App.sheet = s.back; else { App.sheet = null; if (s && (s.kind === 'card' || s.kind === 'pick')) App.card = null; } renderSheet(); if (G()) Game.render(); break;
     case 'leave': App.sheet = null; if (Exit.ask()) renderSheet(); else leaveTable(); break;
     case 'invite': App.sheet = null; renderSheet(); invite(); break;
     case 'copylink': copyText(inviteLink(), 'Link d’invito copiato'); break;
@@ -187,7 +213,9 @@ document.addEventListener('click', function (ev) {
     case 'myrole': App.sheet = { kind: 'myrole' }; renderSheet(); break;
     case 'mycap': App.sheet = { kind: 'mycap' }; renderSheet(); break;
     case 'myship': App.sheet = { kind: 'myship' }; renderSheet(); break;
-    case 'seecard': App.sheet = { kind: 'seecard', id: +el.getAttribute('data-id') }; renderSheet(); break;
+    case 'seecard': App.sheet = { kind: 'seecard', id: +el.getAttribute('data-id'), back: s && s.kind !== 'seecard' ? s : null }; renderSheet(); break;
+    case 'catalog': App.sheet = { kind: 'catalog', tab: 'cards' }; renderSheet(); break;
+    case 'cattab': s.tab = el.getAttribute('data-v'); renderSheet(); var sh = document.querySelector('.sheet'); if (sh) sh.scrollTop = 0; break;
     // il turno
     case 'hand': handClick(+el.getAttribute('data-id')); break;
     case 'cplay': { var id = App.card, as = el.getAttribute('data-as'); if (id == null) return; var op = { a: 'play', id: id }; if (as) op.as = as; App.sheet = null; App.card = null; renderSheet(); act(op); break; }

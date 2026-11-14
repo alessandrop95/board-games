@@ -1,7 +1,9 @@
-/* ===== Il Forziere Maledetto: schermata di gioco (tracciato, navi, mano) e animazioni =====
-   In alto il tracciato con il Forziere e le due bandiere, la Clessidra e il mazzo; poi le navi degli altri
-   capitani (toccane una per i dettagli, o per sceglierla come bersaglio); in basso la tua plancia: ruolo
-   segreto, capitano, nave con i barili, equipaggiamenti e le carte in mano. */
+/* ===== Il Forziere Maledetto: schermata di gioco (tavolo rotondo, tracciato, mano) e animazioni =====
+   In alto il tracciato con il Forziere e le due bandiere. Poi il tavolo visto dall'alto, come al tavolo vero:
+   tu in basso e gli altri capitani intorno nell'ordine dei turni, con nave, barili, distanza da te (verde se
+   a tiro) ed equipaggiamenti. Al centro la carta giocata adesso (chi, contro chi, chi deve rispondere), sotto
+   il diario delle ultime mosse. Ogni carta che si vede (al centro, nel diario, davanti ai giocatori, in mano)
+   si tocca per leggerne le regole; il pulsante Carte apre il catalogo completo. */
 var Game = (function () {
   var mountedFor = null, reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   function el(id) { return document.getElementById(id); }
@@ -11,9 +13,9 @@ var Game = (function () {
   function sea() { return '<div class="sea" aria-hidden="true"><div class="wv w1"></div><div class="wv w2"></div><div class="wv w3"></div></div>'; }
   function mount() {
     $('#app').innerHTML = '<div class="gv" id="gv">' + sea() +
-      '<header class="gv-top"><button class="iconbtn brandbtn" data-act="menu" aria-label="Menu">☰</button><span class="gv-info" id="gv-info"></span>' + Sound.buttonHTML() + '<span id="gv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="rules" aria-label="Regole">' + IC('help') + '<span class="hide-s"> Regole</span></button></header>' +
+      '<header class="gv-top"><button class="iconbtn brandbtn" data-act="menu" aria-label="Menu">☰</button><span class="gv-info" id="gv-info"></span>' + Sound.buttonHTML() + '<span id="gv-chat">' + Chat.badgeHTML() + '</span><button class="iconbtn" data-act="catalog" aria-label="Tutte le carte">' + IC('cards') + '<span class="hide-s"> Carte</span></button><button class="iconbtn" data-act="rules" aria-label="Regole">' + IC('help') + '<span class="hide-s"> Regole</span></button></header>' +
       '<div class="gv-board" id="gv-board"></div>' +
-      '<div class="gv-opp" id="gv-opp"></div>' + Chat.dockHTML() +
+      '<div class="gv-table" id="gv-table"></div><div class="feed" id="gv-feed" aria-live="polite"></div>' + Chat.dockHTML() +
       '<div class="gv-prompt" id="gv-prompt" aria-live="polite"></div>' +
       '<div class="gv-me" id="gv-me"></div></div>';
     mountedFor = App.code;
@@ -24,7 +26,8 @@ var Game = (function () {
     var g = G(), me = myIdx();
     setHTML('gv-info', '<b>Il Forziere Maledetto</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : 'Turno ' + g.turnN) + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
     setHTML('gv-board', board(g));
-    setHTML('gv-opp', opponents(g, me));
+    setHTML('gv-table', table(g, me));
+    setHTML('gv-feed', feed(g, me));
     setHTML('gv-prompt', prompt(g, me));
     setHTML('gv-me', me >= 0 ? mine(g, me) : spectator(g));
     var chat = el('gv-chat'); if (chat) { var ch = Chat.badgeHTML(); if (chat._h !== ch) { chat.innerHTML = ch; chat._h = ch; } }
@@ -35,32 +38,64 @@ var Game = (function () {
   function board(g) {
     var sp = g.spectre && g.spectre.on != null ? '<span class="bchip ghost" title="Vascello spettrale">' + IC('ghost') + 'Spettro su ' + esc(g.players[g.spectre.on].nick) + '</span>' : '';
     var gg = g.gorgo ? '<span class="bchip gorgo" title="Il Gorgo">' + IC('gorgo') + 'Gorgo: ' + esc(g.players[g.gorgo.at].nick) + '</span>' : '';
-    return ART.track(g) + '<div class="bchips"><span class="bchip" title="Dobloni nella Clessidra">' + IC('hourglass') + g.glass + '</span><span class="bchip" title="Carte nel mazzo">' + IC('cards') + g.deck.length + '</span>' +
+    return ART.track(g) + '<div class="bchips"><span class="bchip" title="Bandiere">' + IC('flag') + 'a ' + g.flag + ' passi</span>' +
       '<button class="bchip port" data-act="port" title="Navi in porto">' + IC('ship') + 'Porto: ' + g.row.map(function (s) { return esc(E.SHIPS[s].n); }).join(', ') + '</button>' + sp + gg + '</div>';
   }
 
-  /* ---------- avversari ---------- */
+  /* ---------- il tavolo rotondo: tu in basso, gli altri intorno nell'ordine dei turni ---------- */
   function ini(n) { return esc(String(n).charAt(0).toUpperCase()); }
-  function eqChips(g, p) { return g.players[p].eq.map(function (id) { return '<span class="eqc" title="' + esc(E.T[E.ty(id)].d) + '">' + esc(E.T[E.ty(id)].n) + '</span>'; }).join(''); }
   function coins(n) { return n ? '<span class="coins" title="' + n + ' dobloni">' + IC('coin') + n + '</span>' : ''; }
-  function canTarget(g, me, p) { return App.mode === 'aim' && App.card != null && (E.targets(g, me, App.card, App.as) || []).indexOf(p) >= 0; }
-  function oppTile(g, p, me) {
-    var P = g.players[p], on = g.phase === 'play' && (g.pend ? g.pend.who === p : g.turn === p), r = roleOf(g, p), tgt = canTarget(g, me, p);
-    var S = P.ship != null ? E.SHIPS[P.ship] : null;
-    var dist = me >= 0 && P.ship != null && g.players[me].ship != null ? '<span class="dist" title="Distanza da te">' + IC('range') + E.distance(g, me, p) + '</span>' : '';
-    var tags = (g.turn === p && g.phase === 'play' ? '<span class="tag turn">di turno</span>' : '') + (g.pend && g.pend.who === p ? '<span class="tag wait">risponde…</span>' : '') +
-      (P.away ? '<span class="tag away">assente</span>' : P.bot && g.phase !== 'over' ? '<span class="tag bot">auto</span>' : '') +
-      (g.spectre && g.spectre.on === p ? '<span class="tag ghost">' + IC('ghost') + '</span>' : '') + (g.gorgo && g.gorgo.at === p ? '<span class="tag gorgo">' + IC('gorgo') + '</span>' : '');
-    return '<button class="opp' + (on ? ' on' : '') + (tgt ? ' tgt' : '') + (App.mode === 'aim' && !tgt ? ' dim' : '') + (S ? '' : ' noship') + '" style="--pc:' + pcol(g, p) + '" data-act="opp" data-p="' + p + '" aria-label="' + esc(P.nick) + '">' +
-      '<span class="opp-h"><span class="pv">' + ini(P.nick) + '</span><b>' + Net.dot(P.uid) + esc(P.nick) + '</b>' + coins(P.dbl) + '</span>' +
-      '<span class="opp-s">' + (S ? '<span class="sn">' + esc(S.n) + '</span>' + ART.barrels(P.bar, E.maxBar(g, p)) : '<span class="sn muted">senza nave</span>') + '</span>' +
-      '<span class="opp-x">' + ART.roleBadge(r) + '<span title="Carte in mano">' + IC('cards') + P.hand.length + '</span>' + dist + '<span class="cap" title="' + esc(E.CAPS[P.cap].n + ': ' + E.CAPS[P.cap].d) + '">' + esc(E.CAPS[P.cap].n.split(' ')[0]) + '</span></span>' +
-      (P.eq.length ? '<span class="opp-eq">' + eqChips(g, p) + '</span>' : '') + '<span class="opp-t">' + tags + '</span></button>';
+  function pos(k, n) { var a = Math.PI / 2 + 2 * Math.PI * k / n; return { x: 50 + 42 * Math.cos(a), y: 50 + 41 * Math.sin(a) }; }
+  var EQI = { cannoniera: 'cannon', coffa: 'range', nebbia: 'wave', polena: 'anchor', fasciame: 'barrel', cassa: 'ammo' };
+  function seat(g, p, me, k, n) {
+    var P = g.players[p], at = pos(k, n), r = roleOf(g, p), S = P.ship != null ? E.SHIPS[P.ship] : null;
+    var turn = g.phase === 'play' && g.turn === p, ask = g.phase === 'play' && g.pend && g.pend.who === p, mine = p === me;
+    var dist = '';
+    if (me >= 0 && !mine && S && g.players[me].ship != null) {
+      var d = E.distance(g, me, p), inR = d <= E.range(g, me, p);
+      dist = '<i class="dd' + (inR ? ' in' : '') + '" title="Distanza ' + d + (inR ? ': a tiro della tua nave' : ': fuori tiro') + '">' + d + '</i>';
+    }
+    var eq = P.eq.map(function (id) { return '<span class="eqm" data-act="seecard" data-id="' + id + '" title="' + esc(E.T[E.ty(id)].n) + '">' + IC(EQI[E.ty(id)] || 'cards') + '</span>'; }).join('');
+    var marks = (g.spectre && g.spectre.on === p ? '<span class="mk ghost" title="Vascello spettrale">' + IC('ghost') + '</span>' : '') + (g.gorgo && g.gorgo.at === p ? '<span class="mk gorgo" title="Il Gorgo">' + IC('gorgo') + '</span>' : '');
+    return '<div class="seat' + (turn ? ' turn' : '') + (ask ? ' ask' : '') + (mine ? ' mine' : '') + (S ? '' : ' noship') + (at.y < 35 ? ' top' : '') + '" role="button" tabindex="0" data-act="opp" data-p="' + p + '" style="left:' + at.x.toFixed(1) + '%;top:' + at.y.toFixed(1) + '%;--pc:' + pcol(g, p) + '" aria-label="' + esc(P.nick) + '">' +
+      '<span class="sav">' + ini(P.nick) + dist + marks + '</span>' +
+      '<span class="snm">' + Net.dot(P.uid) + esc(mine ? 'Tu' : P.nick) + '</span>' + ART.roleBadge(r) +
+      '<span class="ssh">' + (S ? esc(S.n) : 'senza nave') + '</span>' + (S ? ART.barrels(P.bar, E.maxBar(g, p)) : '') +
+      '<span class="smt"><span title="Carte in mano">' + IC('cards') + P.hand.length + '</span>' + coins(P.dbl) + (P.bot && g.phase !== 'over' ? '<span class="sauto">' + (P.away ? 'assente' : 'auto') + '</span>' : '') + '</span>' +
+      (eq ? '<span class="seq">' + eq + '</span>' : '') + (ask ? '<span class="sask">risponde…</span>' : turn ? '<span class="sturn">di turno</span>' : '') + '</div>';
   }
-  function opponents(g, me) {
-    var n = g.players.length, h = '', start = me >= 0 ? me + 1 : 0;
-    for (var k = 0; k < n; k++) { var p = (start + k) % n; if (p !== me) h += oppTile(g, p, me); }
-    return h;
+  // al centro: la carta di cui si parla adesso, chi l'ha giocata e contro chi
+  function lastPlay(g) {
+    for (var i = g.fx.length - 1; i >= 0; i--) { var e = g.fx[i]; if (e.k === 'turn') return null; if (e.k === 'play' && !e.resp) return e; }
+    return null;
+  }
+  function center(g, me) {
+    var c = null, txt = '', who = function (p) { return '<b class="pn-c" style="--pc:' + pcol(g, p) + '">' + esc(p === me ? 'Tu' : g.players[p].nick) + '</b>'; };
+    if (g.phase === 'over') { txt = '<b>Partita finita</b><br>' + (g.final.solo != null ? 'vince ' + who(g.final.solo) : 'vince ' + E.NAT[g.final.team]); }
+    else if (g.pend) {
+      var pd = g.pend; c = pd.card;
+      txt = who(pd.by) + (pd.by === me ? ' giochi' : ' gioca') + ' <b>' + esc(c != null ? E.T[E.ty(c)].n : pd.label) + '</b><br>' + (pd.who != null ? 'ora risponde ' + who(pd.who) : '');
+    } else if (g.step === 'spectre' && g.spectreRev != null) { c = g.spectreRev; txt = 'Vascello spettrale su ' + who(g.turn) + ': serve il simbolo <b>' + E.SYM[E.CARDS[c].s] + '</b>'; }
+    else {
+      var e = lastPlay(g);
+      if (e) { c = e.c; txt = who(e.p) + (e.p === me ? ' giochi' : ' gioca') + ' <b>' + esc(E.T[E.ty(c)].n) + '</b>' + (e.t != null && e.t !== e.p ? '<br>contro ' + who(e.t) : ''); }
+      else txt = g.step === 'ship' ? who(g.turn) + (g.turn === me ? ' scegli' : ' sceglie') + ' una nave' : g.turn === me ? '<b>Tocca a te!</b>' : 'Tocca a ' + who(g.turn);
+    }
+    var card = c != null ? '<button class="midc" data-act="seecard" data-id="' + c + '" aria-label="Leggi la carta ' + esc(E.T[E.ty(c)].n) + '">' + ART.card(c) + '<i>' + IC('eye') + '</i></button>' : '<span class="midc empty">' + ART.back() + '</span>';
+    return '<div class="tmid">' + card + '<div class="midt">' + txt + '</div><div class="midp"><span title="Carte nel mazzo">' + IC('cards') + g.deck.length + '</span><span title="Dobloni nella Clessidra">' + IC('hourglass') + g.glass + '</span></div></div>';
+  }
+  function table(g, me) {
+    var n = g.players.length, base = me >= 0 ? me : 0, h = '';
+    for (var k = 0; k < n; k++) h += seat(g, (base + k) % n, me, k, n);
+    return '<div class="felt n' + n + '">' + center(g, me) + h + '</div>';
+  }
+  // il diario: le ultime mosse, sempre visibili; quelle con una carta si toccano per leggerla
+  function feed(g, me) {
+    var L = g.log.filter(function (l) { return l.k !== 'draw' || l.c != null; }).slice(-4).reverse();
+    return '<button class="feed-all" data-act="log">' + IC('log') + ' Diario</button>' + L.map(function (l, i) {
+      var col = l.p != null && g.players[l.p] ? pcol(g, l.p) : 'rgba(242,193,78,.6)';
+      return '<div class="fl k-' + l.k + (i ? '' : ' new') + '" style="--pc:' + col + '">' + (l.c != null ? '<button class="flc" data-act="seecard" data-id="' + l.c + '" aria-label="Leggi la carta">' + ART.card(l.c) + '</button>' : '') + '<span>' + esc(l.t) + '</span></div>';
+    }).join('');
   }
 
   /* ---------- la mia plancia ---------- */
@@ -121,7 +156,7 @@ var Game = (function () {
 
   /* ---------- effetti ---------- */
   function rectOf(n) { return n ? n.getBoundingClientRect() : null; }
-  function tileOf(p) { return p === myIdx() ? document.querySelector('.gv-me') : document.querySelector('.opp[data-p="' + p + '"]'); }
+  function tileOf(p) { return document.querySelector('.seat[data-p="' + p + '"]'); }
   function floatTxt(r, txt, cls) {
     if (!r) return;
     var f = document.createElement('div'); f.className = 'floatxt ' + (cls || ''); f.innerHTML = txt; f.style.left = (r.left + r.width / 2) + 'px'; f.style.top = (r.top + Math.min(r.height / 2, 60)) + 'px';

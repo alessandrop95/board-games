@@ -109,7 +109,8 @@ var FZEngine = (function () {
   function ty(id) { return CARDS[id].t; }
   function kind(id) { return T[ty(id)].k; }
   function nick(g, p) { return g.players[p].nick; }
-  function log(g, t, k, p) { g.log.push({ n: ++g.logN, t: t, k: k || '', p: p == null ? null : p }); if (g.log.length > 120) g.log.splice(0, g.log.length - 120); }
+  var CUR = null;   // la carta di cui si sta parlando: finisce nel diario, così chiunque può aprirla
+  function log(g, t, k, p) { var e = { n: ++g.logN, t: t, k: k || '', p: p == null ? null : p }; if (CUR != null) e.c = CUR; g.log.push(e); if (g.log.length > 120) g.log.splice(0, g.log.length - 120); }
   function fx(g, e) { e.n = ++g.fxN; g.fx.push(e); if (g.fx.length > 24) g.fx.splice(0, g.fx.length - 24); }
   function cap(g, p) { return CAPS[g.players[p].cap]; }
   function isCap(g, p, a) { return g.players[p] && CAPS[g.players[p].cap].a === a; }
@@ -233,7 +234,7 @@ var FZEngine = (function () {
   /* ---------- vascello spettrale e Gorgo ---------- */
   function spectreReveal(g, p) {
     var c = topCheck(g); if (c == null) { g.step = 'ship'; return; }
-    g.spectreRev = c; g.step = 'spectre';
+    g.spectreRev = c; g.step = 'spectre'; CUR = c;
     log(g, 'Il Vascello spettrale è sulla nave di ' + nick(g, p) + ': esce ' + T[ty(c)].n + ' (' + SYM[CARDS[c].s] + ').', 'ghost', p);
     fx(g, { k: 'reveal', p: p, c: c, why: 'spectre' });
     if (!matching(g, p, CARDS[c].s).length) spectreFail(g, p);
@@ -253,6 +254,7 @@ var FZEngine = (function () {
   function spectreAnswer(g, p, id) {
     var s = CARDS[g.spectreRev].s;
     if (id != null) {
+      CUR = id;
       if (g.players[p].hand.indexOf(id) < 0 || CARDS[id].s !== s) return 'Serve una carta con il simbolo ' + SYM[s] + '.';
       log(g, nick(g, p) + ' risponde mostrando ' + T[ty(id)].n + ' (' + SYM[s] + ').', 'ghost', p);
       fx(g, { k: 'answer', p: p, c: id });
@@ -276,7 +278,7 @@ var FZEngine = (function () {
   // true se si può continuare il turno
   function gorgoCheck(g, p) {
     var c = topCheck(g); if (c == null) { g.step = 'ship'; return true; }
-    var s = CARDS[c].s, m = matching(g, p, s);
+    var s = CARDS[c].s, m = matching(g, p, s); CUR = c;
     fx(g, { k: 'reveal', p: p, c: c, why: 'gorgo' });
     if (m.length) {
       log(g, 'Il Gorgo scopre ' + T[ty(c)].n + ' (' + SYM[s] + '): ' + nick(g, p) + ' risponde con ' + T[ty(m[0])].n + '.', 'ghost', p);
@@ -415,7 +417,7 @@ var FZEngine = (function () {
       return false;
     });
   }
-  function begin(g, pd) { g.pend = pd; pump(g); }
+  function begin(g, pd) { if (CUR != null) pd.card = CUR; g.pend = pd; pump(g); }
   // passa al prossimo bersaglio finché qualcuno deve scegliere
   function pump(g) {
     var pd = g.pend;
@@ -465,7 +467,7 @@ var FZEngine = (function () {
     var pd = g.pend; if (!pd || pd.who !== p) return 'Non tocca a te rispondere.';
     if (a.a === 'take') { resolveTake(g, p); if (g.pend) pump(g); else afterPend(g); return null; }
     var id = +a.id; if (answers(g, p).indexOf(id) < 0) return 'Questa carta non serve adesso.';
-    discardHand(g, p, id);
+    discardHand(g, p, id); CUR = id;
     var x = ty(id);
     fx(g, { k: 'play', p: p, c: id, t: pd.by, resp: true });
     if (x === 'bianca') {
@@ -516,6 +518,7 @@ var FZEngine = (function () {
     if (g.turn !== p || g.step !== 'play') return 'Non puoi giocare carte adesso.';
     var P = g.players[p], id = +a.id;
     if (P.hand.indexOf(id) < 0) return 'Non hai questa carta.';
+    CUR = id;
     var t = ty(id), as = a.as === 'def' ? 'def' : a.as === 'atk' ? 'atk' : null;
     if (kind(id) === 'multi' && as === 'def') return 'La Difesa si gioca solo fuori dal tuo turno.';
     var tg = targets(g, p, id, as);
@@ -578,7 +581,9 @@ var FZEngine = (function () {
     if (!a || typeof a.a !== 'string') return 'Mossa non valida.';
     if (g.phase !== 'play') return 'La partita è finita.';
     if (!g.players[p]) return 'Non sei al tavolo.';
+    CUR = null;
     var r = doAct(g, p, a);
+    CUR = null;
     if (!r) g.seq++;
     return r;
   }
