@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Board Games</title>
 <meta name="description" content="Giochi da tavolo da giocare online con gli amici, ognuno dal proprio telefono.">
-<meta name="theme-color" content="#1d140e">
+<meta name="theme-color" content="#120d09">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -15,248 +15,419 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="pwa-sw" content="sw.js" data-scope="./">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:wght@400;700&family=Sancreek&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap">
 <style>
-:root { --bg: #1d140e; --panel: rgba(255,240,210,.05); --line: rgba(241,228,198,.14); --text: #f1e4c6; --muted: #b8a682; --brass: #d9a441; color-scheme: dark; }
+:root { --bg: #120d09; --bg2: #1a130e; --card: #1d1610; --card2: #251c15; --line: rgba(255,228,186,.09); --line2: rgba(255,228,186,.17); --text: #f6ecdc; --muted: #ab9b83; --accent: #e8ab4c; --accent2: #f6cd7d; --r: 18px; color-scheme: dark; }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse 80% 40% at 50% -5%, rgba(255,196,110,.16), transparent 70%), var(--bg); color: var(--text); font: 16px/1.5 'Old Standard TT', Georgia, serif; }
-main { max-width: 720px; margin: 0 auto; padding: calc(40px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 24px; }
-h1 { font: 400 clamp(36px, 9vw, 56px)/1 'Sancreek', Georgia, serif; margin: 0; letter-spacing: .02em; }
-p { margin: 0; color: var(--muted); }
-.game { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 16px; align-items: center; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: inherit; text-decoration: none; }
-.game:hover, .game:focus-visible { border-color: var(--brass); outline: none; }
-.game img { width: 96px; height: 96px; border-radius: 18px; display: block; }
-.game h2 { font: 400 26px/1.1 'Sancreek', Georgia, serif; margin: 0 0 4px; color: var(--text); }
-.game .meta { font-size: 14px; color: var(--brass); margin-top: 6px; }
-.install { justify-self: start; appearance: none; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; min-height: 42px; padding: 8px 18px; font: inherit; }
-.install:hover, .install:focus-visible { border-color: var(--brass); outline: none; }
-.cats { display: flex; gap: 8px; flex-wrap: wrap; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; padding: 8px 0; background: linear-gradient(var(--bg) 70%, transparent); }
-.cats a { color: var(--text); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 14px; background: var(--panel); }
-.cats a:hover, .cats a:focus-visible { border-color: var(--brass); outline: none; }
-.cat { display: grid; gap: 12px; scroll-margin-top: 64px; }
-.cat-h h2 { font: 400 28px/1.1 'Sancreek', Georgia, serif; margin: 0; color: var(--brass); }
-.cat-h p { font-size: 15px; margin-top: 2px; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1; background: radial-gradient(60% 45% at 85% -8%, rgba(232,171,76,.20), transparent 70%), radial-gradient(50% 40% at -5% 10%, rgba(169,139,236,.10), transparent 70%), radial-gradient(70% 50% at 50% 110%, rgba(79,195,161,.07), transparent 70%); }
+.wrap { width: 100%; max-width: 980px; margin: 0 auto; padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+p { margin: 0; }
+.muted, #open-tables > p { color: var(--muted); }
+
+/* intestazione */
+.top { position: sticky; top: 0; z-index: 20; padding-top: env(safe-area-inset-top, 0px); background: rgba(18,13,9,.72); -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--line); }
+.top-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font: 600 20px/1 'Fraunces', Georgia, serif; white-space: nowrap; }
+.brand img { width: 34px; height: 34px; border-radius: 9px; box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+#account-slot:empty { display: none; }
+
+/* presentazione */
+main { display: grid; gap: 28px; padding-top: 28px; padding-bottom: 40px; }
+.hero { display: grid; gap: 16px; padding: 18px 0 6px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; justify-self: start; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent2); background: rgba(232,171,76,.1); border: 1px solid rgba(232,171,76,.28); padding: 5px 11px; border-radius: 999px; }
+.hero h1 { font-size: clamp(34px, 7.4vw, 60px); line-height: 1.04; letter-spacing: -.025em; }
+.hero h1 em { font-style: italic; font-weight: 500; background: linear-gradient(100deg, var(--accent2), var(--accent) 60%, #e2725b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lead { font-size: clamp(16px, 2.3vw, 18.5px); color: #cdbfa8; max-width: 620px; }
+.stats { display: flex; flex-wrap: wrap; gap: 10px; }
+.stats div { display: grid; padding: 10px 16px; border-radius: 14px; background: rgba(255,240,215,.04); border: 1px solid var(--line); min-width: 104px; }
+.stats b { font: 600 24px/1.1 'Fraunces', Georgia, serif; color: var(--text); }
+.stats span { font-size: 13px; color: var(--muted); }
+#install-slot:empty { display: none; }
+.install { justify-self: start; appearance: none; cursor: pointer; border: 0; background: var(--accent); color: #1b1209; font: 700 15px system-ui, sans-serif; border-radius: 999px; min-height: 44px; padding: 10px 20px; box-shadow: 0 6px 20px rgba(232,171,76,.25); }
+.install:hover, .install:focus-visible { background: var(--accent2); outline: none; }
+
+/* pannelli: continua e tavoli aperti */
+.panel { display: grid; gap: 12px; padding: 18px; border-radius: var(--r); background: linear-gradient(180deg, rgba(255,240,215,.05), rgba(255,240,215,.025)); border: 1px solid var(--line); }
+.panel[hidden] { display: none; }
+.panel h2 { font-size: 21px; display: flex; align-items: center; gap: 10px; }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: #43d17c; box-shadow: 0 0 0 0 rgba(67,209,124,.6); animation: pulse 2s infinite; flex: none; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 9px rgba(67,209,124,0); } 100% { box-shadow: 0 0 0 0 rgba(67,209,124,0); } }
+.panel .ppa-home { gap: 8px; }
+.panel .ppa-row { background: rgba(0,0,0,.18); border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px 11px 14px; }
+.panel .ppa-row small { color: var(--muted); opacity: 1; }
+.panel .ppa-row a { border-color: var(--line2); padding: 8px 15px; font-weight: 600; font-size: 14.5px; }
+.panel .ppa-row a.sit { background: var(--accent); border-color: var(--accent); color: #1b1209; }
+.panel .ppa-ctl { border: 0; background: rgba(0,0,0,.18); border-radius: 14px; color: #d8cab2; }
+.panel .ppa-ctl button { border-color: var(--line2); }
+.panel .ppa-ctl button.on { background: var(--accent); border-color: var(--accent); }
+
+/* libreria */
+.lib-h { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.lib-h h2 { font-size: clamp(26px, 4.6vw, 34px); }
+.lib-h p { color: var(--muted); font-size: 15px; }
+.tools { display: flex; gap: 8px; align-items: center; flex: 1 1 280px; justify-content: flex-end; }
+.search { position: relative; flex: 1; max-width: 340px; display: block; }
+.search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.search input { width: 100%; appearance: none; font: 16px system-ui, sans-serif; color: var(--text); background: rgba(255,240,215,.05); border: 1px solid var(--line2); border-radius: 999px; min-height: 44px; padding: 9px 14px 9px 40px; }
+.search input::placeholder { color: #8c7e69; }
+.search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,171,76,.18); }
+.all { appearance: none; cursor: pointer; white-space: nowrap; font: 600 14px system-ui, sans-serif; color: var(--text); background: none; border: 1px solid var(--line2); border-radius: 999px; min-height: 44px; padding: 8px 15px; }
+.all:hover, .all:focus-visible { border-color: var(--accent); outline: none; }
+.cats { display: grid; gap: 12px; }
+.cat { border-radius: var(--r); background: var(--card); border: 1px solid var(--line); overflow: hidden; transition: border-color .2s, background .2s; scroll-margin-top: 76px; }
+.cat:hover { border-color: var(--line2); }
+.cat.open { background: linear-gradient(180deg, color-mix(in srgb, var(--c) 9%, var(--card)), var(--card) 120px); border-color: color-mix(in srgb, var(--c) 35%, transparent); }
+.cat[hidden] { display: none; }
+.cat-h { width: 100%; appearance: none; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 14px; padding: 16px 16px 16px 16px; -webkit-tap-highlight-color: transparent; }
+.cat-h:focus-visible { outline: 2px solid var(--c); outline-offset: -4px; border-radius: var(--r); }
+.cat-ic { width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 30%, transparent); }
+.cat-t { display: grid; gap: 2px; min-width: 0; }
+.cat-t b { font: 600 19px/1.2 'Fraunces', Georgia, serif; }
+.cat-t small { font-size: 14px; color: var(--muted); line-height: 1.35; }
+.cat-pv { display: flex; padding-left: 8px; }
+.cat-pv img { width: 30px; height: 30px; border-radius: 9px; margin-left: -8px; box-shadow: 0 0 0 2px var(--card); }
+.cat-n { font-size: 13px; font-weight: 600; color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.chev { color: var(--muted); display: grid; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.cat.open .chev { transform: rotate(180deg); color: var(--c); }
+.cat-b { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s cubic-bezier(.2,.8,.2,1); }
+.cat.open .cat-b { grid-template-rows: 1fr; }
+.cat-in { min-height: 0; overflow: hidden; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; padding: 0 14px 14px; }
+.game { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; align-items: start; padding: 14px; border-radius: 15px; background: rgba(0,0,0,.2); border: 1px solid var(--line); color: inherit; text-decoration: none; transition: transform .15s, border-color .15s, background .15s; }
+.game:hover, .game:focus-visible { border-color: color-mix(in srgb, var(--c) 60%, transparent); background: rgba(0,0,0,.28); outline: none; transform: translateY(-1px); }
+.game:active { transform: scale(.99); }
+.game img { width: 72px; height: 72px; border-radius: 16px; display: block; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+.gi { display: grid; gap: 5px; min-width: 0; }
+.game h3 { font-size: 18.5px; line-height: 1.2; color: var(--text); }
+.game p { font-size: 14px; line-height: 1.45; color: #c2b39b; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.tags span { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: #dccdb4; background: rgba(255,240,215,.06); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; }
+.tags svg { color: var(--c); }
+.game[hidden] { display: none; }
+.empty { text-align: center; color: var(--muted); padding: 24px; border: 1px dashed var(--line2); border-radius: var(--r); }
+.empty[hidden] { display: none; }
+footer { border-top: 1px solid var(--line); color: #7f725f; font-size: 13.5px; padding-top: 20px; padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; }
+@media (max-width: 640px) {
+  main { gap: 22px; padding-top: 18px; }
+  .cat-h { grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; padding: 14px; }
+  .cat-pv, .cat-n { display: none; }
+  .cat-ic { width: 44px; height: 44px; border-radius: 13px; }
+  .cat-t b { font-size: 17.5px; }
+  .cat-t small { font-size: 13px; }
+  .grid { grid-template-columns: minmax(0, 1fr); padding: 0 10px 10px; gap: 8px; }
+  .game { grid-template-columns: 60px minmax(0, 1fr); padding: 12px; gap: 12px; }
+  .game img { width: 60px; height: 60px; border-radius: 14px; }
+  .panel { padding: 14px; }
+  .tools { flex-basis: 100%; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .stats div { min-width: 0; padding: 9px 10px; }
+  .stats b { font-size: 20px; }
+  .stats span { font-size: 12px; }
+  .search { max-width: none; }
+}
+@media (max-width: 330px) { .brand span { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
-<main>
-  <header><h1>Board Games</h1></header>
-  <p>Giochi da tavolo da fare online con gli amici, ognuno dal proprio telefono. Crea un account gratuito, apri un tavolo e manda il link o invita gli amici.</p>
-  <div id="install-slot"></div>
-  <section style="display:grid;gap:10px" hidden>
-    <h2 style="font:400 24px/1.1 'Sancreek',Georgia,serif;margin:0">Continua la partita</h2>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="./"><img src="icon.svg" alt="" width="34" height="34"><span>Board Games</span></a>
+    <div id="account-slot"></div>
+  </div>
+</header>
+<main class="wrap">
+  <section class="hero">
+    <span class="eyebrow">Giochi da tavolo online</span>
+    <h1>Il tavolo da gioco<br><em>che sta in tasca.</em></h1>
+    <p class="lead">Giochi da fare con gli amici, ognuno dal proprio telefono, nella stessa stanza o a distanza. Crea un account gratuito, apri un tavolo e manda il link o invita gli amici.</p>
+    <div class="stats"><div><b>24</b><span>giochi</span></div><div><b>6</b><span>categorie</span></div><div><b>2–12</b><span>giocatori</span></div><div><b>0 €</b><span>sempre gratis</span></div></div>
+    <div id="install-slot"></div>
+  </section>
+  <section class="panel" hidden>
+    <h2>Continua la partita</h2>
     <div id="continue-slot"></div>
   </section>
-  <section style="display:grid;gap:10px">
-    <h2 style="font:400 24px/1.1 'Sancreek',Georgia,serif;margin:0">Tavoli aperti adesso</h2>
+  <section class="panel">
+    <h2><span class="pulse" aria-hidden="true"></span>Tavoli aperti adesso</h2>
     <div id="open-tables"><p>Cerco i tavoli aperti…</p></div>
-    <div id="account-slot"></div>
     <div id="alerts-slot"></div>
   </section>
-  <nav class="cats" aria-label="Categorie"><a href="#parole">Parole e feste a squadre</a><a href="#italiane">Carte italiane</a><a href="#famiglia">Carte veloci per tutti</a><a href="#bluff">Bluff e ruoli segreti</a><a href="#strategia">Strategia da tavolo</a><a href="#coop">Avventure cooperative</a></nav>
-  <section class="cat" id="parole">
-    <div class="cat-h"><h2>Parole e feste a squadre</h2><p>Per gruppi grandi, anche a distanza: si gioca a squadre, ognuno dal proprio telefono.</p></div>
-    <a class="game" href="nomicose/">
-      <img src="nomicose/icon-180.png" alt="">
-      <div>
-        <h2>Nomi, cose, città</h2>
-        <p>Esce una lettera e con la tua squadra riempite insieme il foglio: nome, cosa, città, animale… ognuno dal proprio telefono, anche a distanza. Le parole che nessun altro ha scritto valgono di più.</p>
-        <div class="meta">2–12 giocatori · a squadre · 15–25 minuti</div>
+  <section class="library" aria-labelledby="lib-t">
+    <div class="lib-h">
+      <div><h2 id="lib-t">Tutti i giochi</h2><p>Tocca una categoria per vedere i giochi che contiene.</p></div>
+      <div class="tools">
+        <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" id="q" placeholder="Cerca un gioco…" autocomplete="off" enterkeyhint="search" aria-label="Cerca un gioco"></label>
+        <button class="all" type="button">Apri tutte</button>
       </div>
-    </a>
-    <a class="game" href="disegna/">
-      <img src="disegna/icon-180.png" alt="">
-      <div>
-        <h2>Disegna e indovina</h2>
-        <p>A turno uno disegna con il dito e i compagni indovinano la parola, mentre gli avversari guardano il disegno in diretta pronti a rubarla. Si gioca anche a distanza.</p>
-        <div class="meta">4–12 giocatori · a squadre · 15–30 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="sintonia/">
-      <img src="sintonia/icon-180.png" alt="">
-      <div>
-        <h2>Sintonia</h2>
-        <p>Esce un tema («Un frutto rosso») e ognuno scrive di nascosto la prima cosa che gli viene in mente: la squadra fa punti quando i compagni scrivono la stessa parola. Vietato mettersi d’accordo!</p>
-        <div class="meta">3–12 giocatori · a squadre · 10–15 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="fune/">
-      <img src="fune/icon-180.png" alt="">
-      <div>
-        <h2>Tiro alla fune</h2>
-        <p>Una griglia di lettere uguale per tutti: trova parole con lettere vicine e ogni parola tira la corda verso la tua squadra, in diretta. Più è lunga, più tira!</p>
-        <div class="meta">2–12 giocatori · due squadre · 5–15 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="conquista/">
-      <img src="conquista/icon-180.png" alt="">
-      <div>
-        <h2>Conquista l’Italia</h2>
-        <p>Domande di cultura generale e stime: chi risponde giusto per primo conquista una regione per la sua squadra. Finite le regioni libere, si strappano quelle degli avversari!</p>
-        <div class="meta">2–12 giocatori · a squadre · 10–20 minuti</div>
-      </div>
-    </a>
-  </section>
-  <section class="cat" id="italiane">
-    <div class="cat-h"><h2>Carte italiane</h2><p>I classici da tavola di casa, uno contro uno o in coppia.</p></div>
-    <a class="game" href="briscola/">
-      <img src="briscola/icon-180.png" alt="">
-      <div>
-        <h2>Briscola</h2>
-        <p>Il classico con le carte italiane: asso, tre, re, cavallo e fante. Uno contro uno o due contro due, con i segni al compagno che gli avversari non vedono.</p>
-        <div class="meta">2 o 4 giocatori · a coppie · 5–15 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="scopa/">
-      <img src="scopa/icon-180.png" alt="">
-      <div>
-        <h2>Scopa</h2>
-        <p>Prendi le carte dalla tavola, fai scopa e conquista settebello, denari e primiera. Uno contro uno o due contro due, anche a Scopone scientifico.</p>
-        <div class="meta">2 o 4 giocatori · a coppie · 15–30 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="burraco/">
-      <img src="burraco/icon-180.png" alt="">
-      <div>
-        <h2>Burraco</h2>
-        <p>Scale, tris, pinelle e jolly: cala le combinazioni con il tuo compagno, fai burraco, prendi il pozzetto e chiudi. Uno contro uno o due contro due.</p>
-        <div class="meta">2 o 4 giocatori · a coppie · 30–60 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="machiavelli/">
-      <img src="machiavelli/icon-180.png" alt="">
-      <div>
-        <h2>Machiavelli</h2>
-        <p>Il gioco di carte italiano in cui il tavolo è di tutti: cala tris, poker e scale, smonta e rimonta le combinazioni e liberati per primo delle carte.</p>
-        <div class="meta">2–5 giocatori · 15–40 minuti</div>
-      </div>
-    </a>
-  </section>
-  <section class="cat" id="famiglia">
-    <div class="cat-h"><h2>Carte veloci per tutti</h2><p>Partite brevi, regole che si imparano in un minuto.</p></div>
-    <a class="game" href="skyjo/">
-      <img src="skyjo/icon-180.png" alt="">
-      <div>
-        <h2>Skyjo</h2>
-        <p>Dodici carte coperte a testa: scambiale, scoprile, fai sparire le colonne di tre carte uguali e chiudi la manche con meno punti di tutti. Con le varianti Skyjo Action (stelle e carte Azione) ed eliminazione.</p>
-        <div class="meta">2–8 giocatori · 20–45 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="flip7/">
-      <img src="flip7/icon-180.png" alt="">
-      <div>
-        <h2>Flip 7</h2>
-        <p>Pesca carte una alla volta e fermati prima del doppione: sette numeri diversi valgono il Flip 7. Congela gli amici o costringili a rischiare con le azioni a sorpresa.</p>
-        <div class="meta">2–8 giocatori · 15–30 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="nograzie/">
-      <img src="nograzie/icon-180.png" alt="">
-      <div>
-        <h2>No Grazie!</h2>
-        <p>Una carta alla volta: la prendi o paghi un gettone e dici «No grazie!». Le carte in scala contano solo per la più bassa e chi prende la carta si porta via anche i gettoni.</p>
-        <div class="meta">3–7 giocatori · 10–20 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="prendi6/">
-      <img src="prendi6/icon-180.png" alt="">
-      <div>
-        <h2>Prendi 6!</h2>
-        <p>Tutti insieme giocate una carta e le carte si mettono in fila dalla più bassa: chi mette la sesta in una fila se la prende, con tutte le sue teste di toro. Fino a 10 giocatori!</p>
-        <div class="meta">2–10 giocatori · 20–45 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="sushigo/">
-      <img src="sushigo/icon-180.png" alt="">
-      <div>
-        <h2>Sushi Go!</h2>
-        <p>Tutti insieme scegliete una carta e passate la mano al vicino: tris di sashimi, coppie di tempura, gyoza, maki e nigiri sul wasabi. Tre manche veloci, senza mai aspettare il proprio turno.</p>
-        <div class="meta">2–5 giocatori · 15–20 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="cabo/">
-      <img src="cabo/icon-180.png" alt="">
-      <div>
-        <h2>Cabo</h2>
-        <p>Quattro carte coperte e ne conosci solo due: ricordale, sbircia, spia gli altri, scambia le carte e chiama «Cabo» quando pensi di avere meno punti di tutti.</p>
-        <div class="meta">2–6 giocatori · 20–40 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="gattomina/">
-      <img src="gattomina/icon-180.png" alt="">
-      <div>
-        <h2>Exploding Kittens</h2>
-        <p>Gioco di carte esplosivo: pesca senza far scoppiare la Gattomina, soffia sulle mosse altrui e resta l’ultimo intero.</p>
-        <div class="meta">2–5 giocatori · 10–20 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="presagio/">
-      <img src="presagio/icon-180.png" alt="">
-      <div>
-        <h2>Wizard</h2>
-        <p>Gioco di carte a prese: prevedi quante ne farai, poi fanne esattamente quelle. Con Arcimaghi e Giullari.</p>
-        <div class="meta">3–6 giocatori · 30–60 minuti</div>
-      </div>
-    </a>
-  </section>
-  <section class="cat" id="bluff">
-    <div class="cat-h"><h2>Bluff e ruoli segreti</h2><p>Chi sta mentendo? Personaggi nascosti e alleanze.</p></div>
-    <a class="game" href="polvere-e-piombo/">
-      <img src="polvere-e-piombo/icon-180.png" alt="">
-      <div>
-        <h2>Bang!</h2>
-        <p>Gioco di carte western a ruoli segreti: Sceriffo, Vice, Fuorilegge e Rinnegato. Con Dodge City e gli eventi di Mezzogiorno di Fuoco e Per un Pugno di Carte.</p>
-        <div class="meta">4–8 giocatori · 20–40 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="citadels/">
-      <img src="citadels/icon-180.png" alt="">
-      <div>
-        <h2>Citadels</h2>
-        <p>Ogni round scegli in segreto un personaggio: Assassino, Ladro, Re, Mercante… Raccogli oro, costruisci i quartieri e manda all’aria i piani degli altri. Vince la città più ricca.</p>
-        <div class="meta">4–7 giocatori · 40–70 minuti</div>
-      </div>
-    </a>
-  </section>
-  <section class="cat" id="strategia">
-    <div class="cat-h"><h2>Strategia da tavolo</h2><p>Mappe, risorse e partite più lunghe.</p></div>
-    <a class="game" href="catan/">
-      <img src="catan/icon-180.png" alt="">
-      <div>
-        <h2>Catan</h2>
-        <p>Coloni su un’isola da scoprire: raccogli legname, argilla, lana, grano e minerale, commercia e costruisci strade, colonie e città.</p>
-        <div class="meta">3–4 giocatori · 60–90 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="binari-italia/">
-      <img src="binari-italia/icon-180.png" alt="">
-      <div>
-        <h2>Ticket to Ride Italy</h2>
-        <p>Treni sulla mappa d’Italia: conquista le tratte, attraversa il mare con le carte Traghetto, raggiungi i Paesi confinanti e unisci più regioni possibili.</p>
-        <div class="meta">2–5 giocatori · 30–60 minuti</div>
-      </div>
-    </a>
-    <a class="game" href="campi-acciaio/">
-      <img src="campi-acciaio/icon-180.png" alt="">
-      <div>
-        <h2>Scythe</h2>
-        <p>Strategia dieselpunk: cinque fazioni con mech e personaggi si contendono le campagne intorno a una vecchia Fabbrica.</p>
-        <div class="meta">2–5 giocatori · 60–120 minuti</div>
-      </div>
-    </a>
-  </section>
-  <section class="cat" id="coop">
-    <div class="cat-h"><h2>Avventure cooperative</h2><p>Tutti insieme contro il gioco.</p></div>
-    <a class="game" href="unlock/">
-      <img src="unlock/icon-180.png" alt="">
-      <div>
-        <h2>Unlock!</h2>
-        <p>Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate codici e fate funzionare le macchine prima che scada il tempo.</p>
-        <div class="meta">1–6 giocatori · 10–60 minuti</div>
-      </div>
-    </a>
+    </div>
+    <div class="cats">
+    <section class="cat" id="parole" style="--c:#4fc3a1">
+      <button class="cat-h" type="button" aria-expanded="false" aria-controls="b-parole">
+        <span class="cat-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h9A2.5 2.5 0 0 1 17 6.5v5a2.5 2.5 0 0 1-2.5 2.5H9l-4 3.2V14h0a2.5 2.5 0 0 1-2-2.5z"/><path d="M17 8.5h1.5A2.5 2.5 0 0 1 21 11v5a2.5 2.5 0 0 1-2 2.45V21l-3.6-2.5H12a2.5 2.5 0 0 1-2.4-1.8"/></svg></span>
+        <span class="cat-t"><b>Parole e feste a squadre</b><small>Per gruppi grandi, anche a distanza: ognuno gioca dal proprio telefono.</small></span>
+        <span class="cat-pv" aria-hidden="true"><img src="nomicose/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="disegna/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="sintonia/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="fune/icon-180.png" alt="" width="30" height="30" loading="lazy"></span>
+        <span class="cat-n">5 giochi</span>
+        <span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="cat-b" id="b-parole"><div class="cat-in"><div class="grid">
+        <a class="game" href="nomicose/" data-meta="2–12 giocatori · a squadre · 15–25 minuti" data-q="nomi, cose, citta esce una lettera e con la tua squadra riempite insieme il foglio: nome, cosa, citta, animale… ognuno dal proprio telefono, anche a distanza. le parole che nessun altro ha scritto valgono di piu. 2–12 giocatori · a squadre · 15–25 minuti">
+          <img src="nomicose/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Nomi, cose, città</h3>
+            <p>Esce una lettera e con la tua squadra riempite insieme il foglio: nome, cosa, città, animale… ognuno dal proprio telefono, anche a distanza. Le parole che nessun altro ha scritto valgono di più.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–12</span><span>a squadre</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>15–25 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="disegna/" data-meta="4–12 giocatori · a squadre · 15–30 minuti" data-q="disegna e indovina a turno uno disegna con il dito e i compagni indovinano la parola, mentre gli avversari guardano il disegno in diretta pronti a rubarla. si gioca anche a distanza. 4–12 giocatori · a squadre · 15–30 minuti">
+          <img src="disegna/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Disegna e indovina</h3>
+            <p>A turno uno disegna con il dito e i compagni indovinano la parola, mentre gli avversari guardano il disegno in diretta pronti a rubarla. Si gioca anche a distanza.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>4–12</span><span>a squadre</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>15–30 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="sintonia/" data-meta="3–12 giocatori · a squadre · 10–15 minuti" data-q="sintonia esce un tema («un frutto rosso») e ognuno scrive di nascosto la prima cosa che gli viene in mente: la squadra fa punti quando i compagni scrivono la stessa parola. vietato mettersi d&#x27;accordo! 3–12 giocatori · a squadre · 10–15 minuti">
+          <img src="sintonia/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Sintonia</h3>
+            <p>Esce un tema («Un frutto rosso») e ognuno scrive di nascosto la prima cosa che gli viene in mente: la squadra fa punti quando i compagni scrivono la stessa parola. Vietato mettersi d’accordo!</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>3–12</span><span>a squadre</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>10–15 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="fune/" data-meta="2–12 giocatori · due squadre · 5–15 minuti" data-q="tiro alla fune una griglia di lettere uguale per tutti: trova parole con lettere vicine e ogni parola tira la corda verso la tua squadra, in diretta. piu e lunga, piu tira! 2–12 giocatori · due squadre · 5–15 minuti">
+          <img src="fune/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Tiro alla fune</h3>
+            <p>Una griglia di lettere uguale per tutti: trova parole con lettere vicine e ogni parola tira la corda verso la tua squadra, in diretta. Più è lunga, più tira!</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–12</span><span>due squadre</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>5–15 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="conquista/" data-meta="2–12 giocatori · a squadre · 10–20 minuti" data-q="conquista l&#x27;italia domande di cultura generale e stime: chi risponde giusto per primo conquista una regione per la sua squadra. finite le regioni libere, si strappano quelle degli avversari! 2–12 giocatori · a squadre · 10–20 minuti">
+          <img src="conquista/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Conquista l’Italia</h3>
+            <p>Domande di cultura generale e stime: chi risponde giusto per primo conquista una regione per la sua squadra. Finite le regioni libere, si strappano quelle degli avversari!</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–12</span><span>a squadre</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>10–20 min</span></div>
+          </div>
+        </a>
+      </div></div></div>
+    </section>
+    <section class="cat" id="italiane" style="--c:#e2725b">
+      <button class="cat-h" type="button" aria-expanded="false" aria-controls="b-italiane">
+        <span class="cat-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="10" height="15" rx="2" transform="rotate(-10 8.5 12.5)"/><rect x="10.5" y="4" width="10" height="15" rx="2" transform="rotate(8 15.5 11.5)"/><path d="m15.6 9.2.9 1.8 1.9.3-1.4 1.3.3 1.9-1.7-.9-1.7.9.3-1.9-1.4-1.3 1.9-.3z"/></svg></span>
+        <span class="cat-t"><b>Carte italiane</b><small>I classici di casa, uno contro uno o in coppia.</small></span>
+        <span class="cat-pv" aria-hidden="true"><img src="briscola/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="scopa/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="burraco/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="machiavelli/icon-180.png" alt="" width="30" height="30" loading="lazy"></span>
+        <span class="cat-n">4 giochi</span>
+        <span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="cat-b" id="b-italiane"><div class="cat-in"><div class="grid">
+        <a class="game" href="briscola/" data-meta="2 o 4 giocatori · a coppie · 5–15 minuti" data-q="briscola il classico con le carte italiane: asso, tre, re, cavallo e fante. uno contro uno o due contro due, con i segni al compagno che gli avversari non vedono. 2 o 4 giocatori · a coppie · 5–15 minuti">
+          <img src="briscola/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Briscola</h3>
+            <p>Il classico con le carte italiane: asso, tre, re, cavallo e fante. Uno contro uno o due contro due, con i segni al compagno che gli avversari non vedono.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2 o 4</span><span>a coppie</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>5–15 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="scopa/" data-meta="2 o 4 giocatori · a coppie · 15–30 minuti" data-q="scopa prendi le carte dalla tavola, fai scopa e conquista settebello, denari e primiera. uno contro uno o due contro due, anche a scopone scientifico. 2 o 4 giocatori · a coppie · 15–30 minuti">
+          <img src="scopa/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Scopa</h3>
+            <p>Prendi le carte dalla tavola, fai scopa e conquista settebello, denari e primiera. Uno contro uno o due contro due, anche a Scopone scientifico.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2 o 4</span><span>a coppie</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>15–30 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="burraco/" data-meta="2 o 4 giocatori · a coppie · 30–60 minuti" data-q="burraco scale, tris, pinelle e jolly: cala le combinazioni con il tuo compagno, fai burraco, prendi il pozzetto e chiudi. uno contro uno o due contro due. 2 o 4 giocatori · a coppie · 30–60 minuti">
+          <img src="burraco/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Burraco</h3>
+            <p>Scale, tris, pinelle e jolly: cala le combinazioni con il tuo compagno, fai burraco, prendi il pozzetto e chiudi. Uno contro uno o due contro due.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2 o 4</span><span>a coppie</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>30–60 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="machiavelli/" data-meta="2–5 giocatori · 15–40 minuti" data-q="machiavelli il gioco di carte italiano in cui il tavolo e di tutti: cala tris, poker e scale, smonta e rimonta le combinazioni e liberati per primo delle carte. 2–5 giocatori · 15–40 minuti">
+          <img src="machiavelli/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Machiavelli</h3>
+            <p>Il gioco di carte italiano in cui il tavolo è di tutti: cala tris, poker e scale, smonta e rimonta le combinazioni e liberati per primo delle carte.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–5</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>15–40 min</span></div>
+          </div>
+        </a>
+      </div></div></div>
+    </section>
+    <section class="cat" id="famiglia" style="--c:#e9b949">
+      <button class="cat-h" type="button" aria-expanded="false" aria-controls="b-famiglia">
+        <span class="cat-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2.5 4.5 13.6h6.6l-1.3 7.9 8.7-11.1h-6.6z"/></svg></span>
+        <span class="cat-t"><b>Carte veloci per tutti</b><small>Partite brevi, regole che si imparano in un minuto.</small></span>
+        <span class="cat-pv" aria-hidden="true"><img src="skyjo/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="flip7/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="nograzie/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="prendi6/icon-180.png" alt="" width="30" height="30" loading="lazy"></span>
+        <span class="cat-n">8 giochi</span>
+        <span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="cat-b" id="b-famiglia"><div class="cat-in"><div class="grid">
+        <a class="game" href="skyjo/" data-meta="2–8 giocatori · 20–45 minuti" data-q="skyjo dodici carte coperte a testa: scambiale, scoprile, fai sparire le colonne di tre carte uguali e chiudi la manche con meno punti di tutti. con le varianti skyjo action (stelle e carte azione) ed eliminazione. 2–8 giocatori · 20–45 minuti">
+          <img src="skyjo/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Skyjo</h3>
+            <p>Dodici carte coperte a testa: scambiale, scoprile, fai sparire le colonne di tre carte uguali e chiudi la manche con meno punti di tutti. Con le varianti Skyjo Action (stelle e carte Azione) ed eliminazione.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–8</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>20–45 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="flip7/" data-meta="2–8 giocatori · 15–30 minuti" data-q="flip 7 pesca carte una alla volta e fermati prima del doppione: sette numeri diversi valgono il flip 7. congela gli amici o costringili a rischiare con le azioni a sorpresa. 2–8 giocatori · 15–30 minuti">
+          <img src="flip7/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Flip 7</h3>
+            <p>Pesca carte una alla volta e fermati prima del doppione: sette numeri diversi valgono il Flip 7. Congela gli amici o costringili a rischiare con le azioni a sorpresa.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–8</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>15–30 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="nograzie/" data-meta="3–7 giocatori · 10–20 minuti" data-q="no grazie! una carta alla volta: la prendi o paghi un gettone e dici «no grazie!». le carte in scala contano solo per la piu bassa e chi prende la carta si porta via anche i gettoni. 3–7 giocatori · 10–20 minuti">
+          <img src="nograzie/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>No Grazie!</h3>
+            <p>Una carta alla volta: la prendi o paghi un gettone e dici «No grazie!». Le carte in scala contano solo per la più bassa e chi prende la carta si porta via anche i gettoni.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>3–7</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>10–20 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="prendi6/" data-meta="2–10 giocatori · 20–45 minuti" data-q="prendi 6! tutti insieme giocate una carta e le carte si mettono in fila dalla piu bassa: chi mette la sesta in una fila se la prende, con tutte le sue teste di toro. fino a 10 giocatori! 2–10 giocatori · 20–45 minuti">
+          <img src="prendi6/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Prendi 6!</h3>
+            <p>Tutti insieme giocate una carta e le carte si mettono in fila dalla più bassa: chi mette la sesta in una fila se la prende, con tutte le sue teste di toro. Fino a 10 giocatori!</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–10</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>20–45 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="sushigo/" data-meta="2–5 giocatori · 15–20 minuti" data-q="sushi go! tutti insieme scegliete una carta e passate la mano al vicino: tris di sashimi, coppie di tempura, gyoza, maki e nigiri sul wasabi. tre manche veloci, senza mai aspettare il proprio turno. 2–5 giocatori · 15–20 minuti">
+          <img src="sushigo/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Sushi Go!</h3>
+            <p>Tutti insieme scegliete una carta e passate la mano al vicino: tris di sashimi, coppie di tempura, gyoza, maki e nigiri sul wasabi. Tre manche veloci, senza mai aspettare il proprio turno.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–5</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>15–20 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="cabo/" data-meta="2–6 giocatori · 20–40 minuti" data-q="cabo quattro carte coperte e ne conosci solo due: ricordale, sbircia, spia gli altri, scambia le carte e chiama «cabo» quando pensi di avere meno punti di tutti. 2–6 giocatori · 20–40 minuti">
+          <img src="cabo/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Cabo</h3>
+            <p>Quattro carte coperte e ne conosci solo due: ricordale, sbircia, spia gli altri, scambia le carte e chiama «Cabo» quando pensi di avere meno punti di tutti.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–6</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>20–40 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="gattomina/" data-meta="2–5 giocatori · 10–20 minuti" data-q="exploding kittens gioco di carte esplosivo: pesca senza far scoppiare la gattomina, soffia sulle mosse altrui e resta l&#x27;ultimo intero. 2–5 giocatori · 10–20 minuti">
+          <img src="gattomina/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Exploding Kittens</h3>
+            <p>Gioco di carte esplosivo: pesca senza far scoppiare la Gattomina, soffia sulle mosse altrui e resta l’ultimo intero.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–5</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>10–20 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="presagio/" data-meta="3–6 giocatori · 30–60 minuti" data-q="wizard gioco di carte a prese: prevedi quante ne farai, poi fanne esattamente quelle. con arcimaghi e giullari. 3–6 giocatori · 30–60 minuti">
+          <img src="presagio/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Wizard</h3>
+            <p>Gioco di carte a prese: prevedi quante ne farai, poi fanne esattamente quelle. Con Arcimaghi e Giullari.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>3–6</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>30–60 min</span></div>
+          </div>
+        </a>
+      </div></div></div>
+    </section>
+    <section class="cat" id="bluff" style="--c:#a98bec">
+      <button class="cat-h" type="button" aria-expanded="false" aria-controls="b-bluff">
+        <span class="cat-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.2c3 1.2 6 1.2 9 0s6-1.2 9 0c0 7.2-3.5 12.3-9 12.3S3 13.4 3 6.2z"/><path d="M6.6 10.6c1.1-.9 2.5-.9 3.6 0M13.8 10.6c1.1-.9 2.5-.9 3.6 0M9.6 14.6c1.5.8 3.3.8 4.8 0"/></svg></span>
+        <span class="cat-t"><b>Bluff e ruoli segreti</b><small>Chi sta mentendo? Personaggi nascosti e alleanze.</small></span>
+        <span class="cat-pv" aria-hidden="true"><img src="polvere-e-piombo/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="forziere/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="citadels/icon-180.png" alt="" width="30" height="30" loading="lazy"></span>
+        <span class="cat-n">3 giochi</span>
+        <span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="cat-b" id="b-bluff"><div class="cat-in"><div class="grid">
+        <a class="game" href="polvere-e-piombo/" data-meta="4–8 giocatori · 20–40 minuti" data-q="bang! gioco di carte western a ruoli segreti: sceriffo, vice, fuorilegge e rinnegato. con dodge city e gli eventi di mezzogiorno di fuoco e per un pugno di carte. 4–8 giocatori · 20–40 minuti">
+          <img src="polvere-e-piombo/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Bang!</h3>
+            <p>Gioco di carte western a ruoli segreti: Sceriffo, Vice, Fuorilegge e Rinnegato. Con Dodge City e gli eventi di Mezzogiorno di Fuoco e Per un Pugno di Carte.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>4–8</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>20–40 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="forziere/" data-meta="4–8 giocatori · ruoli segreti · 30–60 minuti" data-q="il forziere maledetto levante contro ponente, con un pirata o due corsari nascosti tra i capitani: prendi il comando di una nave, spara bordate e porta il forziere verso la tua bandiera. ma di chi ti puoi fidare? 4–8 giocatori · ruoli segreti · 30–60 minuti">
+          <img src="forziere/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Il Forziere Maledetto</h3>
+            <p>Levante contro Ponente, con un Pirata o due Corsari nascosti tra i capitani: prendi il comando di una nave, spara bordate e porta il Forziere verso la tua bandiera. Ma di chi ti puoi fidare?</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>4–8</span><span>ruoli segreti</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>30–60 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="citadels/" data-meta="4–7 giocatori · 40–70 minuti" data-q="citadels ogni round scegli in segreto un personaggio: assassino, ladro, re, mercante… raccogli oro, costruisci i quartieri e manda all&#x27;aria i piani degli altri. vince la citta piu ricca. 4–7 giocatori · 40–70 minuti">
+          <img src="citadels/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Citadels</h3>
+            <p>Ogni round scegli in segreto un personaggio: Assassino, Ladro, Re, Mercante… Raccogli oro, costruisci i quartieri e manda all’aria i piani degli altri. Vince la città più ricca.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>4–7</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>40–70 min</span></div>
+          </div>
+        </a>
+      </div></div></div>
+    </section>
+    <section class="cat" id="strategia" style="--c:#68a6ea">
+      <button class="cat-h" type="button" aria-expanded="false" aria-controls="b-strategia">
+        <span class="cat-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6.2v14L9 18l6 2.2 6-2.2V4l-6 2.2z"/><path d="M9 4v14M15 6.2v14"/></svg></span>
+        <span class="cat-t"><b>Strategia da tavolo</b><small>Mappe, risorse e partite più lunghe.</small></span>
+        <span class="cat-pv" aria-hidden="true"><img src="catan/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="binari-italia/icon-180.png" alt="" width="30" height="30" loading="lazy"><img src="campi-acciaio/icon-180.png" alt="" width="30" height="30" loading="lazy"></span>
+        <span class="cat-n">3 giochi</span>
+        <span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="cat-b" id="b-strategia"><div class="cat-in"><div class="grid">
+        <a class="game" href="catan/" data-meta="3–4 giocatori · 60–90 minuti" data-q="catan coloni su un&#x27;isola da scoprire: raccogli legname, argilla, lana, grano e minerale, commercia e costruisci strade, colonie e citta. 3–4 giocatori · 60–90 minuti">
+          <img src="catan/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Catan</h3>
+            <p>Coloni su un’isola da scoprire: raccogli legname, argilla, lana, grano e minerale, commercia e costruisci strade, colonie e città.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>3–4</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>60–90 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="binari-italia/" data-meta="2–5 giocatori · 30–60 minuti" data-q="ticket to ride italy treni sulla mappa d&#x27;italia: conquista le tratte, attraversa il mare con le carte traghetto, raggiungi i paesi confinanti e unisci piu regioni possibili. 2–5 giocatori · 30–60 minuti">
+          <img src="binari-italia/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Ticket to Ride Italy</h3>
+            <p>Treni sulla mappa d’Italia: conquista le tratte, attraversa il mare con le carte Traghetto, raggiungi i Paesi confinanti e unisci più regioni possibili.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–5</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>30–60 min</span></div>
+          </div>
+        </a>
+        <a class="game" href="campi-acciaio/" data-meta="2–5 giocatori · 60–120 minuti" data-q="scythe strategia dieselpunk: cinque fazioni con mech e personaggi si contendono le campagne intorno a una vecchia fabbrica. 2–5 giocatori · 60–120 minuti">
+          <img src="campi-acciaio/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Scythe</h3>
+            <p>Strategia dieselpunk: cinque fazioni con mech e personaggi si contendono le campagne intorno a una vecchia Fabbrica.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>2–5</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>60–120 min</span></div>
+          </div>
+        </a>
+      </div></div></div>
+    </section>
+    <section class="cat" id="coop" style="--c:#ec8fbf">
+      <button class="cat-h" type="button" aria-expanded="false" aria-controls="b-coop">
+        <span class="cat-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/><path d="M2.8 20c0-3.4 2.6-6 5.7-6s5.7 2.6 5.7 6M15 14.3c3.2-.2 6.2 1.9 6.2 5.7"/></svg></span>
+        <span class="cat-t"><b>Avventure cooperative</b><small>Tutti insieme contro il gioco.</small></span>
+        <span class="cat-pv" aria-hidden="true"><img src="unlock/icon-180.png" alt="" width="30" height="30" loading="lazy"></span>
+        <span class="cat-n">1 gioco</span>
+        <span class="chev"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="cat-b" id="b-coop"><div class="cat-in"><div class="grid">
+        <a class="game" href="unlock/" data-meta="1–6 giocatori · 10–60 minuti" data-q="unlock! escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate codici e fate funzionare le macchine prima che scada il tempo. 1–6 giocatori · 10–60 minuti">
+          <img src="unlock/icon-180.png" alt="" width="72" height="72" loading="lazy">
+          <div class="gi">
+            <h3>Unlock!</h3>
+            <p>Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate codici e fate funzionare le macchine prima che scada il tempo.</p>
+            <div class="tags"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/></svg>1–6</span><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>10–60 min</span></div>
+          </div>
+        </a>
+      </div></div></div>
+    </section>
+    </div>
+    <p class="empty" hidden>Nessun gioco trovato: prova con un’altra parola.</p>
   </section>
 </main>
+<footer class="wrap"><span>Board Games · giochi da tavolo tra amici</span><span>Funziona nel browser, anche sul telefono</span></footer>
 <script src="src/shared/install.js"></script>
 <script>function paintInstall() { document.getElementById('install-slot').innerHTML = PWA.buttonHTML('install'); } paintInstall(); PWA.onChange(paintInstall);</script>
 <script src="src/shared/net.js"></script>
@@ -265,6 +436,40 @@ p { margin: 0; color: var(--muted); }
 <script>
 function paintSlots() { document.getElementById('account-slot').innerHTML = Account.chipHTML(); document.getElementById('alerts-slot').innerHTML = Alerts.controlHTML(); }
 paintSlots(); Account.ready.then(paintSlots); Alerts.mountHome(document.getElementById('open-tables')); Alerts.mountContinue(document.getElementById('continue-slot'));
+</script>
+<script>/* home-js */
+(function () {
+  var KEY = 'home-open', cats = [].slice.call(document.querySelectorAll('.cat')), q = document.getElementById('q'), all = document.querySelector('.all'), empty = document.querySelector('.empty');
+  var saved = []; try { saved = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) {}
+  function set(c, on) { c.classList.toggle('open', on); c.querySelector('.cat-h').setAttribute('aria-expanded', String(on)); var b = c.querySelector('.cat-b'); b.inert = !on; if (!on) b.setAttribute('inert', ''); else b.removeAttribute('inert'); }
+  function persist() { saved = cats.filter(function (c) { return c.classList.contains('open'); }).map(function (c) { return c.id; }); try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} paintAll(); }
+  function paintAll() { var open = cats.every(function (c) { return c.classList.contains('open'); }); all.textContent = open ? 'Chiudi tutte' : 'Apri tutte'; all.setAttribute('aria-pressed', String(open)); }
+  var hash = location.hash.slice(1);
+  cats.forEach(function (c) {
+    set(c, saved.indexOf(c.id) >= 0 || c.id === hash);
+    c.querySelector('.cat-h').addEventListener('click', function () {
+      if (q.value) { q.value = ''; filter(); }
+      var on = !c.classList.contains('open'); set(c, on); persist();
+      if (on) setTimeout(function () { var r = c.getBoundingClientRect(); if (r.top < 64 || r.top > innerHeight * .55) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    });
+  });
+  all.addEventListener('click', function () { if (q.value) { q.value = ''; filter(); } var open = !cats.every(function (c) { return c.classList.contains('open'); }); cats.forEach(function (c) { set(c, open); }); persist(); });
+  paintAll();
+  function norm(t) { return t.toLowerCase().replace(/’/g, "'").normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function filter() {
+    var t = norm(q.value.trim()), words = t.split(/\s+/).filter(Boolean), hits = 0;
+    cats.forEach(function (c) {
+      var n = 0;
+      c.querySelectorAll('.game').forEach(function (g) { var ok = words.every(function (w) { return g.getAttribute('data-q').indexOf(w) >= 0; }); g.hidden = !ok; if (ok) n++; });
+      hits += n; c.hidden = !n;
+      set(c, words.length ? n > 0 : saved.indexOf(c.id) >= 0);
+    });
+    empty.hidden = hits > 0; all.hidden = !!words.length;
+  }
+  q.addEventListener('input', filter);
+  q.addEventListener('keydown', function (e) { if (e.key === 'Escape') { q.value = ''; filter(); } if (e.key === 'Enter') { var g = document.querySelector('.game:not([hidden])'); if (g) location.href = g.getAttribute('href'); } });
+  addEventListener('hashchange', function () { var c = document.getElementById(location.hash.slice(1)); if (c && c.classList.contains('cat')) { set(c, true); persist(); } });
+})();
 </script>
 </body>
 </html>

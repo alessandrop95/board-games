@@ -52,6 +52,7 @@ gstep burraco "Regole e partite tra bot di Burraco" node tests/rules/burraco.js 
 gstep sintonia "Regole e partite tra bot di Sintonia" node tests/rules/sintonia.js 10
 gstep fune "Regole e partite tra bot di Tiro alla fune" node tests/rules/fune.js 10
 gstep conquista "Regole e partite tra bot di Conquista l’Italia" node tests/rules/conquista.js 10
+gstep forziere "Regole e partite tra bot di Il Forziere Maledetto" node tests/rules/forziere.js 10
 gstep polvere-e-piombo "Regole di Bang! con le espansioni" node tests/rules/pp_rules.js
 gstep polvere-e-piombo "Partite intere tra bot (Bang!, tutte le combinazioni di espansioni)" node tests/rules/pp_bots.js
 gstep comuni "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs

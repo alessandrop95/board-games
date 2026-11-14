@@ -218,9 +218,17 @@ def build_cq():
         "Conquista l’Italia", "Il quiz a squadre sulla mappa: chi risponde giusto per primo conquista una regione, finite quelle libere si strappano agli avversari. Da 2 a 12 giocatori, anche a distanza.", '#1f6fa8',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Conquista"))
 
+def build_fz():
+    d = 'src/forziere/'
+    js = "window.GAME_PREFIX = 'forziere/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'forziere'), exist_ok=True)
+    open(os.path.join(ROOT, 'forziere', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Il Forziere Maledetto", "Pirati a ruoli segreti: Levante contro Ponente, con un Pirata o due Corsari nascosti. Prendi una nave, spara bordate e porta il Forziere alla tua bandiera. Da 4 a 8 giocatori.", '#0f2a38',
+        'family=Pirata+One&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Forziere"))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()
