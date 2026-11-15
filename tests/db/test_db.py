@@ -170,4 +170,10 @@ q("select save_push('%s','https://push.example/gigi-iphone','PK','AU',array['sky
 o, e = q("select srv_turn('%s','gigi','skyjo','ABCD')" % Hu['token'], 'service_role'); t('chi ha spento «tocca a te» non la riceve', json.loads(o)['subs'] == [], o)
 q("select save_push('%s','https://push.example/gigi-iphone','PK','AU',array['skyjo'],true,'t')" % L2['token'])
 o, e = q("select get_push('%s','https://push.example/gigi-iphone')" % L2['token']); t('un’app non aggiornata (senza la preferenza) salva comunque, con «tocca a te» acceso', json.loads(o).get('turns') is True, o + e)
+# Sala 3D (sito a parte, repository sala-3d): sale condivise con il codice del link, senza account
+o, e = q("select sala3d_save('salaprova12345', 0, '{\"v\":1}')"); t('sala 3D: chi ha il codice crea la sala', o == '1', o + e)
+o, e = q("select sala3d_save('salaprova12345', 1, '{\"v\":2}')"); t('sala 3D: salvataggio sulla versione corrente', o == '2', o + e)
+o, e = q("select sala3d_save('salaprova12345', 1, '{\"v\":3}')"); t('sala 3D: un salvataggio su una versione superata è respinto', o == '-1', o + e)
+o, e = q("select rev from sala3d_get('salaprova12345', 0)"); t('sala 3D: lettura con il codice', o == '2', o + e)
+o, e = q("select * from sala3d_rooms"); t('sala 3D: i codici delle sale non si possono elencare', 'permission denied' in e, e)
 done()
