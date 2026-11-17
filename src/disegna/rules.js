@@ -32,11 +32,11 @@ var DGRules = (function () {
       '<p>Si gioca tutti insieme, solo persone. Ognuno riceve una <b>parola segreta</b> e la disegna sul suo telefono, poi consegna. Il disegno passa al vicino, che scrive <b>che cosa vede</b>; la scritta passa al successivo, che la disegna… e così via (al massimo 6 passaggi).</p>' +
       '<p>Alla fine si rivedono tutte le catene, dalla parola di partenza all’ultima scritta. <b>Un punto</b> a chi scrive esattamente la parola di partenza e uno a chi ha fatto il disegno che gliel’ha fatta capire.</p>'],
     extra: ['Regole in più',
-      '<ul><li><b>Una linea sola</b>: il disegno è un unico tratto, senza mai alzare il dito (si può solo ricominciare).</li>' +
+      '<p>Chi apre il tavolo può attivare le <b>regole in più a sorpresa</b> e scegliere quali possono uscire. A ogni giro di disegni il gioco ne estrae una a caso: vale per <b>un disegnatore di ogni squadra</b> (così tutte le squadre la provano), poi ne esce un’altra. In «Tutti contro tutti» cambia a ogni disegno, nel telefono senza fili a ogni passaggio. La regola del momento è sempre scritta sopra la lavagna.</p><ul><li><b>Una linea sola</b>: il disegno è un unico tratto, senza mai alzare il dito (si può solo ricominciare).</li>' +
       '<li><b>Un colore, niente gomma</b>: solo nero, senza gomma, annulla o cestino.</li>' +
       '<li><b>A occhi chiusi</b>: chi disegna non vede il proprio disegno, lo vedono solo gli altri.</li>' +
       '<li><b>Con la mano sbagliata</b>: si disegna con la mano che non si usa di solito. È una regola d’onore!</li>' +
-      '<li><b>Tempo che si accorcia</b>: a ogni giro il tempo scende di 20 secondi (minimo 30).</li>' +
+      '<li><b>Tempo ridotto</b>: metà del tempo per disegnare (minimo 30 secondi).</li>' +
       '<li><b>Scommessa</b>: prima di disegnare si puntano 1, 2 o 3 punti. Se la squadra indovina vince la puntata (+1 per la parola difficile, +1 se entro metà del tempo); se nessuno indovina, la perde. Chi ruba vince la puntata.</li></ul>'],
     tips: ['Consigli',
       '<ul><li>Disegna prima la forma grande, poi i dettagli.</li><li>Le parole composte si possono disegnare a pezzi.</li><li>Leggi le risposte sbagliate dei compagni: ti dicono cosa stanno capendo.</li></ul>']

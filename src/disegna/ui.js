@@ -92,6 +92,7 @@ function tableReducer(doc, from, op) {
       if (op.teams != null && E.OPT.teams.indexOf(+op.teams) >= 0 && +op.teams !== doc.opts.teams) { doc.opts.teams = +op.teams; balance(doc); }
       if (op.mode != null && E.MODES.indexOf(op.mode) >= 0 && op.mode !== doc.opts.mode) { var wasT = E.teamed(modeOf(doc)); doc.opts.mode = op.mode; if (!wasT && E.teamed(op.mode)) balance(doc); }
       if (op.rule != null && E.RULES.indexOf(op.rule) >= 0) doc.opts[op.rule] = !!op.on;
+      if (op.extra != null) doc.opts.extra = !!op.extra;
       return {};
     }
     case 'back': {
@@ -148,7 +149,7 @@ Score.setup({ game: 'disegna', result: function (g) {
   return g.players.map(function (P) { return { won: (g.winners || []).indexOf(P.team) >= 0, place: place[P.team], score: g.teams[P.team].total }; });
 } });
 Turns.setup({ decider: function (g) { return E.decider(g); }, onTimeout: function () { return false; } });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = [], m = modeOf(d); notes.push(m === 'teams' ? (o.teams || 2) + ' squadre' : E.MODE_NAME[m]); E.RULES.forEach(function (r) { if (o[r]) notes.push(E.RULE_NAME[r].toLowerCase()); }); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = [], m = modeOf(d); notes.push(m === 'teams' ? (o.teams || 2) + ' squadre' : E.MODE_NAME[m]); if (o.extra) notes.push('regole a sorpresa'); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo, il tempo e i giocatori automatici.'); render(); });
 
 /* ---------- connessione al tavolo ---------- */
@@ -330,20 +331,21 @@ var MODE_DESC = {
 };
 var RULE_DESC = {
   line: 'Non si alza il dito: il disegno è un unico tratto.', mono: 'Solo nero, niente gomma né annulla.', dark: 'Chi disegna non vede il proprio disegno.',
-  hand: 'Si disegna con la mano che non si usa di solito (parola d’onore!).', shrink: 'Il tempo scende di 20 secondi a ogni giro.', bet: 'Chi disegna punta 1, 2 o 3 punti: se nessuno indovina li perde.'
+  hand: 'Si disegna con la mano che non si usa di solito (parola d’onore!).', shrink: 'Metà del tempo per disegnare.', bet: 'Chi disegna punta 1, 2 o 3 punti: se nessuno indovina li perde.'
 };
 function optionsHTML(d, isHost) {
   var o = d.opts || {}, m = modeOf(d), teams = o.teams || 2, r = o.rounds || 2, tm = o.time || 80;
-  var rules = E.RULES.filter(function (k) { return o[k] && !(k === 'bet' && m === 'chain'); });
+  var rules = o.extra ? E.rulePool({ mode: m, line: o.line, mono: o.mono, dark: o.dark, hand: o.hand, shrink: o.shrink, bet: o.bet }) : [];
   var desc = E.MODE_NAME[m] + (E.teamed(m) ? ' · ' + teams + ' squadre' : '') + (m === 'chain' ? '' : ' · ' + r + (r > 1 ? ' giri' : ' giro')) + ' · ' + tm + ' secondi per disegno';
-  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.<br><span class="muted">' + MODE_DESC[m] + '</span></p>' + (rules.length ? '<p class="lead">Regole in più: ' + rules.map(function (k) { return '<b>' + E.RULE_NAME[k] + '</b>'; }).join(', ') + '.</p>' : '');
+  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.<br><span class="muted">' + MODE_DESC[m] + '</span></p>' + (rules.length ? '<p class="lead">Regole in più a sorpresa, tra: ' + rules.map(function (k) { return '<b>' + E.RULE_NAME[k] + '</b>'; }).join(', ') + '. Ne esce una a caso, vale per un disegnatore di ogni squadra e poi cambia.</p>' : '<p class="lead muted">Senza regole in più.</p>');
   function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:240px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
   function opt(id, title, sub, cur, list) { return '<div class="tt-opt row"><label for="' + id + '" style="flex:1;min-width:160px"><b>' + title + '</b><br><span class="muted" style="font-size:14px">' + sub + '</span></label>' + sel(id, cur, list) + '</div>'; }
   var h = opt('opt-mode', 'Modalità', MODE_DESC[m], m, E.MODES.map(function (k) { return [k, E.MODE_NAME[k]]; }));
   if (E.teamed(m)) h += opt('opt-teams', 'Squadre', 'Almeno 2 giocatori per squadra.', teams, [[2, '2 squadre'], [3, '3 squadre'], [4, '4 squadre']]);
   if (m !== 'chain') h += opt('opt-rounds', 'Giri', 'In un giro ogni persona disegna una volta.', r, [[1, '1 giro'], [2, '2 giri'], [3, '3 giri']]);
   h += opt('opt-time', 'Tempo', m === 'chain' ? 'Per ogni disegno (per scrivere ci sono 35 secondi).' : 'Per ogni disegno.', tm, [[60, '60 secondi'], [80, '80 secondi'], [100, '100 secondi'], [120, '2 minuti']]);
-  h += '<div class="rules-pick"><b>Regole in più</b>' + E.RULES.filter(function (k) { return !(k === 'bet' && m === 'chain'); }).map(function (k) {
+  h += opt('opt-extra', 'Regole in più', o.extra ? 'Il gioco estrae una regola tra quelle scelte qui sotto: vale per un disegnatore di ogni squadra' + (m === 'ffa' ? ' (qui: per un disegno)' : m === 'chain' ? ' (qui: per un passaggio)' : '') + ', poi ne esce un’altra.' : 'Si gioca normale, senza regole a sorpresa.', o.extra ? 1 : 0, [[0, 'No'], [1, 'Sì, a sorpresa']]);
+  if (o.extra) h += '<div class="rules-pick"><b>Quali regole possono uscire</b><small class="muted">Se non ne scegli nessuna, possono uscire tutte.</small>' + E.RULES.filter(function (k) { return !(k === 'bet' && m === 'chain'); }).map(function (k) {
     return '<label class="rpick"><input type="checkbox" data-rule="' + k + '"' + (o[k] ? ' checked' : '') + '><span><b>' + E.RULE_NAME[k] + '</b><small>' + RULE_DESC[k] + '</small></span></label>';
   }).join('') + '</div>';
   return h;

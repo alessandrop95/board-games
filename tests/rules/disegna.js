@@ -63,9 +63,18 @@ console.log('punti per turno: ' + (hits / turns).toFixed(2));
 // ===== modalità e regole aggiuntive =====
 function hum(teams) { return teams.map(function (tm, i) { return { uid: 'h' + i, nick: 'P' + i, team: tm }; }); }
 // regole
-var sh = E.newGame(seats([0, 1, 0, 1]), { rounds: 3, time: 80, shrink: true }, T0);
-t('tempo che si accorcia: 80, 60, 40 secondi', E.drawTime(sh, 1) === 80 && E.drawTime(sh, 2) === 60 && E.drawTime(sh, 3) === 40 && E.drawTime(E.newGame(seats([0, 1, 0, 1]), { rounds: 3, time: 60, shrink: true }, T0), 3) === 30);
-var bt = E.newGame(seats([0, 1, 0, 1]), { bet: true }, T0);
+t('senza «Regole in più» nessuna regola, anche se spuntata', (function () { var x = E.newGame(seats([0, 1, 0, 1]), { line: true, bet: true }, T0); return x.rule === null && !E.on(x, 'line') && E.drawTime(x) === 80; })());
+var sh = E.newGame(seats([0, 1, 0, 1]), { time: 80, extra: true, shrink: true }, T0);
+t('tempo ridotto: metà del tempo', sh.rule === 'shrink' && E.drawTime(sh) === 40 && E.drawTime(E.newGame(seats([0, 1, 0, 1]), { time: 60, extra: true, shrink: true }, T0)) === 30);
+// la regola estratta vale per un disegnatore di ogni squadra, poi cambia
+var rot = E.newGame(seats([0, 1, 0, 1, 0, 1]), { rounds: 2, extra: true, line: true, mono: true, dark: true }, T0), seenRules = [], changes = 0, last = rot.rule;
+for (var zr = 0; zr < 200 && rot.phase !== 'over'; zr++) { if (rot.phase === 'choose') { seenRules.push({ t: rot.turn, r: rot.rule }); } E.tick(rot, rot.until); }
+var pairsOk = seenRules.every(function (x, i) { return i % 2 === 1 ? seenRules[i - 1].r === x.r : i === 0 || seenRules[i - 1].r !== x.r; });
+t('regole a sorpresa: la stessa per i due disegni di ogni giro di squadre, poi una diversa', seenRules.length === 12 && pairsOk && seenRules.every(function (x) { return ['line', 'mono', 'dark'].indexOf(x.r) >= 0; }), JSON.stringify(seenRules));
+var ffr = E.newGame(hum([0, 0, 0]), { mode: 'ffa', rounds: 1, extra: true, line: true, mono: true }, T0), r1 = ffr.rule; E.tick(ffr, ffr.until); E.tick(ffr, ffr.until); E.tick(ffr, ffr.until); E.tick(ffr, ffr.until);
+t('tutti contro tutti: la regola cambia a ogni disegno', ffr.turn === 1 && ffr.rule !== r1);
+t('se non se ne sceglie nessuna possono uscire tutte', E.rulePool({ mode: 'teams' }).length === 6 && E.rulePool({ mode: 'chain' }).indexOf('bet') < 0);
+var bt = E.newGame(seats([0, 1, 0, 1]), { extra: true, bet: true }, T0);
 t('scommessa: chi disegna punta 3 punti scegliendo la parola', E.act(bt, 0, { a: 'choose', i: 1, b: 3 }, T0 + 1000) === null && bt.bet === 3);
 t('scommessa vinta: puntata +1 per la difficile +1 se in fretta', E.act(bt, 2, { a: 'guess', w: bt.word }, T0 + 2000) === null && bt.teams[0].total === 5);
 E.tick(bt, bt.until);   // turno della squadra 1: sceglie la parola
@@ -73,11 +82,12 @@ bt.teams[1].total = 4; E.act(bt, bt.drawer, { a: 'bet', b: 2 }, bt.until - 100);
 t('la puntata si cambia prima di disegnare', bt.bet === 2);
 E.tick(bt, bt.until); E.tick(bt, bt.until); E.tick(bt, bt.until);
 t('scommessa persa: nessuno indovina e la squadra perde la puntata', bt.phase === 'reveal' && !bt.hit && bt.teams[1].total === 2);
-var ln = E.newGame(seats([0, 1, 0, 1]), { line: true, mono: true }, T0); E.act(ln, 0, { a: 'choose', i: 0 }, T0 + 1000);
+var ln = E.newGame(seats([0, 1, 0, 1]), { extra: true, line: true }, T0); E.act(ln, 0, { a: 'choose', i: 0 }, T0 + 1000);
 E.act(ln, 0, { a: 'pic', t: ln.pic.t, s: [['#e0402c', 30, 1, 1, 50, 50], ['#3d8bfd', 8, 5, 5, 9, 9]] }, T0 + 2000);
 t('una linea sola: conta solo il primo tratto', ln.pic.s.length === 1);
-t('un colore solo: il tratto diventa nero e sottile', ln.pic.s[0][0] === '#1d2333' && ln.pic.s[0][1] <= 18);
-t('opzioni: le regole si salvano solo se valide', E.cleanOpts({ mode: 'boh', dark: 1, hand: 'si', bet: true }).mode === 'teams' && E.cleanOpts({ dark: 1 }).dark === true && E.cleanOpts({ mode: 'chain', bet: true }).bet === false);
+var mn = E.newGame(seats([0, 1, 0, 1]), { extra: true, mono: true }, T0); E.act(mn, 0, { a: 'choose', i: 0 }, T0 + 1000); E.act(mn, 0, { a: 'pic', t: mn.pic.t, s: [['#e0402c', 30, 1, 1, 50, 50]] }, T0 + 2000);
+t('un colore solo: il tratto diventa nero e sottile', mn.pic.s[0][0] === '#1d2333' && mn.pic.s[0][1] <= 18);
+t('opzioni: le regole si salvano solo se valide', E.cleanOpts({ mode: 'boh', dark: 1, hand: 'si', bet: true }).mode === 'teams' && E.cleanOpts({ dark: 1, extra: 1 }).dark === true && E.cleanOpts({ extra: 1 }).extra === true && E.cleanOpts({ mode: 'chain', bet: true }).bet === false);
 // tutti contro tutti
 t('tutti contro tutti: basta un giocatore in più', E.checkSeats(hum([0, 0]), 0, { mode: 'ffa' }) === null && E.checkSeats(hum([0]), 0, { mode: 'ffa' }) !== null);
 var ff = E.newGame(hum([0, 0, 1]), { mode: 'ffa', rounds: 1 }, T0);
@@ -136,7 +146,7 @@ t('dopo le catene la partita finisce', ch.phase === 'over' && ch.winners.length 
 var badm = 0;
 ['ffa', 'relay', 'blind'].forEach(function (mode) {
   for (var r = 0; r < 15; r++) {
-    var gm = E.newGame(seats([0, 1, 0, 1, 0, 1], [0, 0, 0, 0, 1, 1]), { mode: mode, rounds: 1, bet: r % 2 === 0, shrink: r % 3 === 0 }, T0), nw = T0;
+    var gm = E.newGame(seats([0, 1, 0, 1, 0, 1], [0, 0, 0, 0, 1, 1]), { mode: mode, rounds: 1, extra: r % 2 === 0, bet: r % 3 === 0, shrink: r % 4 === 0 }, T0), nw = T0;
     for (var s2 = 0; s2 < 3000 && gm.phase !== 'over'; s2++) {
       nw += 1000;
       gm.players.forEach(function (P, p) { P.bot = true; var a = B.decide(gm, p, nw); if (a && (a.a !== 'guess' || Math.random() < .2)) { var e = E.act(gm, p, a, nw); if (e && !/scaduto|Adesso|tocca/.test(e)) { badm++; if (badm < 4) console.log(mode, e, JSON.stringify(a)); } } });

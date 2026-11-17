@@ -10,9 +10,10 @@
    - chain  «Telefono senza fili»: tutti insieme; ognuno disegna la sua parola, il vicino scrive cosa vede, il
             successivo disegna quella scritta… Alla fine si rivedono le catene. Un punto a chi scrive la parola
             di partenza giusta e a chi l'ha disegnata.
-   Regole che si aggiungono (opts): line (una linea sola), mono (un colore, niente gomma), dark (a occhi chiusi:
-   chi disegna non vede il disegno), hand (con la mano sbagliata: promemoria d'onore), shrink (il tempo scende di
-   20 secondi a ogni giro), bet (scommessa: chi disegna punta 1, 2 o 3 punti; se nessuno indovina li perde).
+   Regole in più (opts.extra = sì): tra quelle scelte (line una linea sola, mono un colore senza gomma, dark a occhi
+   chiusi, hand con la mano sbagliata, shrink tempo ridotto a metà, bet scommessa da 1 a 3 punti) il gioco ne estrae
+   una a caso; vale per un disegnatore di ogni squadra (un disegno in «Tutti contro tutti», un passaggio nel
+   telefono senza fili) e poi se ne estrae un'altra, diversa dalla precedente.
    Le parole difficili valgono 2 punti, le facili 1; indovinata entro metà del tempo: +1.
    Le funzioni che dipendono dall'ora ricevono «now» (millisecondi dell'host). */
 var DGEngine = (function () {
@@ -25,7 +26,7 @@ var DGEngine = (function () {
   var MODES = ['teams', 'ffa', 'relay', 'blind', 'chain'];
   var MODE_NAME = { teams: 'A squadre', ffa: 'Tutti contro tutti', relay: 'Staffetta', blind: 'Indovina tu per me', chain: 'Telefono senza fili' };
   var RULES = ['line', 'mono', 'dark', 'hand', 'shrink', 'bet'];
-  var RULE_NAME = { line: 'Una linea sola', mono: 'Un colore, niente gomma', dark: 'A occhi chiusi', hand: 'Con la mano sbagliata', shrink: 'Tempo che si accorcia', bet: 'Scommessa' };
+  var RULE_NAME = { line: 'Una linea sola', mono: 'Un colore, niente gomma', dark: 'A occhi chiusi', hand: 'Con la mano sbagliata', shrink: 'Tempo ridotto', bet: 'Scommessa' };
   var OPT = { rounds: [1, 2, 3], time: [60, 80, 100, 120], teams: [2, 3, 4] };
   var INK = '#1d2333';
 
@@ -62,10 +63,25 @@ var DGEngine = (function () {
   function pick(list, v, def) { v = +v; return list.indexOf(v) >= 0 ? v : def; }
   function members(g, t) { return g.players.map(function (P, i) { return i; }).filter(function (i) { return g.players[i].team === t; }); }
   function humans(g, t) { return members(g, t).filter(function (i) { return !g.players[i].bot || g.players[i].away; }); }
+  // la regola in più in vigore adesso
+  function on(g, r) { return !!(g && g.opts && g.opts.extra && g.rule === r); }
+  function rulePool(o) {
+    var ok = function (r) { return !(r === 'bet' && o.mode === 'chain'); };
+    var p = RULES.filter(function (r) { return o[r] && ok(r); });
+    return p.length ? p : RULES.filter(ok);   // nessuna spuntata: valgono tutte
+  }
+  function newRule(g) {
+    if (!g.opts.extra) { g.rule = null; return; }
+    var p = rulePool(g.opts), c = p.filter(function (r) { return r !== g.rule; });
+    g.rule = (c.length ? c : p)[Math.floor(rand() * (c.length ? c : p).length)];
+    log(g, 'Nuova regola: ' + RULE_NAME[g.rule] + '.', 'rule');
+    fx(g, { k: 'rule', r: g.rule });
+  }
   function teamed(mode) { return mode === 'teams' || mode === 'relay' || mode === 'blind'; }
   function cleanOpts(opts) {
     opts = opts || {};
     var o = { rounds: pick(OPT.rounds, opts.rounds, 2), time: pick(OPT.time, opts.time, 80), teams: pick(OPT.teams, opts.teams, 2), mode: MODES.indexOf(opts.mode) >= 0 ? opts.mode : 'teams' };
+    o.extra = !!opts.extra;
     RULES.forEach(function (r) { o[r] = !!opts[r]; });
     if (o.mode === 'chain') o.bet = false;
     return o;
@@ -107,7 +123,7 @@ var DGEngine = (function () {
       v: 1, phase: 'choose', seq: 0, turnN: 0, round: 0, turn: -1, clock: now, opts: o, teams: teams,
       players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, team: team(i) }; }),
       order: [], drawer: null, choices: null, word: null, pts: 0, bet: 1, until: 0, start: 0, pic: { t: 0, v: 0, s: [] }, guesses: [], hit: null,
-      words: [], offered: [], avoid: (seen || []).slice(-300), relay: null, hinter: null, clues: null,
+      words: [], offered: [], avoid: (seen || []).slice(-300), relay: null, hinter: null, clues: null, rule: null,
       log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
     };
     if (o.mode === 'chain') { startChain(g, now); return g; }
@@ -121,7 +137,8 @@ var DGEngine = (function () {
     if (!teamed(g.opts.mode)) hs = [g.players.map(function (P, i) { return i; }).filter(function (i) { return !g.players[i].bot; })];
     else hs = g.teams.map(function (T, t) { return members(g, t).filter(function (i) { return !g.players[i].bot; }); });
     var max = Math.max.apply(null, hs.map(function (h) { return h.length; }));
-    for (var r = 0; r < g.opts.rounds; r++) for (var k = 0; k < max; k++) hs.forEach(function (h) { if (k < h.length) out.push({ p: h[k], r: r + 1 }); });
+    // grp: i disegni con la stessa regola in più (uno per squadra; uno solo quando ognuno gioca per sé)
+    for (var r = 0; r < g.opts.rounds; r++) for (var k = 0; k < max; k++) hs.forEach(function (h) { if (k < h.length) out.push({ p: h[k], r: r + 1, grp: teamed(g.opts.mode) ? r * 100 + k : out.length }); });
     return out;
   }
   function draw(g, kind) {
@@ -135,7 +152,7 @@ var DGEngine = (function () {
     return w;
   }
   // il tempo per disegnare: con «Tempo che si accorcia» scende di 20 secondi a ogni giro (minimo 30)
-  function drawTime(g, round) { var r = round == null ? g.round : round; return g.opts.shrink ? Math.max(30, g.opts.time - (r - 1) * 20) : g.opts.time; }
+  function drawTime(g) { return on(g, 'shrink') ? Math.max(30, Math.round(g.opts.time / 2)) : g.opts.time; }
   // chi suggerisce in «Indovina tu per me»: a rotazione, una persona di un'altra squadra
   function pickHinter(g, drawer) {
     var t = g.players[drawer].team, cand = g.players.map(function (P, i) { return i; }).filter(function (i) { return g.players[i].team !== t && !g.players[i].bot; });
@@ -145,7 +162,8 @@ var DGEngine = (function () {
   function nextTurn(g, now) {
     g.turn++;
     if (g.turn >= g.order.length) { finish(g); return; }
-    var o = g.order[g.turn];
+    var o = g.order[g.turn], prev = g.order[g.turn - 1];
+    if (!prev || prev.grp !== o.grp) newRule(g);
     g.round = o.r; g.drawer = o.p; g.phase = 'choose'; g.choices = [draw(g, 'e'), draw(g, 'h')]; g.word = null; g.pts = 0; g.hit = null; g.bet = 1; g.relay = null; g.clues = null; g.hinter = null;
     // numero del disegno unico anche tra una partita e l'altra (così un disegno vecchio non torna)
     g.pic = { t: (Math.floor(now) % 1000000000) * 10 + (g.turn % 10) + 1, v: 0, s: [] }; g.guesses = [];
@@ -167,8 +185,8 @@ var DGEngine = (function () {
   }
   function choose(g, i, now, bet) {
     g.word = g.choices[i]; g.pts = i ? 2 : 1; g.words.push(g.word);
-    if (g.opts.bet && bet != null) g.bet = Math.max(1, Math.min(3, +bet || 1));
-    log(g, nick(g, g.drawer) + ' disegna una parola ' + (i ? 'difficile' : 'facile') + (g.opts.bet ? ' e punta ' + g.bet + (g.bet > 1 ? ' punti' : ' punto') : '') + '.', 'sys', g.drawer);
+    if (on(g, 'bet') && bet != null) g.bet = Math.max(1, Math.min(3, +bet || 1));
+    log(g, nick(g, g.drawer) + ' disegna una parola ' + (i ? 'difficile' : 'facile') + (on(g, 'bet') ? ' e punta ' + g.bet + (g.bet > 1 ? ' punti' : ' punto') : '') + '.', 'sys', g.drawer);
     startDraw(g, now);
   }
   // «Indovina tu per me»: gli aiuti non devono contenere la parola (né un suo pezzo)
@@ -188,14 +206,14 @@ var DGEngine = (function () {
   function score(g, p, steal, now) {
     var m = g.opts.mode, t = g.players[p].team, dt = g.players[g.drawer].team;
     var bonus = !steal && now - g.start < drawTime(g) * 500 ? 1 : 0;
-    var base = g.opts.bet ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts, pts = base + bonus;
+    var base = on(g, 'bet') ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts, pts = base + bonus;
     if (m === 'ffa') {
       addTo(g, t, pts);
-      var dp = g.opts.bet ? g.bet : g.pts; addTo(g, dt, dp);
+      var dp = on(g, 'bet') ? g.bet : g.pts; addTo(g, dt, dp);
       g.hit = { p: p, t: t, pts: pts, steal: false, dp: dp };
     } else {
       addTo(g, t, pts);
-      if (steal && g.opts.bet) addTo(g, dt, -g.bet);
+      if (steal && on(g, 'bet')) addTo(g, dt, -g.bet);
       g.hit = { p: p, t: t, pts: pts, steal: !!steal };
     }
     g.phase = 'reveal'; g.until = now + REVEAL_MS; g.clock = now;
@@ -204,7 +222,7 @@ var DGEngine = (function () {
   }
   function missed(g, now) {
     g.hit = null; g.phase = 'reveal'; g.until = now + REVEAL_MS; g.clock = now;
-    var lost = g.opts.bet && g.drawer != null ? g.bet : 0;
+    var lost = on(g, 'bet') && g.drawer != null ? g.bet : 0;
     if (lost) addTo(g, g.players[g.drawer].team, -lost);
     log(g, 'Nessuno ha indovinato «' + g.word + '»' + (lost ? ': ' + (g.opts.mode === 'ffa' ? nick(g, g.drawer) : 'i ' + g.teams[g.players[g.drawer].team].name) + ' perdono la scommessa (−' + lost + ').' : '.'), 'miss');
     fx(g, { k: 'miss', word: g.word, lost: lost });
@@ -294,7 +312,7 @@ var DGEngine = (function () {
       return s.length >= 4 ? s : null;
     }).filter(Boolean);
   }
-  function chainTime(g, k) { return k % 2 ? WRITE_MS : (g.opts.shrink ? Math.max(30, g.opts.time - Math.floor(k / 2) * 20) : g.opts.time) * 1000; }
+  function chainTime(g, k) { return k % 2 ? WRITE_MS : (on(g, 'shrink') ? Math.max(30, Math.round(g.opts.time / 2)) : g.opts.time) * 1000; }
   // al passo k il giocatore p lavora sulla catena (p - k) mod n
   function chainOf(g, p, k) { var n = g.players.length; return ((p - (k == null ? g.chain.k : k)) % n + n) % n; }
   function startChain(g, now) {
@@ -302,6 +320,7 @@ var DGEngine = (function () {
     g.order = [];
     g.chain = { k: 0, steps: steps, done: {}, list: g.players.map(function () { return { w: draw(g, rand() < .65 ? 'e' : 'h'), it: [] }; }) };
     g.chain.list.forEach(function (c) { g.words.push(c.w); });
+    newRule(g);
     g.phase = 'chain'; g.round = 1; g.start = now; g.until = now + chainTime(g, 0); g.clock = now; g.turnN++;
     log(g, 'Telefono senza fili: ognuno disegna la sua parola segreta.', 'sys');
     fx(g, { k: 'chain', step: 0 });
@@ -321,6 +340,7 @@ var DGEngine = (function () {
     });
     C.k++; C.done = {};
     if (C.k >= C.steps) { showChains(g, now); return; }
+    newRule(g);
     g.round = C.k + 1; g.start = now; g.until = now + chainTime(g, C.k); g.clock = now; g.turnN++;
     fx(g, { k: 'chain', step: C.k });
   }
@@ -372,7 +392,7 @@ var DGEngine = (function () {
     if (g.opts.mode === 'chain') return chainAct(g, p, a, now);
     if (now >= g.until && (g.phase === 'draw' || g.phase === 'steal' || g.phase === 'choose' || g.phase === 'hint')) { tick(g, now); if (a.a !== 'pic') return 'Tempo scaduto.'; }
     if (a.a === 'bet') {
-      if (!g.opts.bet || p !== g.drawer || (g.phase !== 'choose' && g.phase !== 'hint')) return 'Adesso non si scommette.';
+      if (!on(g, 'bet') || p !== g.drawer || (g.phase !== 'choose' && g.phase !== 'hint')) return 'Adesso non si scommette.';
       g.bet = Math.max(1, Math.min(3, +a.b || 1)); return null;
     }
     if (a.a === 'choose') {
@@ -396,8 +416,8 @@ var DGEngine = (function () {
       if (+a.t !== g.pic.t || !Array.isArray(a.s)) return null;
       if ((+a.v || 0) < g.pic.v) return null;
       g.pic.v = +a.v || 0;
-      var s = a.s.slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, g.opts.mono); }).filter(Boolean);
-      if (g.opts.line) s = s.slice(0, 1);   // una linea sola: conta solo il primo tratto
+      var s = a.s.slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, on(g, 'mono')); }).filter(Boolean);
+      if (on(g, 'line')) s = s.slice(0, 1);   // una linea sola: conta solo il primo tratto
       g.pic.s = s;
       return null;
     }
@@ -423,8 +443,8 @@ var DGEngine = (function () {
     var C = g.chain, c = C.list[chainOf(g, p, C.k)];
     if (a.a === 'cdraw') {
       if (task.kind !== 'draw') return 'Adesso si scrive.';
-      var s = (Array.isArray(a.s) ? a.s : []).slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, g.opts.mono); }).filter(Boolean);
-      if (g.opts.line) s = s.slice(0, 1);
+      var s = (Array.isArray(a.s) ? a.s : []).slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, on(g, 'mono')); }).filter(Boolean);
+      if (on(g, 'line')) s = s.slice(0, 1);
       c.it[C.k] = { p: p, s: pack(s) };
     } else if (a.a === 'cwrite') {
       if (task.kind !== 'write') return 'Adesso si disegna.';
@@ -436,7 +456,7 @@ var DGEngine = (function () {
     return null;
   }
   return { newGame: newGame, act: act, tick: tick, decider: decider, pending: pending, canGuess: canGuess, knows: knows, checkSeats: checkSeats, members: members, humans: humans,
-    norm: norm, right: right, near: near, clueOk: clueOk, drawTime: drawTime, chainTask: chainTask, chainOf: chainOf, chainTime: chainTime, pack: pack, unpack: unpack, cleanOpts: cleanOpts, teamed: teamed,
+    on: on, rulePool: rulePool, norm: norm, right: right, near: near, clueOk: clueOk, drawTime: drawTime, chainTask: chainTask, chainOf: chainOf, chainTime: chainTime, pack: pack, unpack: unpack, cleanOpts: cleanOpts, teamed: teamed,
     setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, MODES: MODES, MODE_NAME: MODE_NAME, RULES: RULES, RULE_NAME: RULE_NAME,
     STEAL_MS: STEAL_MS, REVEAL_MS: REVEAL_MS, CHOOSE_MS: CHOOSE_MS, HINT_MS: HINT_MS, RELAY_MS: RELAY_MS, WRITE_MS: WRITE_MS, SHOW_MS: SHOW_MS, D: D };
 })();

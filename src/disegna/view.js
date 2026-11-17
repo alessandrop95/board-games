@@ -77,9 +77,9 @@ var Game = (function () {
   function down(e) {
     var g = G(), me = myIdx(); if (!g || !drawing(g, me) || (g.phase !== 'draw' && g.phase !== 'chain')) return;
     e.preventDefault();
-    if (g.opts.line && mine.s.length >= 1) { toast('Una linea sola: il tuo tratto l’hai già fatto' + (g.opts.mono ? '.' : '. Puoi ricominciare con il cestino.')); return; }
+    if (E.on(g, 'line') && mine.s.length >= 1) { toast('Una linea sola: il tuo tratto l’hai già fatto' + (E.on(g, 'mono') ? '.' : '. Puoi ricominciare con il cestino.')); return; }
     try { cv.setPointerCapture(e.pointerId); } catch (x) {}
-    var p = pos(e), c = g.opts.mono ? INK : App.pen.c, w = c === '#fffdf6' ? 34 : App.pen.w;
+    var p = pos(e), c = E.on(g, 'mono') ? INK : App.pen.c, w = c === '#fffdf6' ? 34 : App.pen.w;
     cur = [c, w, p[0], p[1]]; mine.s.push(cur); sentLen = 0; dirty = true; liveSend(); paint();
   }
   function move(e) {
@@ -183,14 +183,15 @@ var Game = (function () {
   }
   function mask(w) { return '<span class="mask">' + String(w).split(' ').map(function (x) { return '<span class="mw">' + x.split('').map(function () { return '<i></i>'; }).join('') + '</span>'; }).join('') + '</span><small class="ml">' + String(w).replace(/ /g, '').length + ' lettere' + (w.indexOf(' ') >= 0 ? ', ' + w.split(' ').length + ' parole' : '') + '</small>'; }
   function betChips(g, me) {
-    if (!g.opts.bet || g.drawer !== me) return '';
+    if (!E.on(g, 'bet') || g.drawer !== me) return '';
     var b = App.bet || g.bet || 1;
     return '<div class="bets"><span>Punti in palio:</span>' + [1, 2, 3].map(function (k) { return '<button class="chip' + (b === k ? ' on' : '') + '" data-act="bet" data-b="' + k + '">' + k + '</button>'; }).join('') + '<small>se nessuno indovina li perdete</small></div>';
   }
+  // la regola in più del momento: la vedono tutti
+  var RULE_HOW = { line: 'un unico tratto, senza alzare il dito', mono: 'solo nero, niente gomma', dark: 'chi disegna non vede il disegno', hand: '✋ si disegna con la mano sbagliata!', shrink: 'metà del tempo', bet: 'si puntano 1, 2 o 3 punti' };
   function rulesNote(g, me) {
-    var r = [];
-    if (g.opts.line) r.push('una linea sola'); if (g.opts.mono) r.push('solo nero, niente gomma'); if (g.opts.dark) r.push('a occhi chiusi'); if (g.opts.hand) r.push('✋ con la mano sbagliata!');
-    return r.length && drawing(g, me) ? '<div class="rnote">' + r.join(' · ') + '</div>' : '';
+    if (!g.rule || !g.opts.extra || g.phase === 'reveal' || g.phase === 'over' || g.phase === 'show') return '';
+    return '<div class="rnote"><b>Regola: ' + esc(E.RULE_NAME[g.rule]) + '</b> · ' + RULE_HOW[g.rule] + '</div>';
   }
   function clueChips(g) { return '<div class="clues">' + (g.clues || []).map(function (c) { return '<span class="clue-c">' + esc(c) + '</span>'; }).join('') + '</div>'; }
   function mid(g, me) {
@@ -213,17 +214,16 @@ var Game = (function () {
           [0, 1].map(function (i) { return '<button class="btn ch' + (i ? ' hard' : '') + (hi === i ? ' on' : ' ghost') + '" data-act="hintpick" data-i="' + i + '">' + esc(g.choices[i]) + '<small>' + (i ? 'difficile · 2 punti' : 'facile · 1 punto') + '</small></button>'; }).join('') + '</div>' +
           '<div class="clue-row"><input class="field clue" maxlength="24" placeholder="aiuto 1" autocomplete="off"><input class="field clue" maxlength="24" placeholder="aiuto 2" autocomplete="off"><input class="field clue" maxlength="24" placeholder="aiuto 3" autocomplete="off"><button class="btn" data-act="hintgo">Manda gli aiuti</button></div>';
       } else h = '<div class="st">' + (g.hinter != null ? pname(g, g.hinter) + ' sceglie la parola e gli aiuti per ' : 'Gli aiuti per ') + (g.drawer === me ? 'te' : who) + '…</div>' + betChips(g, me);
-    } else if (g.phase === 'choose') h = g.drawer === me ? '<div class="st">Tocca a te! Scegli cosa disegnare:</div>' + betChips(g, me) + '<div class="choices"><button class="btn ch" data-act="choose" data-i="0">' + esc(g.choices[0]) + '<small>facile · ' + (g.opts.bet ? 'puntata +0' : '1 punto') + '</small></button><button class="btn ch hard" data-act="choose" data-i="1">' + esc(g.choices[1]) + '<small>difficile · ' + (g.opts.bet ? 'puntata +1' : '2 punti') + '</small></button></div>'
+    } else if (g.phase === 'choose') h = g.drawer === me ? '<div class="st">Tocca a te! Scegli cosa disegnare:</div>' + betChips(g, me) + '<div class="choices"><button class="btn ch" data-act="choose" data-i="0">' + esc(g.choices[0]) + '<small>facile · ' + (E.on(g, 'bet') ? 'puntata +0' : '1 punto') + '</small></button><button class="btn ch hard" data-act="choose" data-i="1">' + esc(g.choices[1]) + '<small>difficile · ' + (E.on(g, 'bet') ? 'puntata +1' : '2 punti') + '</small></button></div>'
       : '<div class="st">' + who + (forT ? ' (' + tlabel(g, P.team) + ')' : '') + ' sceglie cosa disegnare…</div>';
     else if (g.phase === 'draw' || g.phase === 'steal') {
       var relay = m === 'relay' && g.relay && g.relay.max > 1 ? ' <span class="pp">la penna passa tra <i id="rlv"></i></span>' : '';
-      var pts = g.opts.bet ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts;
+      var pts = E.on(g, 'bet') ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts;
       if (g.drawer === me) h = m === 'blind' ? '<div class="st">Disegna seguendo gli aiuti (la parola non la sai!):</div>' + clueChips(g) : '<div class="st">Disegna: <b class="word">' + esc(g.word) + '</b> <span class="pp">' + pts + (pts > 1 ? ' punti' : ' punto') + '</span>' + relay + '</div>';
       else if (E.knows(g, me)) h = '<div class="st">' + who + ' disegna' + forT + ': <b class="word">' + esc(g.word) + '</b>' + relay + '</div>' + (m === 'blind' ? clueChips(g) : '');
       else h = '<div class="st">' + (g.phase === 'steal' ? '<b class="steal">Furto!</b> ' : '') + (m === 'relay' ? 'Penna a ' : '') + who + (m === 'relay' ? forT + relay : ' disegna' + forT + ':') + '</div>' + mask(g.word);
-      h += rulesNote(g, me);
     } else if (g.phase === 'reveal') h = '<div class="st">Era <b class="word">' + esc(g.word) + '</b>' + (g.hit ? ' · ' + pname(g, g.hit.p) + (g.hit.steal ? ' l’ha rubata' : ' ha indovinato') + ': <b>+' + g.hit.pts + '</b> ' + tto(g, g.hit.t) + (g.hit.dp ? ' e <b>+' + g.hit.dp + '</b> a ' + pname(g, g.drawer) : '') : ' · nessuno l’ha indovinata') + '</div>';
-    return h + '<div class="tm"><span class="tmv" id="tmv"></span><span class="tbar2"><i id="tbar"></i></span></div>';
+    return h + rulesNote(g, me) + '<div class="tm"><span class="tmv" id="tmv"></span><span class="tbar2"><i id="tbar"></i></span></div>';
   }
   function phaseTotal(g) {
     if (g.phase === 'draw') return E.drawTime(g) * 1000;
@@ -248,14 +248,14 @@ var Game = (function () {
     if (!drawing(g, me) || (g.phase !== 'draw' && g.phase !== 'chain')) return '';
     var give = g.phase === 'chain' ? '<button class="btn small" data-act="consegna">Consegna</button>' : '';
     var sizes = SIZES.map(function (w) { return '<button class="sz' + (App.pen.w === w ? ' on' : '') + '" data-act="size" data-w="' + w + '" aria-label="Spessore ' + w + '"><i style="width:' + (w / 1.4 + 3) + 'px;height:' + (w / 1.4 + 3) + 'px"></i></button>'; }).join('');
-    if (g.opts.mono) return '<div class="pal"><span class="muted mono">Solo nero, niente gomma</span></div><div class="pal">' + sizes + give + '</div>';
+    if (E.on(g, 'mono')) return '<div class="pal"><span class="muted mono">Solo nero, niente gomma</span></div><div class="pal">' + sizes + give + '</div>';
     var cols = COLORS.map(function (c) { return '<button class="sw' + (App.pen.c === c ? ' on' : '') + '" style="--c:' + c + '" data-act="pen" data-c="' + c + '" aria-label="Colore"></button>'; }).join('');
-    var rub = g.opts.line ? '' : '<button class="sw er' + (App.pen.c === '#fffdf6' ? ' on' : '') + '" data-act="pen" data-c="#fffdf6" aria-label="Gomma">' + IC('eraser') + '</button>';
-    var un = g.opts.line ? '' : '<button class="tb" data-act="undo" aria-label="Annulla">' + IC('undo') + '</button>';
-    return '<div class="pal">' + cols + rub + '</div><div class="pal">' + sizes + un + '<button class="tb" data-act="clear" aria-label="' + (g.opts.line ? 'Ricomincia' : 'Cancella tutto') + '">' + IC('trash') + '</button>' + give + '</div>';
+    var rub = E.on(g, 'line') ? '' : '<button class="sw er' + (App.pen.c === '#fffdf6' ? ' on' : '') + '" data-act="pen" data-c="#fffdf6" aria-label="Gomma">' + IC('eraser') + '</button>';
+    var un = E.on(g, 'line') ? '' : '<button class="tb" data-act="undo" aria-label="Annulla">' + IC('undo') + '</button>';
+    return '<div class="pal">' + cols + rub + '</div><div class="pal">' + sizes + un + '<button class="tb" data-act="clear" aria-label="' + (E.on(g, 'line') ? 'Ricomincia' : 'Cancella tutto') + '">' + IC('trash') + '</button>' + give + '</div>';
   }
   function over(g, me) {
-    var dark = g.opts.dark && drawing(g, me) ? '<div class="bo dark">A occhi chiusi: il tuo disegno lo vedono solo gli altri</div>' : '';
+    var dark = E.on(g, 'dark') && drawing(g, me) ? '<div class="bo dark">A occhi chiusi: il tuo disegno lo vedono solo gli altri</div>' : '';
     if (g.phase === 'choose') return '<div class="bo">' + (g.drawer === me ? 'Scegli la parola qui sopra' : 'Tra poco si disegna…') + '</div>';
     if (g.phase === 'hint') return '<div class="bo">' + (g.hinter === me ? 'Prepara gli aiuti qui sopra' : 'Si preparano gli aiuti…') + '</div>';
     if (g.phase === 'reveal') return '<div class="bo big">' + esc(g.word) + '</div>';
@@ -323,6 +323,7 @@ var Game = (function () {
       case 'turn': enqueue(function () { Sound.play('turn'); if (e.hinter === me) banner('Tocca a te!', 'Prepara gli aiuti per ' + esc(g.players[e.p].nick)); else if (e.p === me) banner('Tocca a te!', g.opts.mode === 'blind' ? 'Tra poco arrivano gli aiuti' : 'Scegli cosa disegnare'); else banner(esc(g.players[e.p].nick) + ' disegna', g.teams[e.t].pc ? '' : 'per i ' + esc(g.teams[e.t].name)); return sleep(200); }); break;
       case 'relay': enqueue(function () { Sound.play('turn'); if (e.p === me) banner('La penna è tua!', 'Disegna: ' + esc(G().word || '')); else banner('Penna a ' + esc(g.players[e.p].nick), ''); return sleep(200); }); break;
       case 'chain': enqueue(function () { Sound.play('turn'); var tk = E.chainTask(G(), me); if (tk) banner(tk.kind === 'draw' ? 'Disegna!' : 'Che cos’è?', tk.kind === 'draw' ? esc(tk.text) : 'scrivi cosa vedi nel disegno'); return sleep(200); }); break;
+      case 'rule': enqueue(function () { Sound.play('steal'); banner('Nuova regola!', esc(E.RULE_NAME[e.r]) + ' · ' + RULE_HOW[e.r]); return sleep(900); }); break;
       case 'show': enqueue(function () { Sound.play('hit'); banner('Le catene!', 'guardate com’è cambiata ogni parola'); return sleep(200); }); break;
       case 'draw': enqueue(function () { Sound.play('draw'); return sleep(50); }); break;
       case 'hit': enqueue(function () { Sound.play('hit'); banner(e.steal ? 'Rubata!' : 'Indovinata!', esc(e.word) + ' · +' + e.pts + (g.teams[e.t].pc ? ' a ' : ' ai ') + esc(g.teams[e.t].name)); if (myTeam(g, me) === e.t) confetti(30); return sleep(300); }); break;

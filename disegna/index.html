@@ -525,9 +525,10 @@ if (typeof module !== 'undefined') module.exports = DGData;
    - chain  «Telefono senza fili»: tutti insieme; ognuno disegna la sua parola, il vicino scrive cosa vede, il
             successivo disegna quella scritta… Alla fine si rivedono le catene. Un punto a chi scrive la parola
             di partenza giusta e a chi l'ha disegnata.
-   Regole che si aggiungono (opts): line (una linea sola), mono (un colore, niente gomma), dark (a occhi chiusi:
-   chi disegna non vede il disegno), hand (con la mano sbagliata: promemoria d'onore), shrink (il tempo scende di
-   20 secondi a ogni giro), bet (scommessa: chi disegna punta 1, 2 o 3 punti; se nessuno indovina li perde).
+   Regole in più (opts.extra = sì): tra quelle scelte (line una linea sola, mono un colore senza gomma, dark a occhi
+   chiusi, hand con la mano sbagliata, shrink tempo ridotto a metà, bet scommessa da 1 a 3 punti) il gioco ne estrae
+   una a caso; vale per un disegnatore di ogni squadra (un disegno in «Tutti contro tutti», un passaggio nel
+   telefono senza fili) e poi se ne estrae un'altra, diversa dalla precedente.
    Le parole difficili valgono 2 punti, le facili 1; indovinata entro metà del tempo: +1.
    Le funzioni che dipendono dall'ora ricevono «now» (millisecondi dell'host). */
 var DGEngine = (function () {
@@ -540,7 +541,7 @@ var DGEngine = (function () {
   var MODES = ['teams', 'ffa', 'relay', 'blind', 'chain'];
   var MODE_NAME = { teams: 'A squadre', ffa: 'Tutti contro tutti', relay: 'Staffetta', blind: 'Indovina tu per me', chain: 'Telefono senza fili' };
   var RULES = ['line', 'mono', 'dark', 'hand', 'shrink', 'bet'];
-  var RULE_NAME = { line: 'Una linea sola', mono: 'Un colore, niente gomma', dark: 'A occhi chiusi', hand: 'Con la mano sbagliata', shrink: 'Tempo che si accorcia', bet: 'Scommessa' };
+  var RULE_NAME = { line: 'Una linea sola', mono: 'Un colore, niente gomma', dark: 'A occhi chiusi', hand: 'Con la mano sbagliata', shrink: 'Tempo ridotto', bet: 'Scommessa' };
   var OPT = { rounds: [1, 2, 3], time: [60, 80, 100, 120], teams: [2, 3, 4] };
   var INK = '#1d2333';
 
@@ -577,10 +578,25 @@ var DGEngine = (function () {
   function pick(list, v, def) { v = +v; return list.indexOf(v) >= 0 ? v : def; }
   function members(g, t) { return g.players.map(function (P, i) { return i; }).filter(function (i) { return g.players[i].team === t; }); }
   function humans(g, t) { return members(g, t).filter(function (i) { return !g.players[i].bot || g.players[i].away; }); }
+  // la regola in più in vigore adesso
+  function on(g, r) { return !!(g && g.opts && g.opts.extra && g.rule === r); }
+  function rulePool(o) {
+    var ok = function (r) { return !(r === 'bet' && o.mode === 'chain'); };
+    var p = RULES.filter(function (r) { return o[r] && ok(r); });
+    return p.length ? p : RULES.filter(ok);   // nessuna spuntata: valgono tutte
+  }
+  function newRule(g) {
+    if (!g.opts.extra) { g.rule = null; return; }
+    var p = rulePool(g.opts), c = p.filter(function (r) { return r !== g.rule; });
+    g.rule = (c.length ? c : p)[Math.floor(rand() * (c.length ? c : p).length)];
+    log(g, 'Nuova regola: ' + RULE_NAME[g.rule] + '.', 'rule');
+    fx(g, { k: 'rule', r: g.rule });
+  }
   function teamed(mode) { return mode === 'teams' || mode === 'relay' || mode === 'blind'; }
   function cleanOpts(opts) {
     opts = opts || {};
     var o = { rounds: pick(OPT.rounds, opts.rounds, 2), time: pick(OPT.time, opts.time, 80), teams: pick(OPT.teams, opts.teams, 2), mode: MODES.indexOf(opts.mode) >= 0 ? opts.mode : 'teams' };
+    o.extra = !!opts.extra;
     RULES.forEach(function (r) { o[r] = !!opts[r]; });
     if (o.mode === 'chain') o.bet = false;
     return o;
@@ -622,7 +638,7 @@ var DGEngine = (function () {
       v: 1, phase: 'choose', seq: 0, turnN: 0, round: 0, turn: -1, clock: now, opts: o, teams: teams,
       players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, team: team(i) }; }),
       order: [], drawer: null, choices: null, word: null, pts: 0, bet: 1, until: 0, start: 0, pic: { t: 0, v: 0, s: [] }, guesses: [], hit: null,
-      words: [], offered: [], avoid: (seen || []).slice(-300), relay: null, hinter: null, clues: null,
+      words: [], offered: [], avoid: (seen || []).slice(-300), relay: null, hinter: null, clues: null, rule: null,
       log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
     };
     if (o.mode === 'chain') { startChain(g, now); return g; }
@@ -636,7 +652,8 @@ var DGEngine = (function () {
     if (!teamed(g.opts.mode)) hs = [g.players.map(function (P, i) { return i; }).filter(function (i) { return !g.players[i].bot; })];
     else hs = g.teams.map(function (T, t) { return members(g, t).filter(function (i) { return !g.players[i].bot; }); });
     var max = Math.max.apply(null, hs.map(function (h) { return h.length; }));
-    for (var r = 0; r < g.opts.rounds; r++) for (var k = 0; k < max; k++) hs.forEach(function (h) { if (k < h.length) out.push({ p: h[k], r: r + 1 }); });
+    // grp: i disegni con la stessa regola in più (uno per squadra; uno solo quando ognuno gioca per sé)
+    for (var r = 0; r < g.opts.rounds; r++) for (var k = 0; k < max; k++) hs.forEach(function (h) { if (k < h.length) out.push({ p: h[k], r: r + 1, grp: teamed(g.opts.mode) ? r * 100 + k : out.length }); });
     return out;
   }
   function draw(g, kind) {
@@ -650,7 +667,7 @@ var DGEngine = (function () {
     return w;
   }
   // il tempo per disegnare: con «Tempo che si accorcia» scende di 20 secondi a ogni giro (minimo 30)
-  function drawTime(g, round) { var r = round == null ? g.round : round; return g.opts.shrink ? Math.max(30, g.opts.time - (r - 1) * 20) : g.opts.time; }
+  function drawTime(g) { return on(g, 'shrink') ? Math.max(30, Math.round(g.opts.time / 2)) : g.opts.time; }
   // chi suggerisce in «Indovina tu per me»: a rotazione, una persona di un'altra squadra
   function pickHinter(g, drawer) {
     var t = g.players[drawer].team, cand = g.players.map(function (P, i) { return i; }).filter(function (i) { return g.players[i].team !== t && !g.players[i].bot; });
@@ -660,7 +677,8 @@ var DGEngine = (function () {
   function nextTurn(g, now) {
     g.turn++;
     if (g.turn >= g.order.length) { finish(g); return; }
-    var o = g.order[g.turn];
+    var o = g.order[g.turn], prev = g.order[g.turn - 1];
+    if (!prev || prev.grp !== o.grp) newRule(g);
     g.round = o.r; g.drawer = o.p; g.phase = 'choose'; g.choices = [draw(g, 'e'), draw(g, 'h')]; g.word = null; g.pts = 0; g.hit = null; g.bet = 1; g.relay = null; g.clues = null; g.hinter = null;
     // numero del disegno unico anche tra una partita e l'altra (così un disegno vecchio non torna)
     g.pic = { t: (Math.floor(now) % 1000000000) * 10 + (g.turn % 10) + 1, v: 0, s: [] }; g.guesses = [];
@@ -682,8 +700,8 @@ var DGEngine = (function () {
   }
   function choose(g, i, now, bet) {
     g.word = g.choices[i]; g.pts = i ? 2 : 1; g.words.push(g.word);
-    if (g.opts.bet && bet != null) g.bet = Math.max(1, Math.min(3, +bet || 1));
-    log(g, nick(g, g.drawer) + ' disegna una parola ' + (i ? 'difficile' : 'facile') + (g.opts.bet ? ' e punta ' + g.bet + (g.bet > 1 ? ' punti' : ' punto') : '') + '.', 'sys', g.drawer);
+    if (on(g, 'bet') && bet != null) g.bet = Math.max(1, Math.min(3, +bet || 1));
+    log(g, nick(g, g.drawer) + ' disegna una parola ' + (i ? 'difficile' : 'facile') + (on(g, 'bet') ? ' e punta ' + g.bet + (g.bet > 1 ? ' punti' : ' punto') : '') + '.', 'sys', g.drawer);
     startDraw(g, now);
   }
   // «Indovina tu per me»: gli aiuti non devono contenere la parola (né un suo pezzo)
@@ -703,14 +721,14 @@ var DGEngine = (function () {
   function score(g, p, steal, now) {
     var m = g.opts.mode, t = g.players[p].team, dt = g.players[g.drawer].team;
     var bonus = !steal && now - g.start < drawTime(g) * 500 ? 1 : 0;
-    var base = g.opts.bet ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts, pts = base + bonus;
+    var base = on(g, 'bet') ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts, pts = base + bonus;
     if (m === 'ffa') {
       addTo(g, t, pts);
-      var dp = g.opts.bet ? g.bet : g.pts; addTo(g, dt, dp);
+      var dp = on(g, 'bet') ? g.bet : g.pts; addTo(g, dt, dp);
       g.hit = { p: p, t: t, pts: pts, steal: false, dp: dp };
     } else {
       addTo(g, t, pts);
-      if (steal && g.opts.bet) addTo(g, dt, -g.bet);
+      if (steal && on(g, 'bet')) addTo(g, dt, -g.bet);
       g.hit = { p: p, t: t, pts: pts, steal: !!steal };
     }
     g.phase = 'reveal'; g.until = now + REVEAL_MS; g.clock = now;
@@ -719,7 +737,7 @@ var DGEngine = (function () {
   }
   function missed(g, now) {
     g.hit = null; g.phase = 'reveal'; g.until = now + REVEAL_MS; g.clock = now;
-    var lost = g.opts.bet && g.drawer != null ? g.bet : 0;
+    var lost = on(g, 'bet') && g.drawer != null ? g.bet : 0;
     if (lost) addTo(g, g.players[g.drawer].team, -lost);
     log(g, 'Nessuno ha indovinato «' + g.word + '»' + (lost ? ': ' + (g.opts.mode === 'ffa' ? nick(g, g.drawer) : 'i ' + g.teams[g.players[g.drawer].team].name) + ' perdono la scommessa (−' + lost + ').' : '.'), 'miss');
     fx(g, { k: 'miss', word: g.word, lost: lost });
@@ -809,7 +827,7 @@ var DGEngine = (function () {
       return s.length >= 4 ? s : null;
     }).filter(Boolean);
   }
-  function chainTime(g, k) { return k % 2 ? WRITE_MS : (g.opts.shrink ? Math.max(30, g.opts.time - Math.floor(k / 2) * 20) : g.opts.time) * 1000; }
+  function chainTime(g, k) { return k % 2 ? WRITE_MS : (on(g, 'shrink') ? Math.max(30, Math.round(g.opts.time / 2)) : g.opts.time) * 1000; }
   // al passo k il giocatore p lavora sulla catena (p - k) mod n
   function chainOf(g, p, k) { var n = g.players.length; return ((p - (k == null ? g.chain.k : k)) % n + n) % n; }
   function startChain(g, now) {
@@ -817,6 +835,7 @@ var DGEngine = (function () {
     g.order = [];
     g.chain = { k: 0, steps: steps, done: {}, list: g.players.map(function () { return { w: draw(g, rand() < .65 ? 'e' : 'h'), it: [] }; }) };
     g.chain.list.forEach(function (c) { g.words.push(c.w); });
+    newRule(g);
     g.phase = 'chain'; g.round = 1; g.start = now; g.until = now + chainTime(g, 0); g.clock = now; g.turnN++;
     log(g, 'Telefono senza fili: ognuno disegna la sua parola segreta.', 'sys');
     fx(g, { k: 'chain', step: 0 });
@@ -836,6 +855,7 @@ var DGEngine = (function () {
     });
     C.k++; C.done = {};
     if (C.k >= C.steps) { showChains(g, now); return; }
+    newRule(g);
     g.round = C.k + 1; g.start = now; g.until = now + chainTime(g, C.k); g.clock = now; g.turnN++;
     fx(g, { k: 'chain', step: C.k });
   }
@@ -887,7 +907,7 @@ var DGEngine = (function () {
     if (g.opts.mode === 'chain') return chainAct(g, p, a, now);
     if (now >= g.until && (g.phase === 'draw' || g.phase === 'steal' || g.phase === 'choose' || g.phase === 'hint')) { tick(g, now); if (a.a !== 'pic') return 'Tempo scaduto.'; }
     if (a.a === 'bet') {
-      if (!g.opts.bet || p !== g.drawer || (g.phase !== 'choose' && g.phase !== 'hint')) return 'Adesso non si scommette.';
+      if (!on(g, 'bet') || p !== g.drawer || (g.phase !== 'choose' && g.phase !== 'hint')) return 'Adesso non si scommette.';
       g.bet = Math.max(1, Math.min(3, +a.b || 1)); return null;
     }
     if (a.a === 'choose') {
@@ -911,8 +931,8 @@ var DGEngine = (function () {
       if (+a.t !== g.pic.t || !Array.isArray(a.s)) return null;
       if ((+a.v || 0) < g.pic.v) return null;
       g.pic.v = +a.v || 0;
-      var s = a.s.slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, g.opts.mono); }).filter(Boolean);
-      if (g.opts.line) s = s.slice(0, 1);   // una linea sola: conta solo il primo tratto
+      var s = a.s.slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, on(g, 'mono')); }).filter(Boolean);
+      if (on(g, 'line')) s = s.slice(0, 1);   // una linea sola: conta solo il primo tratto
       g.pic.s = s;
       return null;
     }
@@ -938,8 +958,8 @@ var DGEngine = (function () {
     var C = g.chain, c = C.list[chainOf(g, p, C.k)];
     if (a.a === 'cdraw') {
       if (task.kind !== 'draw') return 'Adesso si scrive.';
-      var s = (Array.isArray(a.s) ? a.s : []).slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, g.opts.mono); }).filter(Boolean);
-      if (g.opts.line) s = s.slice(0, 1);
+      var s = (Array.isArray(a.s) ? a.s : []).slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, on(g, 'mono')); }).filter(Boolean);
+      if (on(g, 'line')) s = s.slice(0, 1);
       c.it[C.k] = { p: p, s: pack(s) };
     } else if (a.a === 'cwrite') {
       if (task.kind !== 'write') return 'Adesso si disegna.';
@@ -951,7 +971,7 @@ var DGEngine = (function () {
     return null;
   }
   return { newGame: newGame, act: act, tick: tick, decider: decider, pending: pending, canGuess: canGuess, knows: knows, checkSeats: checkSeats, members: members, humans: humans,
-    norm: norm, right: right, near: near, clueOk: clueOk, drawTime: drawTime, chainTask: chainTask, chainOf: chainOf, chainTime: chainTime, pack: pack, unpack: unpack, cleanOpts: cleanOpts, teamed: teamed,
+    on: on, rulePool: rulePool, norm: norm, right: right, near: near, clueOk: clueOk, drawTime: drawTime, chainTask: chainTask, chainOf: chainOf, chainTime: chainTime, pack: pack, unpack: unpack, cleanOpts: cleanOpts, teamed: teamed,
     setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, MODES: MODES, MODE_NAME: MODE_NAME, RULES: RULES, RULE_NAME: RULE_NAME,
     STEAL_MS: STEAL_MS, REVEAL_MS: REVEAL_MS, CHOOSE_MS: CHOOSE_MS, HINT_MS: HINT_MS, RELAY_MS: RELAY_MS, WRITE_MS: WRITE_MS, SHOW_MS: SHOW_MS, D: D };
 })();
@@ -1064,11 +1084,11 @@ var DGRules = (function () {
       '<p>Si gioca tutti insieme, solo persone. Ognuno riceve una <b>parola segreta</b> e la disegna sul suo telefono, poi consegna. Il disegno passa al vicino, che scrive <b>che cosa vede</b>; la scritta passa al successivo, che la disegna… e così via (al massimo 6 passaggi).</p>' +
       '<p>Alla fine si rivedono tutte le catene, dalla parola di partenza all’ultima scritta. <b>Un punto</b> a chi scrive esattamente la parola di partenza e uno a chi ha fatto il disegno che gliel’ha fatta capire.</p>'],
     extra: ['Regole in più',
-      '<ul><li><b>Una linea sola</b>: il disegno è un unico tratto, senza mai alzare il dito (si può solo ricominciare).</li>' +
+      '<p>Chi apre il tavolo può attivare le <b>regole in più a sorpresa</b> e scegliere quali possono uscire. A ogni giro di disegni il gioco ne estrae una a caso: vale per <b>un disegnatore di ogni squadra</b> (così tutte le squadre la provano), poi ne esce un’altra. In «Tutti contro tutti» cambia a ogni disegno, nel telefono senza fili a ogni passaggio. La regola del momento è sempre scritta sopra la lavagna.</p><ul><li><b>Una linea sola</b>: il disegno è un unico tratto, senza mai alzare il dito (si può solo ricominciare).</li>' +
       '<li><b>Un colore, niente gomma</b>: solo nero, senza gomma, annulla o cestino.</li>' +
       '<li><b>A occhi chiusi</b>: chi disegna non vede il proprio disegno, lo vedono solo gli altri.</li>' +
       '<li><b>Con la mano sbagliata</b>: si disegna con la mano che non si usa di solito. È una regola d’onore!</li>' +
-      '<li><b>Tempo che si accorcia</b>: a ogni giro il tempo scende di 20 secondi (minimo 30).</li>' +
+      '<li><b>Tempo ridotto</b>: metà del tempo per disegnare (minimo 30 secondi).</li>' +
       '<li><b>Scommessa</b>: prima di disegnare si puntano 1, 2 o 3 punti. Se la squadra indovina vince la puntata (+1 per la parola difficile, +1 se entro metà del tempo); se nessuno indovina, la perde. Chi ruba vince la puntata.</li></ul>'],
     tips: ['Consigli',
       '<ul><li>Disegna prima la forma grande, poi i dettagli.</li><li>Le parole composte si possono disegnare a pezzi.</li><li>Leggi le risposte sbagliate dei compagni: ti dicono cosa stanno capendo.</li></ul>']
@@ -4074,6 +4094,7 @@ function tableReducer(doc, from, op) {
       if (op.teams != null && E.OPT.teams.indexOf(+op.teams) >= 0 && +op.teams !== doc.opts.teams) { doc.opts.teams = +op.teams; balance(doc); }
       if (op.mode != null && E.MODES.indexOf(op.mode) >= 0 && op.mode !== doc.opts.mode) { var wasT = E.teamed(modeOf(doc)); doc.opts.mode = op.mode; if (!wasT && E.teamed(op.mode)) balance(doc); }
       if (op.rule != null && E.RULES.indexOf(op.rule) >= 0) doc.opts[op.rule] = !!op.on;
+      if (op.extra != null) doc.opts.extra = !!op.extra;
       return {};
     }
     case 'back': {
@@ -4130,7 +4151,7 @@ Score.setup({ game: 'disegna', result: function (g) {
   return g.players.map(function (P) { return { won: (g.winners || []).indexOf(P.team) >= 0, place: place[P.team], score: g.teams[P.team].total }; });
 } });
 Turns.setup({ decider: function (g) { return E.decider(g); }, onTimeout: function () { return false; } });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = [], m = modeOf(d); notes.push(m === 'teams' ? (o.teams || 2) + ' squadre' : E.MODE_NAME[m]); E.RULES.forEach(function (r) { if (o[r]) notes.push(E.RULE_NAME[r].toLowerCase()); }); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = [], m = modeOf(d); notes.push(m === 'teams' ? (o.teams || 2) + ' squadre' : E.MODE_NAME[m]); if (o.extra) notes.push('regole a sorpresa'); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo, il tempo e i giocatori automatici.'); render(); });
 
 /* ---------- connessione al tavolo ---------- */
@@ -4312,20 +4333,21 @@ var MODE_DESC = {
 };
 var RULE_DESC = {
   line: 'Non si alza il dito: il disegno è un unico tratto.', mono: 'Solo nero, niente gomma né annulla.', dark: 'Chi disegna non vede il proprio disegno.',
-  hand: 'Si disegna con la mano che non si usa di solito (parola d’onore!).', shrink: 'Il tempo scende di 20 secondi a ogni giro.', bet: 'Chi disegna punta 1, 2 o 3 punti: se nessuno indovina li perde.'
+  hand: 'Si disegna con la mano che non si usa di solito (parola d’onore!).', shrink: 'Metà del tempo per disegnare.', bet: 'Chi disegna punta 1, 2 o 3 punti: se nessuno indovina li perde.'
 };
 function optionsHTML(d, isHost) {
   var o = d.opts || {}, m = modeOf(d), teams = o.teams || 2, r = o.rounds || 2, tm = o.time || 80;
-  var rules = E.RULES.filter(function (k) { return o[k] && !(k === 'bet' && m === 'chain'); });
+  var rules = o.extra ? E.rulePool({ mode: m, line: o.line, mono: o.mono, dark: o.dark, hand: o.hand, shrink: o.shrink, bet: o.bet }) : [];
   var desc = E.MODE_NAME[m] + (E.teamed(m) ? ' · ' + teams + ' squadre' : '') + (m === 'chain' ? '' : ' · ' + r + (r > 1 ? ' giri' : ' giro')) + ' · ' + tm + ' secondi per disegno';
-  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.<br><span class="muted">' + MODE_DESC[m] + '</span></p>' + (rules.length ? '<p class="lead">Regole in più: ' + rules.map(function (k) { return '<b>' + E.RULE_NAME[k] + '</b>'; }).join(', ') + '.</p>' : '');
+  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.<br><span class="muted">' + MODE_DESC[m] + '</span></p>' + (rules.length ? '<p class="lead">Regole in più a sorpresa, tra: ' + rules.map(function (k) { return '<b>' + E.RULE_NAME[k] + '</b>'; }).join(', ') + '. Ne esce una a caso, vale per un disegnatore di ogni squadra e poi cambia.</p>' : '<p class="lead muted">Senza regole in più.</p>');
   function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:240px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
   function opt(id, title, sub, cur, list) { return '<div class="tt-opt row"><label for="' + id + '" style="flex:1;min-width:160px"><b>' + title + '</b><br><span class="muted" style="font-size:14px">' + sub + '</span></label>' + sel(id, cur, list) + '</div>'; }
   var h = opt('opt-mode', 'Modalità', MODE_DESC[m], m, E.MODES.map(function (k) { return [k, E.MODE_NAME[k]]; }));
   if (E.teamed(m)) h += opt('opt-teams', 'Squadre', 'Almeno 2 giocatori per squadra.', teams, [[2, '2 squadre'], [3, '3 squadre'], [4, '4 squadre']]);
   if (m !== 'chain') h += opt('opt-rounds', 'Giri', 'In un giro ogni persona disegna una volta.', r, [[1, '1 giro'], [2, '2 giri'], [3, '3 giri']]);
   h += opt('opt-time', 'Tempo', m === 'chain' ? 'Per ogni disegno (per scrivere ci sono 35 secondi).' : 'Per ogni disegno.', tm, [[60, '60 secondi'], [80, '80 secondi'], [100, '100 secondi'], [120, '2 minuti']]);
-  h += '<div class="rules-pick"><b>Regole in più</b>' + E.RULES.filter(function (k) { return !(k === 'bet' && m === 'chain'); }).map(function (k) {
+  h += opt('opt-extra', 'Regole in più', o.extra ? 'Il gioco estrae una regola tra quelle scelte qui sotto: vale per un disegnatore di ogni squadra' + (m === 'ffa' ? ' (qui: per un disegno)' : m === 'chain' ? ' (qui: per un passaggio)' : '') + ', poi ne esce un’altra.' : 'Si gioca normale, senza regole a sorpresa.', o.extra ? 1 : 0, [[0, 'No'], [1, 'Sì, a sorpresa']]);
+  if (o.extra) h += '<div class="rules-pick"><b>Quali regole possono uscire</b><small class="muted">Se non ne scegli nessuna, possono uscire tutte.</small>' + E.RULES.filter(function (k) { return !(k === 'bet' && m === 'chain'); }).map(function (k) {
     return '<label class="rpick"><input type="checkbox" data-rule="' + k + '"' + (o[k] ? ' checked' : '') + '><span><b>' + E.RULE_NAME[k] + '</b><small>' + RULE_DESC[k] + '</small></span></label>';
   }).join('') + '</div>';
   return h;
@@ -4435,9 +4457,9 @@ var Game = (function () {
   function down(e) {
     var g = G(), me = myIdx(); if (!g || !drawing(g, me) || (g.phase !== 'draw' && g.phase !== 'chain')) return;
     e.preventDefault();
-    if (g.opts.line && mine.s.length >= 1) { toast('Una linea sola: il tuo tratto l’hai già fatto' + (g.opts.mono ? '.' : '. Puoi ricominciare con il cestino.')); return; }
+    if (E.on(g, 'line') && mine.s.length >= 1) { toast('Una linea sola: il tuo tratto l’hai già fatto' + (E.on(g, 'mono') ? '.' : '. Puoi ricominciare con il cestino.')); return; }
     try { cv.setPointerCapture(e.pointerId); } catch (x) {}
-    var p = pos(e), c = g.opts.mono ? INK : App.pen.c, w = c === '#fffdf6' ? 34 : App.pen.w;
+    var p = pos(e), c = E.on(g, 'mono') ? INK : App.pen.c, w = c === '#fffdf6' ? 34 : App.pen.w;
     cur = [c, w, p[0], p[1]]; mine.s.push(cur); sentLen = 0; dirty = true; liveSend(); paint();
   }
   function move(e) {
@@ -4541,14 +4563,15 @@ var Game = (function () {
   }
   function mask(w) { return '<span class="mask">' + String(w).split(' ').map(function (x) { return '<span class="mw">' + x.split('').map(function () { return '<i></i>'; }).join('') + '</span>'; }).join('') + '</span><small class="ml">' + String(w).replace(/ /g, '').length + ' lettere' + (w.indexOf(' ') >= 0 ? ', ' + w.split(' ').length + ' parole' : '') + '</small>'; }
   function betChips(g, me) {
-    if (!g.opts.bet || g.drawer !== me) return '';
+    if (!E.on(g, 'bet') || g.drawer !== me) return '';
     var b = App.bet || g.bet || 1;
     return '<div class="bets"><span>Punti in palio:</span>' + [1, 2, 3].map(function (k) { return '<button class="chip' + (b === k ? ' on' : '') + '" data-act="bet" data-b="' + k + '">' + k + '</button>'; }).join('') + '<small>se nessuno indovina li perdete</small></div>';
   }
+  // la regola in più del momento: la vedono tutti
+  var RULE_HOW = { line: 'un unico tratto, senza alzare il dito', mono: 'solo nero, niente gomma', dark: 'chi disegna non vede il disegno', hand: '✋ si disegna con la mano sbagliata!', shrink: 'metà del tempo', bet: 'si puntano 1, 2 o 3 punti' };
   function rulesNote(g, me) {
-    var r = [];
-    if (g.opts.line) r.push('una linea sola'); if (g.opts.mono) r.push('solo nero, niente gomma'); if (g.opts.dark) r.push('a occhi chiusi'); if (g.opts.hand) r.push('✋ con la mano sbagliata!');
-    return r.length && drawing(g, me) ? '<div class="rnote">' + r.join(' · ') + '</div>' : '';
+    if (!g.rule || !g.opts.extra || g.phase === 'reveal' || g.phase === 'over' || g.phase === 'show') return '';
+    return '<div class="rnote"><b>Regola: ' + esc(E.RULE_NAME[g.rule]) + '</b> · ' + RULE_HOW[g.rule] + '</div>';
   }
   function clueChips(g) { return '<div class="clues">' + (g.clues || []).map(function (c) { return '<span class="clue-c">' + esc(c) + '</span>'; }).join('') + '</div>'; }
   function mid(g, me) {
@@ -4571,17 +4594,16 @@ var Game = (function () {
           [0, 1].map(function (i) { return '<button class="btn ch' + (i ? ' hard' : '') + (hi === i ? ' on' : ' ghost') + '" data-act="hintpick" data-i="' + i + '">' + esc(g.choices[i]) + '<small>' + (i ? 'difficile · 2 punti' : 'facile · 1 punto') + '</small></button>'; }).join('') + '</div>' +
           '<div class="clue-row"><input class="field clue" maxlength="24" placeholder="aiuto 1" autocomplete="off"><input class="field clue" maxlength="24" placeholder="aiuto 2" autocomplete="off"><input class="field clue" maxlength="24" placeholder="aiuto 3" autocomplete="off"><button class="btn" data-act="hintgo">Manda gli aiuti</button></div>';
       } else h = '<div class="st">' + (g.hinter != null ? pname(g, g.hinter) + ' sceglie la parola e gli aiuti per ' : 'Gli aiuti per ') + (g.drawer === me ? 'te' : who) + '…</div>' + betChips(g, me);
-    } else if (g.phase === 'choose') h = g.drawer === me ? '<div class="st">Tocca a te! Scegli cosa disegnare:</div>' + betChips(g, me) + '<div class="choices"><button class="btn ch" data-act="choose" data-i="0">' + esc(g.choices[0]) + '<small>facile · ' + (g.opts.bet ? 'puntata +0' : '1 punto') + '</small></button><button class="btn ch hard" data-act="choose" data-i="1">' + esc(g.choices[1]) + '<small>difficile · ' + (g.opts.bet ? 'puntata +1' : '2 punti') + '</small></button></div>'
+    } else if (g.phase === 'choose') h = g.drawer === me ? '<div class="st">Tocca a te! Scegli cosa disegnare:</div>' + betChips(g, me) + '<div class="choices"><button class="btn ch" data-act="choose" data-i="0">' + esc(g.choices[0]) + '<small>facile · ' + (E.on(g, 'bet') ? 'puntata +0' : '1 punto') + '</small></button><button class="btn ch hard" data-act="choose" data-i="1">' + esc(g.choices[1]) + '<small>difficile · ' + (E.on(g, 'bet') ? 'puntata +1' : '2 punti') + '</small></button></div>'
       : '<div class="st">' + who + (forT ? ' (' + tlabel(g, P.team) + ')' : '') + ' sceglie cosa disegnare…</div>';
     else if (g.phase === 'draw' || g.phase === 'steal') {
       var relay = m === 'relay' && g.relay && g.relay.max > 1 ? ' <span class="pp">la penna passa tra <i id="rlv"></i></span>' : '';
-      var pts = g.opts.bet ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts;
+      var pts = E.on(g, 'bet') ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts;
       if (g.drawer === me) h = m === 'blind' ? '<div class="st">Disegna seguendo gli aiuti (la parola non la sai!):</div>' + clueChips(g) : '<div class="st">Disegna: <b class="word">' + esc(g.word) + '</b> <span class="pp">' + pts + (pts > 1 ? ' punti' : ' punto') + '</span>' + relay + '</div>';
       else if (E.knows(g, me)) h = '<div class="st">' + who + ' disegna' + forT + ': <b class="word">' + esc(g.word) + '</b>' + relay + '</div>' + (m === 'blind' ? clueChips(g) : '');
       else h = '<div class="st">' + (g.phase === 'steal' ? '<b class="steal">Furto!</b> ' : '') + (m === 'relay' ? 'Penna a ' : '') + who + (m === 'relay' ? forT + relay : ' disegna' + forT + ':') + '</div>' + mask(g.word);
-      h += rulesNote(g, me);
     } else if (g.phase === 'reveal') h = '<div class="st">Era <b class="word">' + esc(g.word) + '</b>' + (g.hit ? ' · ' + pname(g, g.hit.p) + (g.hit.steal ? ' l’ha rubata' : ' ha indovinato') + ': <b>+' + g.hit.pts + '</b> ' + tto(g, g.hit.t) + (g.hit.dp ? ' e <b>+' + g.hit.dp + '</b> a ' + pname(g, g.drawer) : '') : ' · nessuno l’ha indovinata') + '</div>';
-    return h + '<div class="tm"><span class="tmv" id="tmv"></span><span class="tbar2"><i id="tbar"></i></span></div>';
+    return h + rulesNote(g, me) + '<div class="tm"><span class="tmv" id="tmv"></span><span class="tbar2"><i id="tbar"></i></span></div>';
   }
   function phaseTotal(g) {
     if (g.phase === 'draw') return E.drawTime(g) * 1000;
@@ -4606,14 +4628,14 @@ var Game = (function () {
     if (!drawing(g, me) || (g.phase !== 'draw' && g.phase !== 'chain')) return '';
     var give = g.phase === 'chain' ? '<button class="btn small" data-act="consegna">Consegna</button>' : '';
     var sizes = SIZES.map(function (w) { return '<button class="sz' + (App.pen.w === w ? ' on' : '') + '" data-act="size" data-w="' + w + '" aria-label="Spessore ' + w + '"><i style="width:' + (w / 1.4 + 3) + 'px;height:' + (w / 1.4 + 3) + 'px"></i></button>'; }).join('');
-    if (g.opts.mono) return '<div class="pal"><span class="muted mono">Solo nero, niente gomma</span></div><div class="pal">' + sizes + give + '</div>';
+    if (E.on(g, 'mono')) return '<div class="pal"><span class="muted mono">Solo nero, niente gomma</span></div><div class="pal">' + sizes + give + '</div>';
     var cols = COLORS.map(function (c) { return '<button class="sw' + (App.pen.c === c ? ' on' : '') + '" style="--c:' + c + '" data-act="pen" data-c="' + c + '" aria-label="Colore"></button>'; }).join('');
-    var rub = g.opts.line ? '' : '<button class="sw er' + (App.pen.c === '#fffdf6' ? ' on' : '') + '" data-act="pen" data-c="#fffdf6" aria-label="Gomma">' + IC('eraser') + '</button>';
-    var un = g.opts.line ? '' : '<button class="tb" data-act="undo" aria-label="Annulla">' + IC('undo') + '</button>';
-    return '<div class="pal">' + cols + rub + '</div><div class="pal">' + sizes + un + '<button class="tb" data-act="clear" aria-label="' + (g.opts.line ? 'Ricomincia' : 'Cancella tutto') + '">' + IC('trash') + '</button>' + give + '</div>';
+    var rub = E.on(g, 'line') ? '' : '<button class="sw er' + (App.pen.c === '#fffdf6' ? ' on' : '') + '" data-act="pen" data-c="#fffdf6" aria-label="Gomma">' + IC('eraser') + '</button>';
+    var un = E.on(g, 'line') ? '' : '<button class="tb" data-act="undo" aria-label="Annulla">' + IC('undo') + '</button>';
+    return '<div class="pal">' + cols + rub + '</div><div class="pal">' + sizes + un + '<button class="tb" data-act="clear" aria-label="' + (E.on(g, 'line') ? 'Ricomincia' : 'Cancella tutto') + '">' + IC('trash') + '</button>' + give + '</div>';
   }
   function over(g, me) {
-    var dark = g.opts.dark && drawing(g, me) ? '<div class="bo dark">A occhi chiusi: il tuo disegno lo vedono solo gli altri</div>' : '';
+    var dark = E.on(g, 'dark') && drawing(g, me) ? '<div class="bo dark">A occhi chiusi: il tuo disegno lo vedono solo gli altri</div>' : '';
     if (g.phase === 'choose') return '<div class="bo">' + (g.drawer === me ? 'Scegli la parola qui sopra' : 'Tra poco si disegna…') + '</div>';
     if (g.phase === 'hint') return '<div class="bo">' + (g.hinter === me ? 'Prepara gli aiuti qui sopra' : 'Si preparano gli aiuti…') + '</div>';
     if (g.phase === 'reveal') return '<div class="bo big">' + esc(g.word) + '</div>';
@@ -4681,6 +4703,7 @@ var Game = (function () {
       case 'turn': enqueue(function () { Sound.play('turn'); if (e.hinter === me) banner('Tocca a te!', 'Prepara gli aiuti per ' + esc(g.players[e.p].nick)); else if (e.p === me) banner('Tocca a te!', g.opts.mode === 'blind' ? 'Tra poco arrivano gli aiuti' : 'Scegli cosa disegnare'); else banner(esc(g.players[e.p].nick) + ' disegna', g.teams[e.t].pc ? '' : 'per i ' + esc(g.teams[e.t].name)); return sleep(200); }); break;
       case 'relay': enqueue(function () { Sound.play('turn'); if (e.p === me) banner('La penna è tua!', 'Disegna: ' + esc(G().word || '')); else banner('Penna a ' + esc(g.players[e.p].nick), ''); return sleep(200); }); break;
       case 'chain': enqueue(function () { Sound.play('turn'); var tk = E.chainTask(G(), me); if (tk) banner(tk.kind === 'draw' ? 'Disegna!' : 'Che cos’è?', tk.kind === 'draw' ? esc(tk.text) : 'scrivi cosa vedi nel disegno'); return sleep(200); }); break;
+      case 'rule': enqueue(function () { Sound.play('steal'); banner('Nuova regola!', esc(E.RULE_NAME[e.r]) + ' · ' + RULE_HOW[e.r]); return sleep(900); }); break;
       case 'show': enqueue(function () { Sound.play('hit'); banner('Le catene!', 'guardate com’è cambiata ogni parola'); return sleep(200); }); break;
       case 'draw': enqueue(function () { Sound.play('draw'); return sleep(50); }); break;
       case 'hit': enqueue(function () { Sound.play('hit'); banner(e.steal ? 'Rubata!' : 'Indovinata!', esc(e.word) + ' · +' + e.pts + (g.teams[e.t].pc ? ' a ' : ' ai ') + esc(g.teams[e.t].name)); if (myTeam(g, me) === e.t) confetti(30); return sleep(300); }); break;
@@ -4849,6 +4872,7 @@ document.addEventListener('change', function (ev) {
   if (id === 'opt-time') send({ t: 'opt', time: +ev.target.value });
   if (id === 'opt-teams') send({ t: 'opt', teams: +ev.target.value });
   if (id === 'opt-mode') send({ t: 'opt', mode: ev.target.value });
+  if (id === 'opt-extra') send({ t: 'opt', extra: ev.target.value === '1' });
   if (ev.target.getAttribute && ev.target.getAttribute('data-rule')) send({ t: 'opt', rule: ev.target.getAttribute('data-rule'), on: ev.target.checked });
 });
 document.addEventListener('keydown', function (e) {
