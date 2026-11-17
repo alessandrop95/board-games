@@ -36,7 +36,7 @@ var DGEngine = (function () {
   function right(guess, word) {
     var a = norm(guess).replace(/ /g, ''), b = norm(word).replace(/ /g, '');
     if (!a) return false; if (a === b) return true;
-    if (b.length >= 5 && lev(a, b) <= 1) return true;
+    if (b.length >= 5 && lev(a, b) <= (b.length >= 22 ? 3 : b.length >= 13 ? 2 : 1)) return true;
     return a.length >= 4 && a.slice(0, -1) === b.slice(0, -1);
   }
   function near(guess, word) { var a = norm(guess).replace(/ /g, ''), b = norm(word).replace(/ /g, ''); return !!a && !right(guess, word) && (lev(a, b) <= 2 || (a.length >= 4 && b.indexOf(a) >= 0)); }
@@ -59,7 +59,8 @@ var DGEngine = (function () {
     if (!seats.some(function (s) { return !s.bot; })) return 'Serve almeno una persona che disegni.';
     return null;
   }
-  function newGame(seats, opts, now) {
+  // seen: parole uscite nelle partite precedenti a questo tavolo (o su questo telefono), da non riproporre
+  function newGame(seats, opts, now, seen) {
     opts = opts || {}; now = now || Date.now();
     var o = { rounds: pick(OPT.rounds, opts.rounds, 2), time: pick(OPT.time, opts.time, 80), teams: pick(OPT.teams, opts.teams, 2) };
     var want = seats.map(function (s, i) { var t = +s.team; return t >= 0 && t < o.teams && t === Math.floor(t) ? t : i % o.teams; });
@@ -68,7 +69,7 @@ var DGEngine = (function () {
       v: 1, phase: 'choose', seq: 0, turnN: 0, round: 0, turn: -1, clock: now, opts: o,
       teams: used.map(function (t) { return { name: TEAMS[t][0], col: TEAMS[t][1], total: 0 }; }),
       players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, team: used.indexOf(want[i]) }; }),
-      order: [], drawer: null, choices: null, word: null, pts: 0, until: 0, start: 0, pic: { t: 0, v: 0, s: [] }, guesses: [], hit: null, words: [], decks: { e: [], h: [] },
+      order: [], drawer: null, choices: null, word: null, pts: 0, until: 0, start: 0, pic: { t: 0, v: 0, s: [] }, guesses: [], hit: null, words: [], offered: [], avoid: (seen || []).slice(-300),
       log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
     };
     g.order = makeOrder(g);
@@ -84,9 +85,13 @@ var DGEngine = (function () {
   }
   function draw(g, kind) {
     var key = kind === 'h' ? 'h' : 'e';
-    if (!g.decks[key].length) g.decks[key] = shuffle((key === 'h' ? D.HARD : D.EASY).filter(function (w) { return g.words.indexOf(w) < 0; }));
-    if (!g.decks[key].length) g.decks[key] = shuffle((key === 'h' ? D.HARD : D.EASY).slice());
-    return g.decks[key].pop();
+    var L = key === 'h' ? D.HARD : D.EASY, off = g.offered || [], av = g.avoid || [];
+    var pool = L.filter(function (w) { return off.indexOf(w) < 0 && av.indexOf(w) < 0; });
+    if (!pool.length) pool = L.filter(function (w) { return off.indexOf(w) < 0; });
+    if (!pool.length) { g.offered = []; pool = L; }
+    var w = pool[Math.floor(rand() * pool.length)];
+    (g.offered || (g.offered = [])).push(w);
+    return w;
   }
   function nextTurn(g, now) {
     g.turn++;

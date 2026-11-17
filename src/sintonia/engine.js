@@ -43,22 +43,28 @@ var STEngine = (function () {
     return { teams: used.map(function (t) { return { name: TEAMS[t][0], col: TEAMS[t][1], total: 0, hist: [] }; }), of: want.map(function (t) { return used.indexOf(t); }) };
   }
   function members(g, t) { return g.players.map(function (P, i) { return i; }).filter(function (i) { return g.players[i].team === t; }); }
-  function newGame(seats, opts, now) {
+  // seen: temi usciti nelle partite precedenti a questo tavolo (o su questo telefono), da non riproporre
+  function newGame(seats, opts, now, seen) {
     opts = opts || {}; now = now || Date.now();
     var o = { rounds: pick(OPT.rounds, opts.rounds, 8), time: pick(OPT.time, opts.time, 30), teams: pick(OPT.teams, opts.teams == null ? 2 : opts.teams, 2) };
     var tm = makeTeams(seats, o.teams);
     var g = {
       v: 1, phase: 'write', seq: 0, turnN: 0, round: 0, clock: now, opts: o, teams: tm.teams,
       players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, team: tm.of[i], ans: null, ready: false, total: 0 }; }),
-      deck: shuffle(D.LIST.map(function (x, i) { return i; })), theme: null, until: 0, res: null, log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
+      deck: freshDeck(seen), theme: null, until: 0, res: null, log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
     };
     startRound(g, now);
     return g;
   }
+  function freshDeck(seen) {
+    var all = D.LIST.map(function (x, i) { return i; }), s = seen || [];
+    var d = all.filter(function (i) { return s.indexOf(D.LIST[i].q) < 0; });
+    return shuffle(d.length >= 20 ? d : all);
+  }
   function startRound(g, now) {
     g.round++; g.phase = 'write'; g.res = null;
-    if (!g.deck.length) g.deck = shuffle(D.LIST.map(function (x, i) { return i; }));
-    g.theme = g.deck.pop();
+    if (!g.deck.length) g.deck = freshDeck();
+    g.theme = g.deck.pop(); (g.usedQ || (g.usedQ = [])).push(D.LIST[g.theme].q);
     g.players.forEach(function (P) { P.ans = null; P.ready = false; });
     g.until = now + g.opts.time * 1000; g.clock = now; g.turnN++;
     log(g, 'Manche ' + g.round + ': «' + D.LIST[g.theme].q + '».', 'sys');

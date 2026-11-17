@@ -52,6 +52,13 @@ for (var k2 = 0; k2 < N; k2++) for (var nt = 2; nt <= 4; nt++) {
   turns += b.order.length; b.teams.forEach(function (T) { hits += T.total; });
 }
 t('partite con 2, 3 e 4 squadre finite senza errori', bad === 0, bad);
+// parole già uscite nelle partite precedenti: non tornano finché ce ne sono di nuove
+t('almeno 1000 parole facili e 700 difficili', D.EASY.length >= 1000 && D.HARD.length >= 700);
+var seenW = D.EASY.slice(0, 200).concat(D.HARD.slice(0, 100)), fresh = 0;
+for (var z = 0; z < 20; z++) { var gz = E.newGame(seats([0, 1, 0, 1]), { rounds: 1 }, T0, seenW); if (seenW.indexOf(gz.choices[0]) < 0 && seenW.indexOf(gz.choices[1]) < 0) fresh++; }
+t('le parole già uscite a questo tavolo non vengono riproposte', fresh === 20);
+var gw = E.newGame(seats([0, 1, 0, 1]), { rounds: 1 }, T0), firsts = gw.choices.slice();
+t('nella stessa partita le parole proposte non si ripetono', gw.offered.length === 2 && firsts[0] !== firsts[1]);
 console.log('punti per turno: ' + (hits / turns).toFixed(2));
 console.log('Disegna e indovina: ' + ok + ' prove superate, ' + ko + ' fallite');
 process.exit(ko ? 1 : 0);

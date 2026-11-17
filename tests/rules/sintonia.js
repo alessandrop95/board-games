@@ -43,5 +43,10 @@ for (var k = 0; k < N; k++) {
   b.teams.forEach(function (T) { pts += T.total; });
 }
 t('partite tra automatici finite senza errori', bad === 0, bad);
+// temi già usati nelle partite precedenti: non tornano finché ce ne sono di nuovi
+t('almeno 400 temi diversi', D.LIST.length >= 400 && D.LIST.every(function (x, i, l) { return l.findIndex(function (y) { return y.q === x.q; }) === i; }));
+var seenQ = D.LIST.slice(0, D.LIST.length - 30).map(function (x) { return x.q; });
+var gs = E.newGame(seats([0, 0, 1, 1]), { rounds: 8 }, T0, seenQ);
+t('i temi già usati a questo tavolo non tornano', gs.deck.length + 1 === 30 && gs.deck.concat([gs.theme]).every(function (i) { return seenQ.indexOf(D.LIST[i].q) < 0; }) && gs.usedQ.length === 1);
 console.log('Sintonia: ' + ok + ' prove superate, ' + ko + ' fallite');
 process.exit(ko ? 1 : 0);

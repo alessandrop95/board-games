@@ -29,6 +29,17 @@ function nTeams(doc) { var t = doc.opts && doc.opts.teams; return t == null ? 2 
 // la squadra con meno giocatori (per chi arriva)
 function lightTeam(doc) { var n = nTeams(doc); if (!n) return 0; var c = []; for (var i = 0; i < n; i++) c.push(0); doc.seats.forEach(function (s) { if (s.team >= 0 && s.team < n) c[s.team]++; }); return c.indexOf(Math.min.apply(null, c)); }
 function balance(doc) { var n = nTeams(doc); doc.seats.forEach(function (s, i) { s.team = n ? i % n : 0; }); }
+// cosa è già uscito: sul tavolo (vale per tutti, anche se cambia l'host) e sul telefono di chi apre il tavolo
+var SEEN_KEY = 'st-seen', SEEN_MAX = 200;
+function seenLocal() { try { return JSON.parse(lsGet(SEEN_KEY) || '[]') || []; } catch (e) { return []; } }
+function rememberUsed(doc) {
+  var g = doc.game; if (!g) return;
+  var add = (g.usedQ || []).filter(function (w) { return w; });
+  if (!add.length) return;
+  doc.seen = (doc.seen || []).concat(add).slice(-SEEN_MAX);
+  var loc = seenLocal().filter(function (w) { return add.indexOf(w) < 0; }).concat(add).slice(-SEEN_MAX); lsSet(SEEN_KEY, JSON.stringify(loc));
+}
+function seenList(doc) { var s = seenLocal(); (doc.seen || []).forEach(function (w) { if (s.indexOf(w) < 0) s.push(w); }); return s.slice(-SEEN_MAX); }
 function tableReducer(doc, from, op) {
   var isHost = doc.host === from, seat = doc.seats.filter(function (s) { return s.uid === from; })[0];
   var hostOnly = { err: 'Solo chi ha aperto il tavolo può farlo.' };
@@ -91,9 +102,9 @@ function tableReducer(doc, from, op) {
       if (doc.phase !== 'lobby') return { changed: false };
       if (doc.seats.length < MINP) return { err: 'Servono almeno ' + MINP + ' giocatori: aggiungi giocatori automatici.' };
       if (nTeams(doc)) { var cnt = {}; doc.seats.forEach(function (s) { cnt[s.team] = (cnt[s.team] || 0) + 1; }); var ks = Object.keys(cnt); if (ks.length < 2) return { err: 'Servono almeno due squadre: cambia la squadra a qualcuno.' }; if (ks.some(function (k) { return cnt[k] < 2; })) return { err: 'Ogni squadra ha bisogno di almeno 2 giocatori (anche automatici): la sintonia si cerca in due!' }; }
-      doc.game = E.newGame(doc.seats.slice(), doc.opts, Date.now()); doc.phase = 'play'; return {};
+      rememberUsed(doc); doc.game = E.newGame(doc.seats.slice(), doc.opts, Date.now(), seenList(doc)); doc.phase = 'play'; return {};
     }
-    case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
+    case 'rematch': if (!isHost) return hostOnly; rememberUsed(doc); doc.phase = 'lobby'; doc.game = null; return {};
     case 'auto': if (!isHost) return hostOnly; if (!doc.game || !doc.game.players[op.p]) return { changed: false }; doc.game.players[op.p].bot = !!op.on; if (!op.on) doc.game.players[op.p].away = false; else doc.game.players[op.p].ready = true; return {};
     case 'nextround': if (!isHost) return hostOnly; if (!doc.game || !E.forceNext(doc.game, Date.now())) return { changed: false }; if (doc.game.phase === 'over') doc.phase = 'over'; return {};
     case 'act': {
