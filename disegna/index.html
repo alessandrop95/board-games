@@ -328,6 +328,37 @@ select.field { color: #13284f; }
 }
 @media (prefers-reduced-motion: reduce) { .hero-pen, .gs, .bo.big, .sheet, .toast, .banner span, .gv-mid.low .tmv { animation: none !important; } .tbar2 i { transition: none; } }
 
+/* ===== modalità e regole in più ===== */
+.rules-pick { display: grid; gap: 6px; }
+.rpick { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); cursor: pointer; }
+.rpick input { width: 20px; height: 20px; flex: none; margin-top: 2px; accent-color: var(--gold); }
+.rpick span { display: grid; gap: 1px; } .rpick small { font-size: 13.5px; color: var(--muted); }
+.bets { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; margin: 4px 0; font-size: 14px; }
+.bets .chip { min-width: 40px; justify-content: center; font-weight: 800; }
+.bets .chip.on { background: var(--gold); color: #3a2a00; border-color: var(--gold); }
+.bets small { width: 100%; text-align: center; color: var(--muted); font-size: 12.5px; }
+.rnote { font-size: 13px; font-weight: 800; color: #ffd7a0; text-align: center; }
+.clues { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.clue-c { padding: 4px 12px; border-radius: 999px; background: #fff6c8; color: #3a2a00; font-weight: 800; font-size: 16px; box-shadow: 0 2px 0 rgba(0, 0, 0, .2); }
+.clue-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.clue-row .btn { grid-column: 1 / -1; }
+.clue-row .field { min-height: 42px; font-size: 16px; }
+.btn.ch.on { box-shadow: 0 0 0 3px #fff, 0 0 18px rgba(255, 215, 94, .7); }
+.bo.dark { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 16px; background: #0b0d14; color: #fff6c8; border-radius: inherit; }
+.bo.cap { position: absolute; inset: auto 0 0 0; text-align: center; background: rgba(0, 0, 0, .55); color: #fff; font-size: 15px; padding: 6px; }
+.bo small { display: block; font-size: 14px; font-weight: 700; opacity: .85; margin-top: 4px; }
+.bo.ok { color: #2f9a58; }
+.mono { font-size: 13px; padding: 0 6px; }
+.chainsum { font-size: 14px; line-height: 1.4; }
+.chains { display: grid; gap: 10px; width: 100%; text-align: left; }
+.chainx { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding: 8px; border-radius: 14px; background: rgba(255, 255, 255, .07); scrollbar-width: thin; }
+.chainx .cw { flex: none; padding: 6px 10px; border-radius: 10px; background: #fff6c8; color: #3a2a00; }
+.cpic, .ctxt { flex: none; display: grid; gap: 2px; justify-items: center; font-size: 14px; }
+.cpic .mini { width: 96px; height: 72px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, .3); display: block; }
+.cpic.ok .mini, .ctxt.ok { border-color: #8ff0a4; color: #8ff0a4; }
+.ctxt { padding: 6px 10px; border-radius: 10px; background: rgba(0, 0, 0, .25); border: 2px solid transparent; max-width: 140px; text-align: center; }
+.chainx small { font-size: 11.5px; color: color-mix(in srgb, var(--pc) 60%, #fff); }
+
 </style>
 </head>
 <body>
@@ -483,20 +514,35 @@ var DGData = (function () {
 if (typeof module !== 'undefined') module.exports = DGData;
 
 /* ===== Disegna e indovina: motore delle regole (gira sull'host; lo stato è JSON) =====
-   Squadre da 2 a 4. A turno, una squadra alla volta, uno dei suoi giocatori sceglie una parola tra due
-   (facile: 1 punto, difficile: 2 punti) e la disegna sul telefono: tutti vedono il disegno in diretta, ma solo
-   i compagni possono scrivere le risposte. Se indovinano la squadra prende i punti della parola (+1 se ci
-   mettono meno di metà del tempo). Se il tempo finisce, le altre squadre hanno 10 secondi per «rubarla».
-   Ogni giocatore (persona, non automatico) disegna una volta per giro; dopo i giri stabiliti vince la squadra
-   con più punti. Le funzioni che dipendono dall'ora ricevono «now» (millisecondi dell'host). */
+   Modalità (opts.mode):
+   - teams  «A squadre»: a turno uno disegna e i compagni indovinano; se il tempo finisce le altre squadre
+            hanno 12 secondi per rubare la parola.
+   - ffa    «Tutti contro tutti»: niente squadre; chiunque indovini per primo prende i punti, e anche chi disegna.
+   - relay  «Staffetta»: a squadre, ma ogni 10 secondi la penna passa al compagno successivo, che vede la parola
+            solo quando la riceve; indovina chi non ha ancora disegnato.
+   - blind  «Indovina tu per me»: un avversario sceglie la parola e scrive fino a 3 parole di aiuto; chi disegna
+            vede solo gli aiuti (non la parola) e indovinano lui e i compagni. Niente furto.
+   - chain  «Telefono senza fili»: tutti insieme; ognuno disegna la sua parola, il vicino scrive cosa vede, il
+            successivo disegna quella scritta… Alla fine si rivedono le catene. Un punto a chi scrive la parola
+            di partenza giusta e a chi l'ha disegnata.
+   Regole che si aggiungono (opts): line (una linea sola), mono (un colore, niente gomma), dark (a occhi chiusi:
+   chi disegna non vede il disegno), hand (con la mano sbagliata: promemoria d'onore), shrink (il tempo scende di
+   20 secondi a ogni giro), bet (scommessa: chi disegna punta 1, 2 o 3 punti; se nessuno indovina li perde).
+   Le parole difficili valgono 2 punti, le facili 1; indovinata entro metà del tempo: +1.
+   Le funzioni che dipendono dall'ora ricevono «now» (millisecondi dell'host). */
 var DGEngine = (function () {
   var D = (typeof DGData !== 'undefined') ? DGData : require('./data.js');
   var rand = Math.random;
   function setRandom(f) { rand = f || Math.random; }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   var TEAMS = [['Rossi', 0], ['Blu', 1], ['Verdi', 2], ['Gialli', 3]];
-  var CHOOSE_MS = 15000, STEAL_MS = 12000, REVEAL_MS = 5000, MAXPTS = 2600, MAXSTROKES = 400;
+  var CHOOSE_MS = 15000, STEAL_MS = 12000, REVEAL_MS = 5000, HINT_MS = 45000, RELAY_MS = 10000, WRITE_MS = 35000, SHOW_MS = 3800, MAXPTS = 2600, MAXSTROKES = 400;
+  var MODES = ['teams', 'ffa', 'relay', 'blind', 'chain'];
+  var MODE_NAME = { teams: 'A squadre', ffa: 'Tutti contro tutti', relay: 'Staffetta', blind: 'Indovina tu per me', chain: 'Telefono senza fili' };
+  var RULES = ['line', 'mono', 'dark', 'hand', 'shrink', 'bet'];
+  var RULE_NAME = { line: 'Una linea sola', mono: 'Un colore, niente gomma', dark: 'A occhi chiusi', hand: 'Con la mano sbagliata', shrink: 'Tempo che si accorcia', bet: 'Scommessa' };
   var OPT = { rounds: [1, 2, 3], time: [60, 80, 100, 120], teams: [2, 3, 4] };
+  var INK = '#1d2333';
 
   function norm(s) {
     var t = String(s == null ? '' : s).toLowerCase();
@@ -531,38 +577,64 @@ var DGEngine = (function () {
   function pick(list, v, def) { v = +v; return list.indexOf(v) >= 0 ? v : def; }
   function members(g, t) { return g.players.map(function (P, i) { return i; }).filter(function (i) { return g.players[i].team === t; }); }
   function humans(g, t) { return members(g, t).filter(function (i) { return !g.players[i].bot || g.players[i].away; }); }
+  function teamed(mode) { return mode === 'teams' || mode === 'relay' || mode === 'blind'; }
+  function cleanOpts(opts) {
+    opts = opts || {};
+    var o = { rounds: pick(OPT.rounds, opts.rounds, 2), time: pick(OPT.time, opts.time, 80), teams: pick(OPT.teams, opts.teams, 2), mode: MODES.indexOf(opts.mode) >= 0 ? opts.mode : 'teams' };
+    RULES.forEach(function (r) { o[r] = !!opts[r]; });
+    if (o.mode === 'chain') o.bet = false;
+    return o;
+  }
 
-  // controllo prima di iniziare: almeno due squadre, ognuna con almeno 2 giocatori e chi disegna
-  function checkSeats(seats, n) {
+  // controllo prima di iniziare
+  function checkSeats(seats, n, opts) {
+    var mode = opts && MODES.indexOf(opts.mode) >= 0 ? opts.mode : 'teams';
+    var people = seats.filter(function (s) { return !s.bot; }).length;
+    if (mode === 'chain') return people < 3 ? 'Il telefono senza fili si gioca tra persone: servono almeno 3 persone (i giocatori automatici guardano).' : null;
+    if (mode === 'ffa') {
+      if (seats.length < 2) return 'Servono almeno 2 giocatori.';
+      return people ? null : 'Serve almeno una persona che disegni.';
+    }
     var by = {}; seats.forEach(function (s) { var t = +s.team || 0; (by[t] = by[t] || []).push(s); });
     var ts = Object.keys(by);
     if (ts.length < 2) return 'Servono almeno due squadre.';
     for (var i = 0; i < ts.length; i++) {
       if (by[ts[i]].length < 2) return 'Ogni squadra ha bisogno di almeno 2 giocatori (anche automatici): uno disegna e l’altro indovina.';
     }
-    if (!seats.some(function (s) { return !s.bot; })) return 'Serve almeno una persona che disegni.';
+    if (!people) return 'Serve almeno una persona che disegni.';
     return null;
   }
   // seen: parole uscite nelle partite precedenti a questo tavolo (o su questo telefono), da non riproporre
   function newGame(seats, opts, now, seen) {
-    opts = opts || {}; now = now || Date.now();
-    var o = { rounds: pick(OPT.rounds, opts.rounds, 2), time: pick(OPT.time, opts.time, 80), teams: pick(OPT.teams, opts.teams, 2) };
-    var want = seats.map(function (s, i) { var t = +s.team; return t >= 0 && t < o.teams && t === Math.floor(t) ? t : i % o.teams; });
-    var used = []; want.forEach(function (t) { if (used.indexOf(t) < 0) used.push(t); }); used.sort();
+    now = now || Date.now();
+    var o = cleanOpts(opts), teamsMode = teamed(o.mode), teams, team;
+    if (o.mode === 'chain') seats = seats.filter(function (s) { return !s.bot; });
+    if (teamsMode) {
+      var want = seats.map(function (s, i) { var t = +s.team; return t >= 0 && t < o.teams && t === Math.floor(t) ? t : i % o.teams; });
+      var used = []; want.forEach(function (t) { if (used.indexOf(t) < 0) used.push(t); }); used.sort();
+      teams = used.map(function (t) { return { name: TEAMS[t][0], col: TEAMS[t][1], total: 0 }; });
+      team = function (i) { return used.indexOf(want[i]); };
+    } else {   // tutti contro tutti e telefono: ognuno è una «squadra» da solo
+      teams = seats.map(function (s, i) { return { name: s.nick, col: i, pc: true, total: 0 }; });
+      team = function (i) { return i; };
+    }
     var g = {
-      v: 1, phase: 'choose', seq: 0, turnN: 0, round: 0, turn: -1, clock: now, opts: o,
-      teams: used.map(function (t) { return { name: TEAMS[t][0], col: TEAMS[t][1], total: 0 }; }),
-      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, team: used.indexOf(want[i]) }; }),
-      order: [], drawer: null, choices: null, word: null, pts: 0, until: 0, start: 0, pic: { t: 0, v: 0, s: [] }, guesses: [], hit: null, words: [], offered: [], avoid: (seen || []).slice(-300),
+      v: 1, phase: 'choose', seq: 0, turnN: 0, round: 0, turn: -1, clock: now, opts: o, teams: teams,
+      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, team: team(i) }; }),
+      order: [], drawer: null, choices: null, word: null, pts: 0, bet: 1, until: 0, start: 0, pic: { t: 0, v: 0, s: [] }, guesses: [], hit: null,
+      words: [], offered: [], avoid: (seen || []).slice(-300), relay: null, hinter: null, clues: null,
       log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
     };
+    if (o.mode === 'chain') { startChain(g, now); return g; }
     g.order = makeOrder(g);
     nextTurn(g, now);
     return g;
   }
   // l'ordine dei turni: un giro = ogni persona disegna una volta; le squadre si alternano
   function makeOrder(g) {
-    var out = [], hs = g.teams.map(function (T, t) { return members(g, t).filter(function (i) { return !g.players[i].bot; }); });
+    var out = [], hs;
+    if (!teamed(g.opts.mode)) hs = [g.players.map(function (P, i) { return i; }).filter(function (i) { return !g.players[i].bot; })];
+    else hs = g.teams.map(function (T, t) { return members(g, t).filter(function (i) { return !g.players[i].bot; }); });
     var max = Math.max.apply(null, hs.map(function (h) { return h.length; }));
     for (var r = 0; r < g.opts.rounds; r++) for (var k = 0; k < max; k++) hs.forEach(function (h) { if (k < h.length) out.push({ p: h[k], r: r + 1 }); });
     return out;
@@ -577,59 +649,223 @@ var DGEngine = (function () {
     (g.offered || (g.offered = [])).push(w);
     return w;
   }
+  // il tempo per disegnare: con «Tempo che si accorcia» scende di 20 secondi a ogni giro (minimo 30)
+  function drawTime(g, round) { var r = round == null ? g.round : round; return g.opts.shrink ? Math.max(30, g.opts.time - (r - 1) * 20) : g.opts.time; }
+  // chi suggerisce in «Indovina tu per me»: a rotazione, una persona di un'altra squadra
+  function pickHinter(g, drawer) {
+    var t = g.players[drawer].team, cand = g.players.map(function (P, i) { return i; }).filter(function (i) { return g.players[i].team !== t && !g.players[i].bot; });
+    if (!cand.length) return null;
+    return cand[(g.turn + Math.floor(g.turn / Math.max(1, cand.length))) % cand.length];
+  }
   function nextTurn(g, now) {
     g.turn++;
     if (g.turn >= g.order.length) { finish(g); return; }
     var o = g.order[g.turn];
-    g.round = o.r; g.drawer = o.p; g.phase = 'choose'; g.choices = [draw(g, 'e'), draw(g, 'h')]; g.word = null; g.pts = 0; g.hit = null;
+    g.round = o.r; g.drawer = o.p; g.phase = 'choose'; g.choices = [draw(g, 'e'), draw(g, 'h')]; g.word = null; g.pts = 0; g.hit = null; g.bet = 1; g.relay = null; g.clues = null; g.hinter = null;
     // numero del disegno unico anche tra una partita e l'altra (così un disegno vecchio non torna)
     g.pic = { t: (Math.floor(now) % 1000000000) * 10 + (g.turn % 10) + 1, v: 0, s: [] }; g.guesses = [];
     g.until = now + CHOOSE_MS; g.clock = now; g.turnN++;
-    fx(g, { k: 'turn', p: o.p, t: g.players[o.p].team, turn: g.turn });
+    if (g.opts.mode === 'blind') {
+      g.hinter = pickHinter(g, o.p);
+      g.phase = 'hint'; g.until = now + (g.hinter == null ? 1500 : HINT_MS);
+    }
+    fx(g, { k: 'turn', p: o.p, t: g.players[o.p].team, turn: g.turn, hinter: g.hinter });
   }
-  function choose(g, i, now) {
-    g.word = g.choices[i]; g.pts = i ? 2 : 1; g.words.push(g.word);
-    g.phase = 'draw'; g.start = now; g.until = now + g.opts.time * 1000; g.clock = now;
-    log(g, nick(g, g.drawer) + ' disegna una parola ' + (i ? 'difficile' : 'facile') + '.', 'sys', g.drawer);
+  function startDraw(g, now) {
+    g.phase = 'draw'; g.start = now; g.until = now + drawTime(g) * 1000; g.clock = now;
+    if (g.opts.mode === 'relay') {
+      var t = g.players[g.drawer].team, hs = members(g, t).filter(function (i) { return !g.players[i].bot; });
+      var k = hs.indexOf(g.drawer), list = hs.slice(k).concat(hs.slice(0, k)), hasBot = members(g, t).some(function (i) { return g.players[i].bot; });
+      g.relay = { list: list, k: 0, seen: [g.drawer], next: now + RELAY_MS, max: Math.max(1, hasBot ? list.length : list.length - 1) };
+    }
     fx(g, { k: 'draw', p: g.drawer });
   }
+  function choose(g, i, now, bet) {
+    g.word = g.choices[i]; g.pts = i ? 2 : 1; g.words.push(g.word);
+    if (g.opts.bet && bet != null) g.bet = Math.max(1, Math.min(3, +bet || 1));
+    log(g, nick(g, g.drawer) + ' disegna una parola ' + (i ? 'difficile' : 'facile') + (g.opts.bet ? ' e punta ' + g.bet + (g.bet > 1 ? ' punti' : ' punto') : '') + '.', 'sys', g.drawer);
+    startDraw(g, now);
+  }
+  // «Indovina tu per me»: gli aiuti non devono contenere la parola (né un suo pezzo)
+  function clueOk(c, word) {
+    var a = norm(c).replace(/ /g, ''), parts = norm(word).split(' ').filter(function (x) { return x.length >= 3; });
+    if (!a) return false;
+    if (right(c, word) || near(c, word)) return false;
+    return !parts.some(function (x) { return a.indexOf(x.slice(0, Math.max(3, x.length - 2))) >= 0 || (a.length >= 4 && x.indexOf(a) >= 0); });
+  }
+  function autoClues(word) { var w = norm(word); return ['inizia per ' + w.charAt(0).toUpperCase(), w.replace(/ /g, '').length + ' lettere' + (w.indexOf(' ') >= 0 ? ', ' + w.split(' ').length + ' parole' : '')]; }
+  function giveHint(g, i, clues, now) {
+    g.word = g.choices[i ? 1 : 0]; g.pts = i ? 2 : 1; g.words.push(g.word); g.clues = clues;
+    log(g, (g.hinter != null ? nick(g, g.hinter) + ' sceglie una parola ' + (i ? 'difficile' : 'facile') + ' e lascia ' + clues.length + (clues.length > 1 ? ' aiuti' : ' aiuto') : 'Gli aiuti arrivano dal gioco') + ' per ' + nick(g, g.drawer) + '.', 'sys', g.hinter);
+    startDraw(g, now);
+  }
+  function addTo(g, t, pts) { g.teams[t].total = Math.max(0, g.teams[t].total + pts); }
   function score(g, p, steal, now) {
-    var t = g.players[p].team, bonus = !steal && now - g.start < g.opts.time * 500 ? 1 : 0, pts = g.pts + bonus;
-    g.teams[t].total += pts; g.hit = { p: p, t: t, pts: pts, steal: !!steal };
+    var m = g.opts.mode, t = g.players[p].team, dt = g.players[g.drawer].team;
+    var bonus = !steal && now - g.start < drawTime(g) * 500 ? 1 : 0;
+    var base = g.opts.bet ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts, pts = base + bonus;
+    if (m === 'ffa') {
+      addTo(g, t, pts);
+      var dp = g.opts.bet ? g.bet : g.pts; addTo(g, dt, dp);
+      g.hit = { p: p, t: t, pts: pts, steal: false, dp: dp };
+    } else {
+      addTo(g, t, pts);
+      if (steal && g.opts.bet) addTo(g, dt, -g.bet);
+      g.hit = { p: p, t: t, pts: pts, steal: !!steal };
+    }
     g.phase = 'reveal'; g.until = now + REVEAL_MS; g.clock = now;
-    log(g, nick(g, p) + (steal ? ' ruba' : ' indovina') + ' «' + g.word + '»: +' + pts + ' ai ' + g.teams[t].name + '.', steal ? 'steal' : 'hit', p);
+    log(g, nick(g, p) + (steal ? ' ruba' : ' indovina') + ' «' + g.word + '»: +' + pts + (m === 'ffa' ? ' a ' + nick(g, p) + ' e +' + g.hit.dp + ' a ' + nick(g, g.drawer) : ' ai ' + g.teams[t].name) + '.', steal ? 'steal' : 'hit', p);
     fx(g, { k: 'hit', p: p, t: t, pts: pts, steal: !!steal, word: g.word });
+  }
+  function missed(g, now) {
+    g.hit = null; g.phase = 'reveal'; g.until = now + REVEAL_MS; g.clock = now;
+    var lost = g.opts.bet && g.drawer != null ? g.bet : 0;
+    if (lost) addTo(g, g.players[g.drawer].team, -lost);
+    log(g, 'Nessuno ha indovinato «' + g.word + '»' + (lost ? ': ' + (g.opts.mode === 'ffa' ? nick(g, g.drawer) : 'i ' + g.teams[g.players[g.drawer].team].name) + ' perdono la scommessa (−' + lost + ').' : '.'), 'miss');
+    fx(g, { k: 'miss', word: g.word, lost: lost });
   }
   function finish(g) {
     var order = g.teams.map(function (T, t) { return t; }).sort(function (a, b) { return g.teams[b].total - g.teams[a].total || a - b; });
     var place = g.teams.map(function (T) { return 1 + g.teams.filter(function (U) { return U.total > T.total; }).length; });
     g.winners = order.filter(function (t) { return place[t] === 1; }); g.final = { order: order, place: place };
     g.phase = 'over'; g.drawer = null;
-    log(g, (g.winners.length > 1 ? 'Pari! Vincono ' + g.winners.map(function (t) { return g.teams[t].name; }).join(' e ') : 'Vincono i ' + g.teams[g.winners[0]].name) + ' con ' + g.teams[g.winners[0]].total + ' punti.', 'win');
+    var art = teamed(g.opts.mode) ? 'i ' : '';
+    log(g, (g.winners.length > 1 ? 'Pari! Vincono ' + g.winners.map(function (t) { return art + g.teams[t].name; }).join(' e ') : 'Vince' + (art ? 'no ' : ' ') + art + g.teams[g.winners[0]].name) + ' con ' + g.teams[g.winners[0]].total + ' punti.', 'win');
     fx(g, { k: 'over', t: g.winners[0] });
   }
+  // staffetta: la penna passa al compagno successivo
+  function passPen(g, now) {
+    var R = g.relay; R.k = (R.k + 1) % R.max;
+    var p = R.list[R.k]; g.drawer = p; if (R.seen.indexOf(p) < 0) R.seen.push(p);
+    R.next = now + RELAY_MS; g.pic.v = (g.pic.v || 0) + 1;
+    fx(g, { k: 'relay', p: p });
+  }
   function tick(g, now) {
-    if (g.phase === 'over' || now < g.until) return false;
+    if (g.phase === 'over') return false;
+    if (g.opts.mode === 'chain') return tickChain(g, now);
+    if (g.phase === 'draw' && g.relay && g.relay.max > 1 && now >= g.relay.next && now < g.until) { passPen(g, now); g.seq++; return true; }
+    if (now < g.until) return false;
     if (g.phase === 'choose') choose(g, 0, now);
+    else if (g.phase === 'hint') giveHint(g, 0, autoClues(g.choices[0]), now);
     else if (g.phase === 'draw') {
-      g.phase = 'steal'; g.until = now + STEAL_MS; g.clock = now;
-      fx(g, { k: 'steal', t: g.players[g.drawer].team });
-    } else if (g.phase === 'steal') {
-      g.hit = null; g.phase = 'reveal'; g.until = now + REVEAL_MS; g.clock = now;
-      log(g, 'Nessuno ha indovinato «' + g.word + '».', 'miss');
-      fx(g, { k: 'miss', word: g.word });
-    } else if (g.phase === 'reveal') nextTurn(g, now);
+      if (g.opts.mode === 'teams' || g.opts.mode === 'relay') { g.phase = 'steal'; g.until = now + STEAL_MS; g.clock = now; fx(g, { k: 'steal', t: g.players[g.drawer].team }); }
+      else missed(g, now);
+    } else if (g.phase === 'steal') missed(g, now);
+    else if (g.phase === 'reveal') nextTurn(g, now);
     g.seq++;
     return true;
   }
   // chi può scrivere le risposte adesso
   function canGuess(g, p) {
-    if (g.drawer == null || p === g.drawer || !g.players[p]) return false;
-    var dt = g.players[g.drawer].team, t = g.players[p].team;
-    return g.phase === 'draw' ? t === dt : g.phase === 'steal' ? t !== dt : false;
+    if (g.opts.mode === 'chain' || g.drawer == null || !g.players[p]) return false;
+    var m = g.opts.mode, dt = g.players[g.drawer].team, t = g.players[p].team;
+    if (g.phase === 'draw') {
+      if (m === 'ffa') return p !== g.drawer;
+      if (m === 'blind') return t === dt;   // anche chi disegna: la parola non la sa
+      if (p === g.drawer) return false;
+      if (m === 'relay' && g.relay && g.relay.seen.indexOf(p) >= 0) return false;
+      return t === dt;
+    }
+    if (g.phase === 'steal') return t !== dt;
+    return false;
+  }
+  // chi vede la parola adesso
+  function knows(g, p) {
+    if (p < 0 || !g.players[p] || g.word == null) return false;
+    if (g.phase === 'reveal' || g.phase === 'over') return true;
+    var m = g.opts.mode, dt = g.drawer != null ? g.players[g.drawer].team : -1;
+    if (m === 'blind') return g.players[p].team !== dt;
+    if (m === 'relay') return !!g.relay && g.relay.seen.indexOf(p) >= 0;
+    return p === g.drawer;
   }
   function decider() { return null; }
-  function pending() { return []; }
+  function pending(g) { if (g.opts && g.opts.mode === 'chain' && g.phase === 'chain') return g.players.map(function (P, i) { return i; }).filter(function (i) { return !g.chain.done[i]; }); return []; }
+
+  /* ---------- Telefono senza fili ---------- */
+  // i disegni della catena restano nello stato fino alla fine: si salvano compatti (tratti semplificati,
+  // coordinate in base 36 con due caratteri)
+  var COLS = ['#1d2333', '#e0402c', '#3d8bfd', '#2fb36d', '#f2b705', '#8a5a22', '#ef7aa8', '#9a5cf0', '#fffdf6'];
+  function b36(n) { var s = Math.max(0, Math.min(1295, Math.round(n))).toString(36); return s.length < 2 ? '0' + s : s; }
+  function pack(strokes, limit) {
+    var out = [], budget = limit || 600;
+    (strokes || []).slice(0, 200).forEach(function (s) {
+      if (!Array.isArray(s) || s.length < 4 || budget <= 0) return;
+      var ci = COLS.indexOf(String(s[0]).toLowerCase()); if (ci < 0) ci = 0;
+      var w = Math.max(1, Math.min(60, Math.round(+s[1] || 6))), pts = b36(s[2]) + b36(s[3]), lx = +s[2], ly = +s[3];
+      for (var i = 4; i + 1 < s.length && budget > 0; i += 2) {
+        var x = +s[i], y = +s[i + 1];
+        if (Math.abs(x - lx) + Math.abs(y - ly) < 7 && i + 2 < s.length) continue;
+        pts += b36(x) + b36(y); lx = x; ly = y; budget--;
+      }
+      out.push(ci + ':' + w + ':' + pts);
+    });
+    return out;
+  }
+  function unpack(packed) {
+    return (packed || []).map(function (p) {
+      var a = String(p).split(':'); if (a.length < 3) return null;
+      var s = [COLS[+a[0]] || COLS[0], +a[1] || 6], d = a[2];
+      for (var i = 0; i + 3 < d.length; i += 4) s.push(parseInt(d.substr(i, 2), 36), parseInt(d.substr(i + 2, 2), 36));
+      return s.length >= 4 ? s : null;
+    }).filter(Boolean);
+  }
+  function chainTime(g, k) { return k % 2 ? WRITE_MS : (g.opts.shrink ? Math.max(30, g.opts.time - Math.floor(k / 2) * 20) : g.opts.time) * 1000; }
+  // al passo k il giocatore p lavora sulla catena (p - k) mod n
+  function chainOf(g, p, k) { var n = g.players.length; return ((p - (k == null ? g.chain.k : k)) % n + n) % n; }
+  function startChain(g, now) {
+    var n = g.players.length, steps = Math.min(n, 6);
+    g.order = [];
+    g.chain = { k: 0, steps: steps, done: {}, list: g.players.map(function () { return { w: draw(g, rand() < .65 ? 'e' : 'h'), it: [] }; }) };
+    g.chain.list.forEach(function (c) { g.words.push(c.w); });
+    g.phase = 'chain'; g.round = 1; g.start = now; g.until = now + chainTime(g, 0); g.clock = now; g.turnN++;
+    log(g, 'Telefono senza fili: ognuno disegna la sua parola segreta.', 'sys');
+    fx(g, { k: 'chain', step: 0 });
+  }
+  // cosa deve fare adesso il giocatore p: disegnare un testo o scrivere cosa vede in un disegno
+  function chainTask(g, p) {
+    if (g.phase !== 'chain' || !g.players[p]) return null;
+    var k = g.chain.k, c = g.chain.list[chainOf(g, p, k)], prev = c.it[k - 1];
+    if (k % 2 === 0) return { kind: 'draw', text: k === 0 ? c.w : (prev && prev.w) || '…', done: !!g.chain.done[p] };
+    return { kind: 'write', pic: prev ? prev.s : [], done: !!g.chain.done[p] };
+  }
+  function chainStep(g, now) {
+    var C = g.chain, k = C.k;
+    g.players.forEach(function (P, p) {
+      var c = C.list[chainOf(g, p, k)];
+      if (!c.it[k]) c.it[k] = k % 2 ? { p: p, w: '' } : { p: p, s: [] };
+    });
+    C.k++; C.done = {};
+    if (C.k >= C.steps) { showChains(g, now); return; }
+    g.round = C.k + 1; g.start = now; g.until = now + chainTime(g, C.k); g.clock = now; g.turnN++;
+    fx(g, { k: 'chain', step: C.k });
+  }
+  function showChains(g, now) {
+    // punti: chi scrive esattamente la parola di partenza (+1) e chi ha fatto il disegno che ha capito (+1)
+    g.chain.list.forEach(function (c) {
+      c.it.forEach(function (x, j) {
+        if (j % 2 === 1 && x.w && right(x.w, c.w)) { x.ok = true; addTo(g, g.players[x.p].team, 1); var d = c.it[j - 1]; if (d) { d.ok = true; addTo(g, g.players[d.p].team, 1); } }
+      });
+    });
+    g.phase = 'show'; g.show = { c: 0, i: -1 }; g.until = now + SHOW_MS; g.clock = now;
+    log(g, 'Si rivedono le catene!', 'sys');
+    fx(g, { k: 'show' });
+  }
+  function tickChain(g, now) {
+    if (g.phase === 'chain') {
+      var all = g.players.every(function (P, p) { return g.chain.done[p]; });
+      if (!all && now < g.until) return false;
+      chainStep(g, now);
+    } else if (g.phase === 'show') {
+      if (now < g.until) return false;
+      var S = g.show, c = g.chain.list[S.c];
+      if (S.i < c.it.length - 1) S.i++;
+      else if (S.c < g.chain.list.length - 1) { S.c++; S.i = -1; }
+      else { finish(g); g.seq++; return true; }
+      g.until = now + (S.i === -1 ? 2500 : SHOW_MS); g.clock = now;
+    } else return false;
+    g.seq++;
+    return true;
+  }
 
   function act(g, p, a, now) {
     now = now || Date.now();
@@ -640,41 +876,84 @@ var DGEngine = (function () {
     if (!r) { g.seq++; g.clock = now; }
     return r;
   }
-  function cleanStroke(s) {
+  function cleanStroke(s, mono) {
     if (!Array.isArray(s) || s.length < 4) return null;
-    var col = String(s[0]).slice(0, 9), w = Math.max(1, Math.min(60, +s[1] || 6)), out = [/^#[0-9a-f]{3,8}$/i.test(col) ? col : '#222', w];
+    var col = String(s[0]).slice(0, 9), w = Math.max(1, Math.min(60, +s[1] || 6)), out = [mono ? INK : /^#[0-9a-f]{3,8}$/i.test(col) ? col : '#222', mono ? Math.min(w, 18) : w];
     for (var i = 2; i + 1 < s.length && out.length < MAXPTS; i += 2) { out.push(Math.max(0, Math.min(1000, Math.round(+s[i] || 0)))); out.push(Math.max(0, Math.min(750, Math.round(+s[i + 1] || 0)))); }
     return out.length >= 4 ? out : null;
   }
+  function cleanText(w, n) { return String(w == null ? '' : w).replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, n || 40); }
   function doAct(g, p, a, now) {
-    if (now >= g.until && (g.phase === 'draw' || g.phase === 'steal' || g.phase === 'choose')) { tick(g, now); if (a.a !== 'pic') return 'Tempo scaduto.'; }
+    if (g.opts.mode === 'chain') return chainAct(g, p, a, now);
+    if (now >= g.until && (g.phase === 'draw' || g.phase === 'steal' || g.phase === 'choose' || g.phase === 'hint')) { tick(g, now); if (a.a !== 'pic') return 'Tempo scaduto.'; }
+    if (a.a === 'bet') {
+      if (!g.opts.bet || p !== g.drawer || (g.phase !== 'choose' && g.phase !== 'hint')) return 'Adesso non si scommette.';
+      g.bet = Math.max(1, Math.min(3, +a.b || 1)); return null;
+    }
     if (a.a === 'choose') {
       if (g.phase !== 'choose' || p !== g.drawer) return 'Non tocca a te scegliere.';
-      choose(g, +a.i ? 1 : 0, now); return null;
+      choose(g, +a.i ? 1 : 0, now, a.b); return null;
+    }
+    if (a.a === 'hint') {
+      if (g.phase !== 'hint' || p !== g.hinter) return 'Non tocca a te dare gli aiuti.';
+      var i = +a.i ? 1 : 0, word = g.choices[i];
+      if (a.auto) { giveHint(g, i, autoClues(word), now); return null; }   // chi suggerisce è assente: aiuti automatici
+      var cl = (Array.isArray(a.c) ? a.c : []).map(function (x) { return cleanText(x, 24); }).filter(Boolean);
+      var nw = cl.reduce(function (s, x) { return s + x.split(' ').length; }, 0);
+      if (!cl.length) return 'Scrivi almeno un aiuto.';
+      if (nw > 3) return 'Al massimo 3 parole di aiuto in tutto.';
+      for (var k = 0; k < cl.length; k++) if (!clueOk(cl[k], word)) return '«' + cl[k] + '» è troppo simile alla parola: scegline un altro.';
+      giveHint(g, i, cl, now); return null;
     }
     if (a.a === 'pic') {
       // il disegno intero (chi disegna lo manda ogni tanto): così lo vede anche chi arriva dopo
       if (p !== g.drawer || (g.phase !== 'draw' && g.phase !== 'steal')) return 'Non stai disegnando.';
       if (+a.t !== g.pic.t || !Array.isArray(a.s)) return null;
       if ((+a.v || 0) < g.pic.v) return null;
-      g.pic.v = +a.v || 0; g.pic.s = a.s.slice(0, MAXSTROKES).map(cleanStroke).filter(Boolean);
+      g.pic.v = +a.v || 0;
+      var s = a.s.slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, g.opts.mono); }).filter(Boolean);
+      if (g.opts.line) s = s.slice(0, 1);   // una linea sola: conta solo il primo tratto
+      g.pic.s = s;
       return null;
     }
     if (a.a === 'guess') {
       if (!canGuess(g, p)) return g.phase === 'draw' ? 'Adesso indovina solo la squadra di chi disegna.' : 'Adesso non si indovina.';
-      var w = String(a.w == null ? '' : a.w).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40); if (!w) return 'Scrivi una risposta.';
+      var w = cleanText(a.w); if (!w) return 'Scrivi una risposta.';
       if (right(w, g.word)) { score(g, p, g.phase === 'steal', now); return null; }
       g.guesses.push({ p: p, w: w, near: near(w, g.word) }); if (g.guesses.length > 40) g.guesses.splice(0, g.guesses.length - 40);
       return null;
     }
     if (a.a === 'skip') {
       if (p !== g.drawer || g.phase !== 'draw') return 'Non stai disegnando.';
-      g.phase = 'steal'; g.until = now + STEAL_MS; fx(g, { k: 'steal', t: g.players[g.drawer].team }); return null;
+      if (g.opts.mode === 'teams' || g.opts.mode === 'relay') { g.phase = 'steal'; g.until = now + STEAL_MS; fx(g, { k: 'steal', t: g.players[g.drawer].team }); }
+      else missed(g, now);
+      return null;
     }
     return 'Mossa sconosciuta.';
   }
-  return { newGame: newGame, act: act, tick: tick, decider: decider, pending: pending, canGuess: canGuess, checkSeats: checkSeats, members: members, humans: humans,
-    norm: norm, right: right, near: near, setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, STEAL_MS: STEAL_MS, REVEAL_MS: REVEAL_MS, CHOOSE_MS: CHOOSE_MS, D: D };
+  function chainAct(g, p, a, now) {
+    if (g.phase !== 'chain') return 'Adesso si guardano le catene.';
+    var task = chainTask(g, p); if (!task) return 'Non stai giocando.';
+    if (task.done) return 'Hai già consegnato: aspetta gli altri.';
+    var C = g.chain, c = C.list[chainOf(g, p, C.k)];
+    if (a.a === 'cdraw') {
+      if (task.kind !== 'draw') return 'Adesso si scrive.';
+      var s = (Array.isArray(a.s) ? a.s : []).slice(0, MAXSTROKES).map(function (x) { return cleanStroke(x, g.opts.mono); }).filter(Boolean);
+      if (g.opts.line) s = s.slice(0, 1);
+      c.it[C.k] = { p: p, s: pack(s) };
+    } else if (a.a === 'cwrite') {
+      if (task.kind !== 'write') return 'Adesso si disegna.';
+      var w = cleanText(a.w); if (!w) return 'Scrivi che cosa vedi.';
+      c.it[C.k] = { p: p, w: w };
+    } else return 'Mossa sconosciuta.';
+    C.done[p] = 1;
+    if (g.players.every(function (P, i) { return C.done[i]; })) chainStep(g, now);
+    return null;
+  }
+  return { newGame: newGame, act: act, tick: tick, decider: decider, pending: pending, canGuess: canGuess, knows: knows, checkSeats: checkSeats, members: members, humans: humans,
+    norm: norm, right: right, near: near, clueOk: clueOk, drawTime: drawTime, chainTask: chainTask, chainOf: chainOf, chainTime: chainTime, pack: pack, unpack: unpack, cleanOpts: cleanOpts, teamed: teamed,
+    setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, MODES: MODES, MODE_NAME: MODE_NAME, RULES: RULES, RULE_NAME: RULE_NAME,
+    STEAL_MS: STEAL_MS, REVEAL_MS: REVEAL_MS, CHOOSE_MS: CHOOSE_MS, HINT_MS: HINT_MS, RELAY_MS: RELAY_MS, WRITE_MS: WRITE_MS, SHOW_MS: SHOW_MS, D: D };
 })();
 if (typeof module !== 'undefined') module.exports = DGEngine;
 
@@ -687,7 +966,10 @@ var DGBot = (function () {
   function decide(g, p, now) {
     now = now || Date.now();
     var P = g.players[p]; if (!P || !P.bot) return null;
-    if (p === g.drawer) { if (g.phase === 'choose') return { a: 'choose', i: 0 }; if (g.phase === 'draw' && now - g.start > 4000) return { a: 'skip' }; return null; }
+    if (g.opts.mode === 'chain') return null;   // il telefono senza fili è solo per le persone
+    if (g.phase === 'hint' && p === g.hinter) return { a: 'hint', i: 0, auto: true };
+    if (p === g.drawer && g.phase !== 'draw' && g.phase !== 'steal') { if (g.phase === 'choose') return { a: 'choose', i: 0 }; return null; }
+    if (p === g.drawer && g.phase === 'draw' && !E.canGuess(g, p)) { if (now - g.start > 4000) return { a: 'skip' }; return null; }
     if (!E.canGuess(g, p)) return null;
     var f = g.phase === 'draw' ? Math.max(0, Math.min(1, (now - g.start) / (g.opts.time * 1000))) : .5;
     var chance = g.phase === 'draw' ? .08 + .5 * f : .3;
@@ -736,7 +1018,16 @@ var DGArt = (function () {
       '<circle cx="380" cy="160" r="34" stroke="#f2b705" stroke-width="14"/></g>' +
       '<g transform="translate(250 330) rotate(-38)"><path d="M0 30 L44 8 H230 a14 14 0 0 1 14 14 v16 a14 14 0 0 1 -14 14 H44 Z" fill="#f2b705" stroke="#6a4400" stroke-width="6"/><path d="M0 30 L44 8 V52 Z" fill="#f4d2a6" stroke="#6a4400" stroke-width="6"/><path d="M0 30 L16 22 V38 Z" fill="#1d2333"/><rect x="214" y="8" width="30" height="44" rx="10" fill="#ef8a9a" stroke="#6a4400" stroke-width="6"/></g></svg>';
   }
-  return { defs: defs, doodle: doodle, pencil: pencil, icon: icon, logo: logo };
+  // un disegno ridotto in un riquadro SVG (tratti nel sistema 1000×750)
+  function mini(strokes) {
+    return '<svg class="mini" viewBox="0 0 1000 750" aria-hidden="true"><rect width="1000" height="750" fill="#fffdf6"/>' + (strokes || []).map(function (s) {
+      if (!s || s.length < 4) return '';
+      if (s.length === 4) return '<circle cx="' + s[2] + '" cy="' + s[3] + '" r="' + s[1] / 2 + '" fill="' + s[0] + '"/>';
+      var d = 'M' + s[2] + ' ' + s[3]; for (var i = 4; i + 1 < s.length; i += 2) d += 'L' + s[i] + ' ' + s[i + 1];
+      return '<path d="' + d + '" fill="none" stroke="' + s[0] + '" stroke-width="' + s[1] + '" stroke-linecap="round" stroke-linejoin="round"/>';
+    }).join('') + '</svg>';
+  }
+  return { mini: mini, defs: defs, doodle: doodle, pencil: pencil, icon: icon, logo: logo };
 })();
 
 /* ===== Disegna e indovina: regolamento (sezioni richiamabili dal «?») ===== */
@@ -756,10 +1047,33 @@ var DGRules = (function () {
       '<li>Indovinata entro metà del tempo: <b>+1 punto</b> in più.</li></ul>'],
     steal: ['Il furto',
       '<p>Se il tempo finisce e i compagni non hanno indovinato, le <b>altre squadre</b> hanno 12 secondi per scrivere la parola: la prima che indovina ruba i punti. Per questo conviene guardare bene anche i disegni degli avversari!</p>'],
+    modes: ['Le modalità',
+      '<p>Chi apre il tavolo sceglie come si gioca:</p><ul>' +
+      '<li><b>A squadre</b>: quella classica, con il furto.</li>' +
+      '<li><b>Tutti contro tutti</b>: niente squadre, vedi sotto.</li>' +
+      '<li><b>Staffetta</b>: la penna passa di mano ogni 10 secondi.</li>' +
+      '<li><b>Indovina tu per me</b>: chi disegna non sa la parola, ha solo 3 aiuti.</li>' +
+      '<li><b>Telefono senza fili</b>: catene di disegni e scritte, tutti insieme.</li></ul>'],
+    ffa: ['Tutti contro tutti',
+      '<p>Niente squadre: ognuno gioca per sé. A turno ogni persona disegna e <b>tutti gli altri</b> provano a indovinare. Il primo che indovina prende i punti della parola (+1 se entro metà del tempo) e prende i punti della parola anche <b>chi disegna</b>, perché ha disegnato bene. Niente furto: se nessuno indovina si passa avanti. Vince chi ha più punti.</p>'],
+    relay: ['Staffetta',
+      '<p>Si gioca a squadre, ma il disegno è di tutta la squadra: chi comincia sceglie la parola e la disegna per <b>10 secondi</b>, poi la penna passa a un compagno, che vede la parola solo in quel momento e continua il disegno da dove era arrivato. Indovinano i compagni che <b>non hanno ancora avuto la penna</b>: per questo resta sempre almeno uno che indovina. Se il tempo finisce, le altre squadre possono rubare.</p>'],
+    blind: ['Indovina tu per me',
+      '<p>Quando tocca alla tua squadra, un <b>avversario</b> sceglie la parola (facile o difficile) e scrive <b>al massimo 3 parole di aiuto</b>, senza usare la parola né un suo pezzo. Chi disegna <b>non vede la parola</b>: vede solo gli aiuti e disegna quello che gli suggeriscono. Indovinano lui e i suoi compagni. Gli avversari vedono la parola, quindi niente furto.</p>'],
+    chain: ['Telefono senza fili',
+      '<p>Si gioca tutti insieme, solo persone. Ognuno riceve una <b>parola segreta</b> e la disegna sul suo telefono, poi consegna. Il disegno passa al vicino, che scrive <b>che cosa vede</b>; la scritta passa al successivo, che la disegna… e così via (al massimo 6 passaggi).</p>' +
+      '<p>Alla fine si rivedono tutte le catene, dalla parola di partenza all’ultima scritta. <b>Un punto</b> a chi scrive esattamente la parola di partenza e uno a chi ha fatto il disegno che gliel’ha fatta capire.</p>'],
+    extra: ['Regole in più',
+      '<ul><li><b>Una linea sola</b>: il disegno è un unico tratto, senza mai alzare il dito (si può solo ricominciare).</li>' +
+      '<li><b>Un colore, niente gomma</b>: solo nero, senza gomma, annulla o cestino.</li>' +
+      '<li><b>A occhi chiusi</b>: chi disegna non vede il proprio disegno, lo vedono solo gli altri.</li>' +
+      '<li><b>Con la mano sbagliata</b>: si disegna con la mano che non si usa di solito. È una regola d’onore!</li>' +
+      '<li><b>Tempo che si accorcia</b>: a ogni giro il tempo scende di 20 secondi (minimo 30).</li>' +
+      '<li><b>Scommessa</b>: prima di disegnare si puntano 1, 2 o 3 punti. Se la squadra indovina vince la puntata (+1 per la parola difficile, +1 se entro metà del tempo); se nessuno indovina, la perde. Chi ruba vince la puntata.</li></ul>'],
     tips: ['Consigli',
       '<ul><li>Disegna prima la forma grande, poi i dettagli.</li><li>Le parole composte si possono disegnare a pezzi.</li><li>Leggi le risposte sbagliate dei compagni: ti dicono cosa stanno capendo.</li></ul>']
   };
-  var ORDER = ['goal', 'draw', 'guess', 'steal', 'tips'];
+  var ORDER = ['goal', 'draw', 'guess', 'steal', 'modes', 'ffa', 'relay', 'blind', 'chain', 'extra', 'tips'];
   function section(k) { var s = S[k]; return s ? '<section class="rsec" id="r-' + k + '"><h3>' + s[0] + '</h3>' + s[1] + '</section>' : ''; }
   function html() { return '<div class="rules">' + ORDER.map(section).join('') + '</div>'; }
   function toc() { return '<nav class="rtoc">' + ORDER.map(function (k) { return '<button class="chip" data-act="rulego" data-r="' + k + '">' + S[k][0] + '</button>'; }).join('') + '</nav>'; }
@@ -3684,16 +3998,19 @@ function myNick() { return (lsGet('pp-nick') || '').trim().slice(0, 18); }
 function G() { return App.doc && App.doc.game; }
 function myIdx() { var g = G(); if (!g) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].uid === Net.uid) return i; return -1; }
 function pcol(g, p) { return PCOL[g.players[p].col % PCOL.length]; }
-function tcol(g, t) { return TCOL[g.teams[t].col % TCOL.length]; }
+function tcol(g, t) { var T = g.teams[t]; return T.pc ? PCOL[T.col % PCOL.length] : TCOL[T.col % TCOL.length]; }
 function pname(g, p) { return '<b class="pn-c" style="--pc:' + pcol(g, p) + '">' + esc(g.players[p].nick) + '</b>'; }
 function tlabel(g, t) { return '<b class="pn-c" style="--pc:' + tcol(g, t) + '">' + esc(g.teams[t].name) + '</b>'; }
+// «ai Rossi» a squadre, «a Ale» quando ognuno gioca per sé
+function tto(g, t) { return (g.teams[t].pc ? 'a ' : 'ai ') + tlabel(g, t); }
 // l'ora dell'host vista da questo telefono (i telefoni possono avere l'orologio un po' diverso)
 function hostNow() { return Date.now() + (Net.isHost ? 0 : App.off); }
 function left(g) { return Math.max(0, g.until - hostNow()); }
 
 /* ---------- regole del tavolo (girano sull'host) ---------- */
 function uniqueNick(seats, n) { var base = n, k = 2; while (seats.some(function (s) { return s.nick.toLowerCase() === n.toLowerCase(); })) n = base + ' ' + k++; return n; }
-function nTeams(doc) { var t = doc.opts && doc.opts.teams; return t == null ? 2 : +t; }
+function modeOf(doc) { var m = doc.opts && doc.opts.mode; return E.MODES.indexOf(m) >= 0 ? m : 'teams'; }
+function nTeams(doc) { if (!E.teamed(modeOf(doc))) return 0; var t = doc.opts && doc.opts.teams; return t == null ? 2 : +t; }
 // la squadra con meno giocatori (per chi arriva)
 function lightTeam(doc) { var n = nTeams(doc); if (!n) return 0; var c = []; for (var i = 0; i < n; i++) c.push(0); doc.seats.forEach(function (s) { if (s.team >= 0 && s.team < n) c[s.team]++; }); return c.indexOf(Math.min.apply(null, c)); }
 function balance(doc) { var n = nTeams(doc); doc.seats.forEach(function (s, i) { s.team = n ? i % n : 0; }); }
@@ -3711,7 +4028,7 @@ function seenList(doc) { var s = seenLocal(); (doc.seen || []).forEach(function 
 function tableReducer(doc, from, op) {
   var isHost = doc.host === from, seat = doc.seats.filter(function (s) { return s.uid === from; })[0];
   var hostOnly = { err: 'Solo chi ha aperto il tavolo può farlo.' };
-  doc.opts = doc.opts || {}; if (doc.opts.rounds == null) doc.opts.rounds = 2; if (doc.opts.time == null) doc.opts.time = 80; if (doc.opts.teams == null) doc.opts.teams = 2;
+  doc.opts = doc.opts || {}; if (doc.opts.rounds == null) doc.opts.rounds = 2; if (doc.opts.time == null) doc.opts.time = 80; if (doc.opts.teams == null) doc.opts.teams = 2; if (doc.opts.mode == null) doc.opts.mode = 'teams';
   // il posto di chi apre il tavolo nasce senza squadra
   doc.seats.forEach(function (s) { if (s.team == null) s.team = lightTeam({ opts: doc.opts, seats: doc.seats.filter(function (x) { return x.team != null; }) }); });
   switch (op.t) {
@@ -3755,6 +4072,8 @@ function tableReducer(doc, from, op) {
       if (op.rounds != null && E.OPT.rounds.indexOf(+op.rounds) >= 0) doc.opts.rounds = +op.rounds;
       if (op.time != null && E.OPT.time.indexOf(+op.time) >= 0) doc.opts.time = +op.time;
       if (op.teams != null && E.OPT.teams.indexOf(+op.teams) >= 0 && +op.teams !== doc.opts.teams) { doc.opts.teams = +op.teams; balance(doc); }
+      if (op.mode != null && E.MODES.indexOf(op.mode) >= 0 && op.mode !== doc.opts.mode) { var wasT = E.teamed(modeOf(doc)); doc.opts.mode = op.mode; if (!wasT && E.teamed(op.mode)) balance(doc); }
+      if (op.rule != null && E.RULES.indexOf(op.rule) >= 0) doc.opts[op.rule] = !!op.on;
       return {};
     }
     case 'back': {
@@ -3769,7 +4088,7 @@ function tableReducer(doc, from, op) {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
       if (doc.seats.length < MINP) return { err: 'Servono almeno ' + MINP + ' giocatori: aggiungi giocatori automatici.' };
-      var why = E.checkSeats(doc.seats, nTeams(doc)); if (why) return { err: why };
+      var why = E.checkSeats(doc.seats, nTeams(doc), doc.opts); if (why) return { err: why };
       rememberUsed(doc); doc.game = E.newGame(doc.seats.slice(), doc.opts, Date.now(), seenList(doc)); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; rememberUsed(doc); doc.phase = 'lobby'; doc.game = null; return {};
@@ -3789,6 +4108,8 @@ function tableReducer(doc, from, op) {
 Net.setReducer(tableReducer);
 function needsMe(g, me) {
   if (me < 0 || !g) return false;
+  if (g.phase === 'chain') { var tk = E.chainTask(g, me); return !!tk && !tk.done; }
+  if (g.phase === 'hint') return g.hinter === me;
   if (g.phase === 'choose' || g.phase === 'draw') return g.drawer === me || E.canGuess(g, me);
   return g.phase === 'steal' && E.canGuess(g, me);
 }
@@ -3796,8 +4117,11 @@ Coach.setup({ bots: 3, startText: 'Non hai mai giocato qui? Prova una partita co
   myTurn: function (g, me) { return needsMe(g, me); },
   tip: function (g, me) {
     if (!g.players[me]) return null;
+    if (g.phase === 'chain') { var tk = E.chainTask(g, me); if (!tk || tk.done) return null; return tk.kind === 'draw' ? 'Disegna <b>' + esc(tk.text) + '</b> e tocca <b>Consegna</b>: il vicino dovrà capire cos’è.' : 'Guarda il disegno del vicino e scrivi <b>che cosa rappresenta</b>.'; }
+    if (g.phase === 'hint') return g.hinter === me ? 'Scegli la parola per l’avversario e scrivi fino a <b>3 parole di aiuto</b> (senza la parola!): lui disegnerà solo con quelle.' : null;
     if (g.phase === 'choose') return g.drawer === me ? 'Tocca a te disegnare: scegli la parola. La <b>facile</b> vale 1 punto, la <b>difficile</b> 2.' : null;
-    if (g.phase === 'draw' && g.drawer === me) return 'Disegna <b>' + esc(g.word) + '</b> con il dito: niente lettere né numeri! I tuoi compagni scrivono le risposte. Se è troppo difficile tocca <b>Passo</b>.';
+    if (g.phase === 'draw' && g.drawer === me && g.opts.mode === 'blind') return 'Non sai la parola: disegna quello che ti suggeriscono gli aiuti e prova anche tu a indovinarla!';
+    if (g.phase === 'draw' && g.drawer === me) return 'Disegna <b>' + esc(g.word) + '</b> con il dito: niente lettere né numeri! Se è troppo difficile tocca <b>Passo</b>.';
     if (E.canGuess(g, me)) return 'Guarda il disegno e scrivi la parola: puoi provare quante volte vuoi.';
     return null;
   } });
@@ -3806,7 +4130,7 @@ Score.setup({ game: 'disegna', result: function (g) {
   return g.players.map(function (P) { return { won: (g.winners || []).indexOf(P.team) >= 0, place: place[P.team], score: g.teams[P.team].total }; });
 } });
 Turns.setup({ decider: function (g) { return E.decider(g); }, onTimeout: function () { return false; } });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; notes.push((o.teams || 2) + ' squadre'); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = [], m = modeOf(d); notes.push(m === 'teams' ? (o.teams || 2) + ' squadre' : E.MODE_NAME[m]); E.RULES.forEach(function (r) { if (o[r]) notes.push(E.RULE_NAME[r].toLowerCase()); }); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo, il tempo e i giocatori automatici.'); render(); });
 
 /* ---------- connessione al tavolo ---------- */
@@ -3911,6 +4235,7 @@ function driveBots() {
   if (!doc || !Net.isHost || doc.phase !== 'play' || !doc.game) return;
   var g = doc.game;
   // un tentativo ogni 5-9 secondi per ogni automatico che può indovinare (o che deve scegliere/passare al posto di un assente)
+  if (g.phase === 'hint' && g.hinter != null && g.players[g.hinter].bot) botStep(g.hinter, 2000, g.turn + ':hint');
   if (g.phase === 'choose' || g.phase === 'draw' || g.phase === 'steal') g.players.forEach(function (P, p) {
     if (!P.bot || !(p === g.drawer || E.canGuess(g, p))) return;
     var slot = Math.floor((Date.now() + p * 1300) / 7000);
@@ -3921,7 +4246,7 @@ function driveBots() {
 setInterval(function () {
   var d = App.doc, g = d && d.game;
   if (!g || d.phase !== 'play') return;
-  if (Net.isHost && g.phase !== 'over' && Date.now() >= g.until) {
+  if (Net.isHost && g.phase !== 'over' && (Date.now() >= g.until || (g.phase === 'draw' && g.relay && g.relay.max > 1 && Date.now() >= g.relay.next))) {
     Net.hostApply(function (cur) { var gg = cur && cur.game; if (!gg || !E.tick(gg, Date.now())) return false; if (gg.phase === 'over') cur.phase = 'over'; return true; });
   }
   if (Net.isHost) driveBots();
@@ -3939,7 +4264,7 @@ function onDoc() {
   if (App.screen !== 'table') { driveBots(); Turns.watch(App.doc); paintCur(); return; }
   if (g) {
     if (me >= 0 && !App.introShown) { App.introShown = true; if (!lsGet('dg-intro-done')) App.sheet = { kind: 'intro', page: 0 }; }
-    var rk = g.turn + ':' + g.pic.t; if (App.roundKey !== rk) { App.roundKey = rk; App.live = {}; }
+    var rk = g.turn + ':' + g.pic.t + ':' + (g.chain ? g.chain.k : ''); if (App.roundKey !== rk) { App.roundKey = rk; App.live = {}; App.sent = null; }
   }
   render(); if (g) Game.fx(g, me); driveBots(); Turns.watch(App.doc);
   if (g) App.seenFirstDoc = true;
@@ -3978,15 +4303,32 @@ function lobbyHTML() {
     '<section class="panel"><h2>Come si gioca, in 30 secondi</h2>' + RU.section('goal') + RU.section('steal') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';
 }
 Lobby.setRecentKey(KEY_RECENT);
+var MODE_DESC = {
+  teams: 'Uno disegna, i compagni indovinano; se il tempo finisce le altre squadre possono rubare la parola.',
+  ffa: 'Niente squadre: chi indovina per primo prende i punti, e li prende anche chi disegna.',
+  relay: 'A squadre, ma ogni 10 secondi la penna passa a un compagno, che vede la parola solo quando la riceve.',
+  blind: 'Un avversario sceglie la parola e scrive fino a 3 aiuti: chi disegna vede solo quelli e indovina insieme ai compagni.',
+  chain: 'Tutti insieme: si disegna, il vicino scrive cosa vede, il successivo disegna la scritta… alla fine si ride rivedendo le catene.'
+};
+var RULE_DESC = {
+  line: 'Non si alza il dito: il disegno è un unico tratto.', mono: 'Solo nero, niente gomma né annulla.', dark: 'Chi disegna non vede il proprio disegno.',
+  hand: 'Si disegna con la mano che non si usa di solito (parola d’onore!).', shrink: 'Il tempo scende di 20 secondi a ogni giro.', bet: 'Chi disegna punta 1, 2 o 3 punti: se nessuno indovina li perde.'
+};
 function optionsHTML(d, isHost) {
-  var o = d.opts || {}, teams = o.teams || 2, r = o.rounds || 2, tm = o.time || 80;
-  var desc = teams + ' squadre · ' + r + (r > 1 ? ' giri' : ' giro') + ' · ' + tm + ' secondi per disegno';
-  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.</p>';
-  function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:220px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
+  var o = d.opts || {}, m = modeOf(d), teams = o.teams || 2, r = o.rounds || 2, tm = o.time || 80;
+  var rules = E.RULES.filter(function (k) { return o[k] && !(k === 'bet' && m === 'chain'); });
+  var desc = E.MODE_NAME[m] + (E.teamed(m) ? ' · ' + teams + ' squadre' : '') + (m === 'chain' ? '' : ' · ' + r + (r > 1 ? ' giri' : ' giro')) + ' · ' + tm + ' secondi per disegno';
+  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.<br><span class="muted">' + MODE_DESC[m] + '</span></p>' + (rules.length ? '<p class="lead">Regole in più: ' + rules.map(function (k) { return '<b>' + E.RULE_NAME[k] + '</b>'; }).join(', ') + '.</p>' : '');
+  function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:240px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
   function opt(id, title, sub, cur, list) { return '<div class="tt-opt row"><label for="' + id + '" style="flex:1;min-width:160px"><b>' + title + '</b><br><span class="muted" style="font-size:14px">' + sub + '</span></label>' + sel(id, cur, list) + '</div>'; }
-  return opt('opt-teams', 'Squadre', 'Almeno 2 giocatori per squadra.', teams, [[2, '2 squadre'], [3, '3 squadre'], [4, '4 squadre']]) +
-    opt('opt-rounds', 'Giri', 'In un giro ogni persona disegna una volta.', r, [[1, '1 giro'], [2, '2 giri'], [3, '3 giri']]) +
-    opt('opt-time', 'Tempo', 'Per ogni disegno.', tm, [[60, '60 secondi'], [80, '80 secondi'], [100, '100 secondi'], [120, '2 minuti']]);
+  var h = opt('opt-mode', 'Modalità', MODE_DESC[m], m, E.MODES.map(function (k) { return [k, E.MODE_NAME[k]]; }));
+  if (E.teamed(m)) h += opt('opt-teams', 'Squadre', 'Almeno 2 giocatori per squadra.', teams, [[2, '2 squadre'], [3, '3 squadre'], [4, '4 squadre']]);
+  if (m !== 'chain') h += opt('opt-rounds', 'Giri', 'In un giro ogni persona disegna una volta.', r, [[1, '1 giro'], [2, '2 giri'], [3, '3 giri']]);
+  h += opt('opt-time', 'Tempo', m === 'chain' ? 'Per ogni disegno (per scrivere ci sono 35 secondi).' : 'Per ogni disegno.', tm, [[60, '60 secondi'], [80, '80 secondi'], [100, '100 secondi'], [120, '2 minuti']]);
+  h += '<div class="rules-pick"><b>Regole in più</b>' + E.RULES.filter(function (k) { return !(k === 'bet' && m === 'chain'); }).map(function (k) {
+    return '<label class="rpick"><input type="checkbox" data-rule="' + k + '"' + (o[k] ? ' checked' : '') + '><span><b>' + E.RULE_NAME[k] + '</b><small>' + RULE_DESC[k] + '</small></span></label>';
+  }).join('') + '</div>';
+  return h;
 }
 function roomHTML() {
   var d = App.doc, isHost = d.host === Net.uid, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), n = d.seats.length, nt = nTeams(d), seats = '';
@@ -4006,9 +4348,9 @@ function roomHTML() {
   return '<div class="topbar"><div class="wrap"><span class="brand">Disegna e indovina</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
-    '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi, anche da un’altra città. Da 4 a 12 giocatori: disegnano solo le persone, i giocatori automatici aiutano a indovinare.</p></section>' +
+    '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi, anche da un’altra città. Fino a 12 giocatori: disegnano solo le persone, i giocatori automatici aiutano a indovinare.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/' + MAXP + ')</h2>' + seats + (nt && isHost && n > 2 ? '<button class="btn ghost small" data-act="shuffle" style="justify-self:start">Squadre a caso</button>' : '') + Lobby.roomHTML(d, isHost) + optionsHTML(d, isHost) +
-    (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= MAXP ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < MINP ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < MINP ? '<p class="lead">Servono almeno ' + MINP + ' giocatori: aggiungi giocatori automatici.</p>' : '<p class="lead">Dura circa ' + Math.max(5, Math.round((d.opts.rounds || 2) * d.seats.filter(function (s) { return !s.bot; }).length * ((d.opts.time || 80) + 25) / 60)) + ' minuti.</p>')
+    (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= MAXP ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < MINP ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < MINP ? '<p class="lead">Servono almeno ' + MINP + ' giocatori: aggiungi giocatori automatici.</p>' : '<p class="lead">Dura circa ' + (modeOf(d) === 'chain' ? Math.max(5, Math.round(Math.min(6, d.seats.filter(function (s) { return !s.bot; }).length) * ((d.opts.time || 80) + 40) / 2 / 60 + 3)) : Math.max(5, Math.round((d.opts.rounds || 2) * d.seats.filter(function (s) { return !s.bot; }).length * ((d.opts.time || 80) + 25) / 60))) + ' minuti.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.' + (nt ? ' Puoi cambiare squadra con «Cambia».' : '') + '</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
     (isHost ? '<button class="btn ghost small" data-act="closetable" style="justify-self:start">Chiudi il tavolo</button>' : '') + '</section>' +
     '<section class="panel"><h2>Prima di cominciare</h2>' + RU.section('goal') + RU.section('steal') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';
@@ -4019,12 +4361,14 @@ function roomHTML() {
    «in diretta» (Net.sendLive); ogni tanto manda anche il disegno intero all'host, che lo tiene nel documento
    per chi arriva dopo o ha perso un pezzo. La «versione» del disegno cresce quando si annulla o si cancella:
    così un pezzo vecchio arrivato in ritardo non fa ricomparire un tratto tolto.
-   Sotto la lavagna: le risposte scritte e la casella per indovinare. */
+   Sotto la lavagna: le risposte scritte e la casella per indovinare.
+   Nella staffetta la penna passa da un telefono all'altro: chi la riceve riparte dal disegno che stava
+   guardando. Nel telefono senza fili ognuno disegna sul suo telefono senza diretta e consegna il disegno. */
 var Game = (function () {
   var mountedFor = null, reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches, lastTick = null;
   var COLORS = ['#1d2333', '#e0402c', '#3d8bfd', '#2fb36d', '#f2b705', '#8a5a22', '#ef7aa8', '#9a5cf0'], SIZES = [4, 9, 18];
   // il disegno visto da qui: per chi disegna è il suo (mine), per gli altri quello ricomposto (view)
-  var mine = { t: 0, v: 0, s: [] }, view = { t: 0, v: 0, s: [] }, cur = null, sentLen = 0, dirty = false, picT = null, lastPic = 0, cv = null, ctx = null, rafOn = false;
+  var mine = { t: 0, v: 0, s: [], who: null }, view = { t: 0, v: 0, s: [] }, unpacked = { k: null, s: [] }, cur = null, sentLen = 0, dirty = false, picT = null, lastPic = 0, cv = null, ctx = null, rafOn = false;
   function el(id) { return document.getElementById(id); }
   function setHTML(id, h) { var e = el(id); if (e && e._h !== h) { e.innerHTML = h; e._h = h; } }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, reduce ? 0 : ms); }); }
@@ -4044,7 +4388,13 @@ var Game = (function () {
   }
   function unmount() { mountedFor = null; }
   function myTeam(g, me) { return me >= 0 ? g.players[me].team : -1; }
-  function drawing(g, me) { return me >= 0 && g.drawer === me && (g.phase === 'draw' || g.phase === 'steal'); }
+  function drawing(g, me) {
+    if (me < 0 || !g) return false;
+    if (g.phase === 'chain') { var tk = E.chainTask(g, me); return !!tk && tk.kind === 'draw' && !tk.done; }
+    return g.drawer === me && (g.phase === 'draw' || g.phase === 'steal');
+  }
+  var INK = '#1d2333';
+  function chainPic(key, packed) { if (unpacked.k !== key) unpacked = { k: key, s: E.unpack(packed) }; return unpacked.s; }
 
   /* ---------- la lavagna ---------- */
   function fit() {
@@ -4053,7 +4403,19 @@ var Game = (function () {
     if (!w || !h) return;
     cv.width = Math.round(w * r); cv.height = Math.round(h * r); paint();
   }
-  function strokes() { var g = G(); if (!g) return []; return drawing(g, myIdx()) ? mine.s : view.s; }
+  function strokes() {
+    var g = G(), me = myIdx(); if (!g) return [];
+    if (g.phase === 'chain') {
+      var tk = E.chainTask(g, me); if (!tk) return [];
+      if (tk.kind === 'write') return chainPic('w' + g.chain.k + ':' + me, tk.pic);
+      return mine.s;
+    }
+    if (g.phase === 'show' || (g.phase === 'over' && g.chain)) {
+      var S = g.show || { c: 0, i: -1 }, c = g.chain.list[S.c], it = c && c.it[S.i];
+      return it && it.s ? chainPic('s' + S.c + ':' + S.i, it.s) : [];
+    }
+    return drawing(g, me) ? mine.s : view.s;
+  }
   function paint() { if (rafOn) return; rafOn = true; requestAnimationFrame(function () { rafOn = false; paintNow(); }); }
   function paintNow() {
     if (!ctx) return;
@@ -4071,9 +4433,11 @@ var Game = (function () {
   }
   function pos(e) { var r = cv.getBoundingClientRect(); return [Math.max(0, Math.min(1000, Math.round((e.clientX - r.left) / r.width * 1000))), Math.max(0, Math.min(750, Math.round((e.clientY - r.top) / r.height * 750)))]; }
   function down(e) {
-    var g = G(); if (!g || !drawing(g, myIdx()) || g.phase !== 'draw') return;
-    e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (x) {}
-    var p = pos(e), c = App.pen.c, w = c === '#fffdf6' ? 34 : App.pen.w;
+    var g = G(), me = myIdx(); if (!g || !drawing(g, me) || (g.phase !== 'draw' && g.phase !== 'chain')) return;
+    e.preventDefault();
+    if (g.opts.line && mine.s.length >= 1) { toast('Una linea sola: il tuo tratto l’hai già fatto' + (g.opts.mono ? '.' : '. Puoi ricominciare con il cestino.')); return; }
+    try { cv.setPointerCapture(e.pointerId); } catch (x) {}
+    var p = pos(e), c = g.opts.mono ? INK : App.pen.c, w = c === '#fffdf6' ? 34 : App.pen.w;
     cur = [c, w, p[0], p[1]]; mine.s.push(cur); sentLen = 0; dirty = true; liveSend(); paint();
   }
   function move(e) {
@@ -4084,15 +4448,16 @@ var Game = (function () {
   }
   function up() { if (!cur) return; liveSend(); cur = null; picSoon(); }
   var liveT = null;
+  function chainMode() { var g = G(); return !!g && g.phase === 'chain'; }
   function liveSend() {
-    if (!cur) return;
+    if (!cur || chainMode()) return;
     var g = G(), i = mine.s.indexOf(cur); if (i < 0 || !g) return;
     var from = sentLen; if (cur.length <= from) return;
     Net.sendLive({ k: 'pt', t: mine.t, v: mine.v, i: i, o: from, s: from ? cur.slice(Math.max(2, from)) : cur.slice() });
     sentLen = cur.length;
   }
   var picTimer = null;
-  function picSoon() { dirty = true; clearTimeout(picTimer); picTimer = setTimeout(picNow, Date.now() - lastPic > 1500 ? 200 : 900); }
+  function picSoon() { if (chainMode()) return; dirty = true; clearTimeout(picTimer); picTimer = setTimeout(picNow, Date.now() - lastPic > 1500 ? 200 : 900); }
   function picNow() {
     var g = G(); if (!g || !dirty || !drawing(g, myIdx())) return;
     dirty = false; lastPic = Date.now();
@@ -4100,8 +4465,16 @@ var Game = (function () {
   }
   // ogni tanto, mentre si disegna, il disegno intero va anche all'host
   setInterval(function () { if (dirty && !cur && Date.now() - lastPic > 1500) picNow(); else if (dirty && cur && Date.now() - lastPic > 2500) picNow(); }, 500);
-  function undo() { if (!mine.s.length) return; mine.s.pop(); mine.v++; cur = null; Net.sendLive({ k: 'cut', t: mine.t, v: mine.v, n: mine.s.length }); picSoon(); paint(); }
-  function clear() { if (!mine.s.length) return; mine.s = []; mine.v++; cur = null; Net.sendLive({ k: 'cut', t: mine.t, v: mine.v, n: 0 }); Sound.play('clear'); picSoon(); paint(); }
+  function undo() { if (!mine.s.length) return; mine.s.pop(); mine.v++; cur = null; if (!chainMode()) Net.sendLive({ k: 'cut', t: mine.t, v: mine.v, n: mine.s.length }); picSoon(); paint(); }
+  function clear() { if (!mine.s.length) return; mine.s = []; mine.v++; cur = null; if (!chainMode()) Net.sendLive({ k: 'cut', t: mine.t, v: mine.v, n: 0 }); Sound.play('clear'); picSoon(); paint(); }
+  // telefono senza fili: consegna il disegno o la scritta (anche da sola poco prima che finisca il tempo)
+  function submitChain(auto) {
+    var g = G(), me = myIdx(); if (!g || g.phase !== 'chain') return;
+    var tk = E.chainTask(g, me); if (!tk || tk.done || App.sent === g.chain.k) return;
+    if (tk.kind === 'draw') { App.sent = g.chain.k; Sound.play('guess'); quiet({ a: 'cdraw', s: mine.s }); return; }
+    var i = el('gin'), w = i && i.value.trim(); if (!w) { if (!auto) toast('Scrivi che cosa vedi nel disegno.'); return; }
+    App.sent = g.chain.k; i.value = ''; Sound.play('guess'); quiet({ a: 'cwrite', w: w });
+  }
   // un pezzo di tratto arrivato in diretta
   function live(d) {
     var g = G(); if (!g || !d || d.t !== g.pic.t || drawing(g, myIdx())) return;
@@ -4118,11 +4491,18 @@ var Game = (function () {
   }
   // il disegno salvato nel documento (arriva più di rado): si prende se è più nuovo o più lungo
   function sync(g, me) {
+    if (g.phase === 'chain' || g.phase === 'show') return;
     var p = g.pic;
     if (drawing(g, me)) {
-      if (mine.t !== p.t) { mine = { t: p.t, v: p.v || 0, s: (p.s || []).map(function (x) { return x.slice(); }) }; cur = null; }
+      // nella staffetta chi riceve la penna riparte dal disegno che stava guardando
+      if (mine.t !== p.t || mine.who !== me) {
+        var base = view.t === p.t && view.s.length >= (p.s || []).length ? view.s : (p.s || []);
+        mine = { t: p.t, v: Math.max(p.v || 0, view.v || 0) + (mine.t === p.t ? 1 : 0), s: base.map(function (x) { return x.slice(); }), who: me }; cur = null;
+        if (g.relay) { dirty = true; picSoon(); }
+      }
       return;
     }
+    if (mine.who === me && mine.t === p.t) { view = { t: p.t, v: mine.v, s: mine.s.map(function (x) { return x.slice(); }) }; mine.who = null; cur = null; }
     if (view.t !== p.t || (p.v || 0) > view.v) { view = { t: p.t, v: p.v || 0, s: (p.s || []).map(function (x) { return x.slice(); }) }; paint(); return; }
     if ((p.v || 0) < view.v) return;
     var ch = false;
@@ -4134,12 +4514,15 @@ var Game = (function () {
   function render() {
     if (mountedFor !== App.code || !el('gv')) mount();
     var g = G(), me = myIdx();
-    if (picT !== g.pic.t) { picT = g.pic.t; mine = { t: g.pic.t, v: 0, s: [] }; view = { t: g.pic.t, v: 0, s: [] }; cur = null; dirty = false; }
+    var pk = g.phase === 'chain' ? 'c' + g.chain.k : g.phase === 'show' ? 'show' : g.pic.t;
+    if (picT !== pk) { picT = pk; mine = { t: g.pic.t, v: 0, s: [], who: null }; view = { t: g.pic.t, v: 0, s: [] }; cur = null; dirty = false; }
     sync(g, me);
-    var o = g.order[g.turn];
-    setHTML('gv-info', '<b>Disegna e indovina</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : 'Giro ' + g.round + ' di ' + g.opts.rounds + ' · disegno ' + (g.turn + 1) + ' di ' + g.order.length) + ' · tavolo ' + esc(App.code)) + '</span>');
+    var where = g.phase === 'over' ? 'Partita finita' : g.phase === 'chain' ? E.MODE_NAME.chain + ' · passo ' + (g.chain.k + 1) + ' di ' + g.chain.steps : g.phase === 'show' ? 'Le catene' : (g.opts.mode !== 'teams' ? E.MODE_NAME[g.opts.mode] + ' · ' : '') + 'giro ' + g.round + ' di ' + g.opts.rounds + ' · disegno ' + (g.turn + 1) + ' di ' + g.order.length;
+    setHTML('gv-info', '<b>Disegna e indovina</b> <span class="muted">· ' + connInfo(where + ' · tavolo ' + esc(App.code)) + '</span>');
     setHTML('gv-teams', teams(g, me));
+    var keep = Array.prototype.map.call(document.querySelectorAll('.clue'), function (x) { return x.value; }), focus = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('clue') ? Array.prototype.indexOf.call(document.querySelectorAll('.clue'), document.activeElement) : -1;
     setHTML('gv-mid', mid(g, me));
+    Array.prototype.forEach.call(document.querySelectorAll('.clue'), function (x, i) { if (keep[i] != null && !x.value) x.value = keep[i]; if (i === focus) x.focus(); });
     setHTML('tools', tools(g, me));
     setHTML('bover', over(g, me));
     setHTML('feed', feed(g, me));
@@ -4153,60 +4536,126 @@ var Game = (function () {
     var mt = myTeam(g, me), dt = g.drawer != null ? g.players[g.drawer].team : -1;
     return g.teams.map(function (T, t) {
       return '<button class="team' + (t === mt ? ' mine' : '') + (t === dt && g.phase !== 'over' ? ' turn' : '') + '" style="--tc:' + tcol(g, t) + '" data-act="team" data-t="' + t + '"><span class="tm-h"><b>' + esc(T.name) + '</b><span class="tm-s">' + T.total + '</span></span>' +
-        '<span class="tm-m">' + E.members(g, t).map(function (i) { var P = g.players[i]; return '<span class="pv sm' + (i === g.drawer ? ' dr' : '') + '" style="--pc:' + pcol(g, i) + '" title="' + esc(P.nick) + '">' + esc(P.nick.charAt(0).toUpperCase()) + '</span>'; }).join('') + '</span></button>';
+        '<span class="tm-m">' + (T.pc ? '' : E.members(g, t).map(function (i) { var P = g.players[i]; return '<span class="pv sm' + (i === g.drawer ? ' dr' : '') + '" style="--pc:' + pcol(g, i) + '" title="' + esc(P.nick) + '">' + esc(P.nick.charAt(0).toUpperCase()) + '</span>'; }).join('')) + '</span></button>';
     }).join('');
   }
   function mask(w) { return '<span class="mask">' + String(w).split(' ').map(function (x) { return '<span class="mw">' + x.split('').map(function () { return '<i></i>'; }).join('') + '</span>'; }).join('') + '</span><small class="ml">' + String(w).replace(/ /g, '').length + ' lettere' + (w.indexOf(' ') >= 0 ? ', ' + w.split(' ').length + ' parole' : '') + '</small>'; }
+  function betChips(g, me) {
+    if (!g.opts.bet || g.drawer !== me) return '';
+    var b = App.bet || g.bet || 1;
+    return '<div class="bets"><span>Punti in palio:</span>' + [1, 2, 3].map(function (k) { return '<button class="chip' + (b === k ? ' on' : '') + '" data-act="bet" data-b="' + k + '">' + k + '</button>'; }).join('') + '<small>se nessuno indovina li perdete</small></div>';
+  }
+  function rulesNote(g, me) {
+    var r = [];
+    if (g.opts.line) r.push('una linea sola'); if (g.opts.mono) r.push('solo nero, niente gomma'); if (g.opts.dark) r.push('a occhi chiusi'); if (g.opts.hand) r.push('✋ con la mano sbagliata!');
+    return r.length && drawing(g, me) ? '<div class="rnote">' + r.join(' · ') + '</div>' : '';
+  }
+  function clueChips(g) { return '<div class="clues">' + (g.clues || []).map(function (c) { return '<span class="clue-c">' + esc(c) + '</span>'; }).join('') + '</div>'; }
   function mid(g, me) {
-    var h = '', P = g.drawer != null ? g.players[g.drawer] : null, who = P ? '<b class="pn-c" style="--pc:' + pcol(g, g.drawer) + '">' + esc(P.nick) + '</b>' : '';
+    var h = '', P = g.drawer != null ? g.players[g.drawer] : null, who = P ? '<b class="pn-c" style="--pc:' + pcol(g, g.drawer) + '">' + esc(P.nick) + '</b>' : '', m = g.opts.mode;
+    var forT = P ? (g.teams[P.team].pc ? '' : ' per i ' + tlabel(g, P.team)) : '';
     if (g.phase === 'over') h = '<div class="st">Partita finita</div>';
-    else if (g.phase === 'choose') h = g.drawer === me ? '<div class="st">Tocca a te! Scegli cosa disegnare:</div><div class="choices"><button class="btn ch" data-act="choose" data-i="0">' + esc(g.choices[0]) + '<small>facile · 1 punto</small></button><button class="btn ch hard" data-act="choose" data-i="1">' + esc(g.choices[1]) + '<small>difficile · 2 punti</small></button></div>'
-      : '<div class="st">' + who + ' (' + tlabel(g, P.team) + ') sceglie cosa disegnare…</div>';
+    else if (g.phase === 'chain') {
+      var tk = E.chainTask(g, me), n = g.players.length, done = Object.keys(g.chain.done).length;
+      if (!tk) h = '<div class="st">Tutti disegnano e scrivono… (' + done + '/' + n + ')</div>';
+      else if (tk.done) h = '<div class="st">Consegnato! Aspetto gli altri (' + done + '/' + n + ')…</div>';
+      else if (tk.kind === 'draw') h = '<div class="st">' + (g.chain.k ? 'Disegna quello che ha scritto il vicino:' : 'Disegna la tua parola segreta:') + ' <b class="word">' + esc(tk.text) + '</b></div>';
+      else h = '<div class="st">Che cosa rappresenta questo disegno? Scrivilo qui sotto.</div>';
+    } else if (g.phase === 'show') {
+      var S = g.show, c = g.chain.list[S.c], first = g.players[c.it[0] ? c.it[0].p : 0];
+      h = '<div class="st">Catena ' + (S.c + 1) + ' di ' + g.chain.list.length + ' · partita da <b class="pn-c" style="--pc:' + pcol(g, c.it[0] ? c.it[0].p : 0) + '">' + esc(first.nick) + '</b>: <b class="word">' + esc(c.w) + '</b></div>';
+    } else if (g.phase === 'hint') {
+      if (g.hinter === me) {
+        var hi = App.hintI || 0;
+        h = '<div class="st">Scegli la parola per ' + who + ' e scrivi fino a 3 parole di aiuto (non la parola!):</div><div class="choices">' +
+          [0, 1].map(function (i) { return '<button class="btn ch' + (i ? ' hard' : '') + (hi === i ? ' on' : ' ghost') + '" data-act="hintpick" data-i="' + i + '">' + esc(g.choices[i]) + '<small>' + (i ? 'difficile · 2 punti' : 'facile · 1 punto') + '</small></button>'; }).join('') + '</div>' +
+          '<div class="clue-row"><input class="field clue" maxlength="24" placeholder="aiuto 1" autocomplete="off"><input class="field clue" maxlength="24" placeholder="aiuto 2" autocomplete="off"><input class="field clue" maxlength="24" placeholder="aiuto 3" autocomplete="off"><button class="btn" data-act="hintgo">Manda gli aiuti</button></div>';
+      } else h = '<div class="st">' + (g.hinter != null ? pname(g, g.hinter) + ' sceglie la parola e gli aiuti per ' : 'Gli aiuti per ') + (g.drawer === me ? 'te' : who) + '…</div>' + betChips(g, me);
+    } else if (g.phase === 'choose') h = g.drawer === me ? '<div class="st">Tocca a te! Scegli cosa disegnare:</div>' + betChips(g, me) + '<div class="choices"><button class="btn ch" data-act="choose" data-i="0">' + esc(g.choices[0]) + '<small>facile · ' + (g.opts.bet ? 'puntata +0' : '1 punto') + '</small></button><button class="btn ch hard" data-act="choose" data-i="1">' + esc(g.choices[1]) + '<small>difficile · ' + (g.opts.bet ? 'puntata +1' : '2 punti') + '</small></button></div>'
+      : '<div class="st">' + who + (forT ? ' (' + tlabel(g, P.team) + ')' : '') + ' sceglie cosa disegnare…</div>';
     else if (g.phase === 'draw' || g.phase === 'steal') {
-      if (g.drawer === me) h = '<div class="st">Disegna: <b class="word">' + esc(g.word) + '</b> <span class="pp">' + g.pts + (g.pts > 1 ? ' punti' : ' punto') + '</span></div>';
-      else h = '<div class="st">' + (g.phase === 'steal' ? '<b class="steal">Furto!</b> ' : '') + who + ' disegna per i ' + tlabel(g, P.team) + ':</div>' + mask(g.word);
-    } else if (g.phase === 'reveal') h = '<div class="st">Era <b class="word">' + esc(g.word) + '</b>' + (g.hit ? ' · ' + pname(g, g.hit.p) + (g.hit.steal ? ' l’ha rubata' : ' ha indovinato') + ': <b>+' + g.hit.pts + '</b> ai ' + tlabel(g, g.hit.t) : ' · nessuno l’ha indovinata') + '</div>';
+      var relay = m === 'relay' && g.relay && g.relay.max > 1 ? ' <span class="pp">la penna passa tra <i id="rlv"></i></span>' : '';
+      var pts = g.opts.bet ? g.bet + (g.pts > 1 ? 1 : 0) : g.pts;
+      if (g.drawer === me) h = m === 'blind' ? '<div class="st">Disegna seguendo gli aiuti (la parola non la sai!):</div>' + clueChips(g) : '<div class="st">Disegna: <b class="word">' + esc(g.word) + '</b> <span class="pp">' + pts + (pts > 1 ? ' punti' : ' punto') + '</span>' + relay + '</div>';
+      else if (E.knows(g, me)) h = '<div class="st">' + who + ' disegna' + forT + ': <b class="word">' + esc(g.word) + '</b>' + relay + '</div>' + (m === 'blind' ? clueChips(g) : '');
+      else h = '<div class="st">' + (g.phase === 'steal' ? '<b class="steal">Furto!</b> ' : '') + (m === 'relay' ? 'Penna a ' : '') + who + (m === 'relay' ? forT + relay : ' disegna' + forT + ':') + '</div>' + mask(g.word);
+      h += rulesNote(g, me);
+    } else if (g.phase === 'reveal') h = '<div class="st">Era <b class="word">' + esc(g.word) + '</b>' + (g.hit ? ' · ' + pname(g, g.hit.p) + (g.hit.steal ? ' l’ha rubata' : ' ha indovinato') + ': <b>+' + g.hit.pts + '</b> ' + tto(g, g.hit.t) + (g.hit.dp ? ' e <b>+' + g.hit.dp + '</b> a ' + pname(g, g.drawer) : '') : ' · nessuno l’ha indovinata') + '</div>';
     return h + '<div class="tm"><span class="tmv" id="tmv"></span><span class="tbar2"><i id="tbar"></i></span></div>';
+  }
+  function phaseTotal(g) {
+    if (g.phase === 'draw') return E.drawTime(g) * 1000;
+    if (g.phase === 'steal') return E.STEAL_MS; if (g.phase === 'choose') return E.CHOOSE_MS; if (g.phase === 'hint') return E.HINT_MS;
+    if (g.phase === 'chain') return E.chainTime(g, g.chain.k); if (g.phase === 'show') return E.SHOW_MS;
+    return E.REVEAL_MS;
   }
   function clock() {
     var g = G(); if (!g || !el('tmv')) return;
     var live = g.phase !== 'over', ms = live ? left(g) : 0, s = Math.ceil(ms / 1000);
-    var total = g.phase === 'draw' ? g.opts.time * 1000 : g.phase === 'steal' ? E.STEAL_MS : g.phase === 'choose' ? E.CHOOSE_MS : E.REVEAL_MS;
-    var txt = live && g.phase !== 'reveal' ? s + '″' : '', tv = el('tmv'), tb = el('tbar');
+    var total = phaseTotal(g);
+    var txt = live && g.phase !== 'reveal' && g.phase !== 'show' ? s + '″' : '', tv = el('tmv'), tb = el('tbar');
     if (tv.textContent !== txt) tv.textContent = txt;
     if (tb) tb.style.width = live ? Math.max(0, Math.min(100, ms / total * 100)).toFixed(1) + '%' : '0%';
-    el('gv-mid').classList.toggle('low', live && (g.phase === 'draw' || g.phase === 'steal') && s <= 10);
-    if ((g.phase === 'draw' || g.phase === 'steal') && s <= 5 && s > 0) { var k = g.turn + g.phase + s; if (lastTick !== k) { lastTick = k; Sound.play('tick'); } }
+    el('gv-mid').classList.toggle('low', live && (g.phase === 'draw' || g.phase === 'steal' || g.phase === 'chain') && s <= 10);
+    var rv = el('rlv'); if (rv && g.relay) { var rs = Math.max(0, Math.ceil((g.relay.next - hostNow()) / 1000)) + '″'; if (rv.textContent !== rs) rv.textContent = rs; }
+    if ((g.phase === 'draw' || g.phase === 'steal' || g.phase === 'chain') && s <= 5 && s > 0) { var k = g.turn + g.phase + s + (g.chain ? g.chain.k : ''); if (lastTick !== k) { lastTick = k; Sound.play('tick'); } }
+    // telefono senza fili: poco prima della fine si consegna da soli quello che c'è
+    if (g.phase === 'chain' && ms < 1800 && ms > 0) submitChain(true);
   }
   function tools(g, me) {
-    if (!drawing(g, me) || g.phase !== 'draw') return '';
-    return '<div class="pal">' + COLORS.map(function (c) { return '<button class="sw' + (App.pen.c === c ? ' on' : '') + '" style="--c:' + c + '" data-act="pen" data-c="' + c + '" aria-label="Colore"></button>'; }).join('') +
-      '<button class="sw er' + (App.pen.c === '#fffdf6' ? ' on' : '') + '" data-act="pen" data-c="#fffdf6" aria-label="Gomma">' + IC('eraser') + '</button></div>' +
-      '<div class="pal">' + SIZES.map(function (w) { return '<button class="sz' + (App.pen.w === w ? ' on' : '') + '" data-act="size" data-w="' + w + '" aria-label="Spessore ' + w + '"><i style="width:' + (w / 1.4 + 3) + 'px;height:' + (w / 1.4 + 3) + 'px"></i></button>'; }).join('') +
-      '<button class="tb" data-act="undo" aria-label="Annulla">' + IC('undo') + '</button><button class="tb" data-act="clear" aria-label="Cancella tutto">' + IC('trash') + '</button></div>';
+    if (!drawing(g, me) || (g.phase !== 'draw' && g.phase !== 'chain')) return '';
+    var give = g.phase === 'chain' ? '<button class="btn small" data-act="consegna">Consegna</button>' : '';
+    var sizes = SIZES.map(function (w) { return '<button class="sz' + (App.pen.w === w ? ' on' : '') + '" data-act="size" data-w="' + w + '" aria-label="Spessore ' + w + '"><i style="width:' + (w / 1.4 + 3) + 'px;height:' + (w / 1.4 + 3) + 'px"></i></button>'; }).join('');
+    if (g.opts.mono) return '<div class="pal"><span class="muted mono">Solo nero, niente gomma</span></div><div class="pal">' + sizes + give + '</div>';
+    var cols = COLORS.map(function (c) { return '<button class="sw' + (App.pen.c === c ? ' on' : '') + '" style="--c:' + c + '" data-act="pen" data-c="' + c + '" aria-label="Colore"></button>'; }).join('');
+    var rub = g.opts.line ? '' : '<button class="sw er' + (App.pen.c === '#fffdf6' ? ' on' : '') + '" data-act="pen" data-c="#fffdf6" aria-label="Gomma">' + IC('eraser') + '</button>';
+    var un = g.opts.line ? '' : '<button class="tb" data-act="undo" aria-label="Annulla">' + IC('undo') + '</button>';
+    return '<div class="pal">' + cols + rub + '</div><div class="pal">' + sizes + un + '<button class="tb" data-act="clear" aria-label="' + (g.opts.line ? 'Ricomincia' : 'Cancella tutto') + '">' + IC('trash') + '</button>' + give + '</div>';
   }
   function over(g, me) {
+    var dark = g.opts.dark && drawing(g, me) ? '<div class="bo dark">A occhi chiusi: il tuo disegno lo vedono solo gli altri</div>' : '';
     if (g.phase === 'choose') return '<div class="bo">' + (g.drawer === me ? 'Scegli la parola qui sopra' : 'Tra poco si disegna…') + '</div>';
+    if (g.phase === 'hint') return '<div class="bo">' + (g.hinter === me ? 'Prepara gli aiuti qui sopra' : 'Si preparano gli aiuti…') + '</div>';
     if (g.phase === 'reveal') return '<div class="bo big">' + esc(g.word) + '</div>';
-    return '';
+    if (g.phase === 'chain') { var tk = E.chainTask(g, me); if (tk && tk.done && tk.kind === 'draw') return '<div class="bo">Consegnato!</div>'; if (tk && tk.kind === 'write' && !tk.pic.length) return '<div class="bo">Il vicino non ha disegnato niente… prova a indovinare lo stesso!</div>'; return dark; }
+    if (g.phase === 'show' || (g.phase === 'over' && g.chain)) {
+      var S = g.show || { c: 0, i: -1 }, c = g.chain.list[S.c], it = c && c.it[S.i];
+      if (!c) return '';
+      if (S.i < 0) return '<div class="bo big">' + esc(c.w) + '<small>la parola di partenza</small></div>';
+      var by = '<small>' + (it.s ? 'disegnato' : 'scritto') + ' da ' + esc(g.players[it.p].nick) + (it.ok ? ' · giusto! +1' : '') + '</small>';
+      return it.s ? '<div class="bo cap">' + by + '</div>' : '<div class="bo big' + (it.ok ? ' ok' : '') + '">«' + esc(it.w || '…') + '»' + by + '</div>';
+    }
+    return dark;
   }
   function feed(g, me) {
+    if (g.phase === 'chain') return '<span class="muted gs0">Hanno consegnato ' + Object.keys(g.chain.done).length + ' su ' + g.players.length + '.</span>';
+    if (g.phase === 'show' || (g.phase === 'over' && g.chain)) {
+      var S = g.show || { c: 0, i: -1 }, c = g.chain.list[S.c]; if (!c) return '';
+      return '<span class="gs chainsum"><b>' + esc(c.w) + '</b>' + c.it.slice(0, S.i + 1).map(function (x) { return ' → ' + (x.s ? '✏️ ' + esc(g.players[x.p].nick) : '«' + esc(x.w || '…') + '»'); }).join('') + '</span>';
+    }
     var list = g.guesses.slice(-6).map(function (x) { var P = g.players[x.p]; return '<span class="gs' + (x.near && x.p === me ? ' near' : '') + '" style="--pc:' + pcol(g, x.p) + '"><b>' + esc(P.nick) + '</b> ' + esc(x.w) + (x.near && x.p === me ? ' <em>quasi!</em>' : '') + '</span>'; }).join('');
     return list || '<span class="muted gs0">Le risposte compaiono qui.</span>';
   }
   function form(g, me) {
-    var f = el('gform'), can = me >= 0 && E.canGuess(g, me), key = can ? 'on:' + g.turn + ':' + g.phase : 'off';
+    var f = el('gform'), tk = g.phase === 'chain' ? E.chainTask(g, me) : null, write = !!tk && tk.kind === 'write' && !tk.done;
+    var can = me >= 0 && (E.canGuess(g, me) || write), key = can ? 'on:' + g.turn + ':' + g.phase + ':' + (g.chain ? g.chain.k : '') : 'off';
     if (f._k === key) return; f._k = key;
-    f.innerHTML = can ? '<input id="gin" class="field gin" maxlength="40" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="send" placeholder="' + (g.phase === 'steal' ? 'Rubala! Scrivi la parola…' : 'Che cos’è? Scrivi qui…') + '"><button class="btn gsend" type="submit" aria-label="Invia">' + IC('send') + '</button>' : '';
+    var ph = write ? 'Che cos’è? Scrivilo qui…' : g.phase === 'steal' ? 'Rubala! Scrivi la parola…' : 'Che cos’è? Scrivi qui…';
+    f.innerHTML = can ? '<input id="gin" class="field gin" maxlength="40" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="send" placeholder="' + ph + '"><button class="btn gsend" type="submit" aria-label="Invia">' + IC('send') + '</button>' : '';
     f.classList.toggle('on', can);
   }
   function prompt(g, me) {
-    var h = '', btn = '', help = 'goal';
-    if (g.phase === 'over') { h = '<b>Partita finita.</b> ' + (g.winners.length > 1 ? 'Pari tra ' + g.winners.map(function (t) { return tlabel(g, t); }).join(' e ') : 'Vincono i ' + tlabel(g, g.winners[0])) + '.'; btn = '<button class="btn small" data-act="showover">Classifica</button>'; }
+    var h = '', btn = '', help = 'goal', m = g.opts.mode;
+    if (g.phase === 'over') { h = '<b>Partita finita.</b> ' + (g.winners.length > 1 ? 'Pari tra ' + g.winners.map(function (t) { return tlabel(g, t); }).join(' e ') : (g.teams[g.winners[0]].pc ? 'Vince ' : 'Vincono i ') + tlabel(g, g.winners[0])) + '.'; btn = '<button class="btn small" data-act="showover">Classifica</button>'; }
+    else if (g.phase === 'chain') { var tk = E.chainTask(g, me); help = 'chain'; h = !tk ? 'Stai guardando.' : tk.done ? 'Aspetta che consegnino tutti.' : tk.kind === 'draw' ? 'Disegna e tocca <b>Consegna</b>. Niente lettere!' : 'Scrivi che cosa vedi e invia.'; }
+    else if (g.phase === 'show') { h = 'Ecco come si è trasformata la parola, passo dopo passo!'; help = 'chain'; }
+    else if (g.phase === 'hint') { h = g.hinter === me ? 'Scegli la parola e scrivi gli aiuti: niente parola né pezzi di parola!' : 'Si preparano gli aiuti.'; help = 'blind'; }
     else if (g.phase === 'choose') { h = g.drawer === me ? 'Scegli la parola: la difficile vale di più.' : 'Si prepara il prossimo disegno.'; help = 'draw'; }
     else if (g.phase === 'draw') {
-      if (g.drawer === me) { h = 'Disegna con il dito. <b>Niente lettere!</b>'; btn = '<button class="btn small ghost" data-act="skip">Passo</button>'; help = 'draw'; }
-      else if (E.canGuess(g, me)) { h = 'Indovina che cosa disegna il tuo compagno!'; help = 'guess'; }
+      if (g.drawer === me) { h = m === 'blind' ? 'Disegna gli aiuti e indovina anche tu!' : m === 'relay' ? 'Disegna finché hai la penna, poi passa al compagno.' : 'Disegna con il dito. <b>Niente lettere!</b>'; btn = '<button class="btn small ghost" data-act="skip">Passo</button>'; help = m === 'relay' ? 'relay' : m === 'blind' ? 'blind' : 'draw'; }
+      else if (E.canGuess(g, me)) { h = m === 'ffa' ? 'Indovina prima di tutti!' : 'Indovina che cosa disegna ' + (m === 'blind' && g.players[g.drawer].team === g.players[me].team ? 'il tuo compagno (non sa la parola!)' : 'il tuo compagno') + '!'; help = m === 'ffa' ? 'ffa' : 'guess'; }
+      else if (m === 'relay' && E.knows(g, me)) { h = 'Hai già avuto la penna: ora tifa per i tuoi compagni.'; help = 'relay'; }
+      else if (m === 'blind' || m === 'ffa') { h = 'Guarda e divertiti: questa volta non indovini tu.'; help = m; }
       else { h = 'Guarda bene: se non indovinano, potete <b>rubarla</b>.'; help = 'steal'; }
     } else if (g.phase === 'steal') { h = E.canGuess(g, me) ? '<b>Furto!</b> Scrivi la parola prima delle altre squadre.' : 'Le altre squadre provano a rubare la parola…'; help = 'steal'; }
     else h = 'Si passa al prossimo disegno…';
@@ -4229,9 +4678,12 @@ var Game = (function () {
   }
   function plan(g, me, e) {
     switch (e.k) {
-      case 'turn': enqueue(function () { Sound.play('turn'); if (e.p === me) banner('Tocca a te!', 'Scegli cosa disegnare'); else banner(esc(g.players[e.p].nick) + ' disegna', 'per i ' + esc(g.teams[e.t].name)); return sleep(200); }); break;
+      case 'turn': enqueue(function () { Sound.play('turn'); if (e.hinter === me) banner('Tocca a te!', 'Prepara gli aiuti per ' + esc(g.players[e.p].nick)); else if (e.p === me) banner('Tocca a te!', g.opts.mode === 'blind' ? 'Tra poco arrivano gli aiuti' : 'Scegli cosa disegnare'); else banner(esc(g.players[e.p].nick) + ' disegna', g.teams[e.t].pc ? '' : 'per i ' + esc(g.teams[e.t].name)); return sleep(200); }); break;
+      case 'relay': enqueue(function () { Sound.play('turn'); if (e.p === me) banner('La penna è tua!', 'Disegna: ' + esc(G().word || '')); else banner('Penna a ' + esc(g.players[e.p].nick), ''); return sleep(200); }); break;
+      case 'chain': enqueue(function () { Sound.play('turn'); var tk = E.chainTask(G(), me); if (tk) banner(tk.kind === 'draw' ? 'Disegna!' : 'Che cos’è?', tk.kind === 'draw' ? esc(tk.text) : 'scrivi cosa vedi nel disegno'); return sleep(200); }); break;
+      case 'show': enqueue(function () { Sound.play('hit'); banner('Le catene!', 'guardate com’è cambiata ogni parola'); return sleep(200); }); break;
       case 'draw': enqueue(function () { Sound.play('draw'); return sleep(50); }); break;
-      case 'hit': enqueue(function () { Sound.play('hit'); banner(e.steal ? 'Rubata!' : 'Indovinata!', esc(e.word) + ' · +' + e.pts + ' ai ' + esc(g.teams[e.t].name)); if (myTeam(g, me) === e.t) confetti(30); return sleep(300); }); break;
+      case 'hit': enqueue(function () { Sound.play('hit'); banner(e.steal ? 'Rubata!' : 'Indovinata!', esc(e.word) + ' · +' + e.pts + (g.teams[e.t].pc ? ' a ' : ' ai ') + esc(g.teams[e.t].name)); if (myTeam(g, me) === e.t) confetti(30); return sleep(300); }); break;
       case 'steal': enqueue(function () { Sound.play('steal'); banner('Furto!', myTeam(g, me) === e.t ? 'gli altri provano a rubarla' : 'scrivi la parola, presto!'); var i = el('gin'); if (i && !('ontouchstart' in window)) i.focus(); return sleep(200); }); break;
       case 'miss': enqueue(function () { Sound.play('miss'); return sleep(50); }); break;
       case 'over': enqueue(function () { App.sheet = { kind: 'over', fresh: true }; renderSheet(); var w = G().winners || []; Sound.play(w.indexOf(myTeam(g, me)) >= 0 ? 'win' : 'lose'); if (w.indexOf(myTeam(g, me)) >= 0) confetti(60); return sleep(100); }); break;
@@ -4245,7 +4697,7 @@ var Game = (function () {
     c.innerHTML = o; document.body.appendChild(c); setTimeout(function () { c.remove(); }, 4500);
   }
   Net.onLive(function (m) { if (m && m.d) live(m.d); });
-  return { render: render, unmount: unmount, fx: fx, idle: idle, banner: banner, clock: clock, undo: undo, clear: clear, picNow: picNow, strokes: strokes };
+  return { render: render, unmount: unmount, fx: fx, idle: idle, banner: banner, clock: clock, undo: undo, clear: clear, picNow: picNow, strokes: strokes, submitChain: submitChain };
 })();
 
 /* ===== Disegna e indovina: finestre (regole, menu, squadra, classifica, presentazione) ed eventi ===== */
@@ -4300,11 +4752,21 @@ function sheetBody(s) {
 function overBody(g, me) {
   var W = g.winners, order = g.final.order, place = g.final.place, mt = me >= 0 ? g.players[me].team : -1, iw = W.indexOf(mt) >= 0;
   var podium = order.slice(0, 3).map(function (t, k) { var T = g.teams[t]; return '<div class="pod p' + (k + 1) + '" style="--pc:' + tcol(g, t) + '"><span class="pv big">' + esc(T.name.charAt(0)) + '</span><b>' + esc(T.name) + '</b><span class="pod-s">' + T.total + '</span><span class="pod-b">' + place[t] + '</span></div>'; }).join('');
-  var title = iw ? 'Avete vinto!' : W.length > 1 ? 'Pari tra ' + W.map(function (t) { return esc(g.teams[t].name); }).join(' e ') : 'Vincono i ' + esc(g.teams[W[0]].name);
+  var solo = !!g.teams[0].pc, title = iw ? (solo ? 'Hai vinto!' : 'Avete vinto!') : W.length > 1 ? 'Pari tra ' + W.map(function (t) { return esc(g.teams[t].name); }).join(' e ') : (solo ? 'Vince ' : 'Vincono i ') + esc(g.teams[W[0]].name);
   var hits = g.log.filter(function (l) { return l.k === 'hit' || l.k === 'steal'; }).length;
+  if (g.chain) return '<div class="over"><span class="over-pen">' + ART.pencil() + '</span><h2>' + title + '</h2><p class="lead">' + g.chain.list.length + ' catene, ' + g.chain.list.reduce(function (n, c) { return n + c.it.filter(function (x) { return x.ok && x.w; }).length; }, 0) + ' parole arrivate giuste.</p>' + chainsHTML(g) + Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda il tavolo') + '</div>';
   return '<div class="over"><span class="over-pen">' + ART.pencil() + '</span><h2>' + title + '</h2><p class="lead">' + g.order.length + ' disegni, ' + hits + ' indovinati.</p>' +
     '<div class="podium">' + podium + '</div>' +
     Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda il tavolo') + '</div>';
+}
+// tutte le catene del telefono senza fili, dalla parola di partenza all'ultima scritta
+function chainsHTML(g) {
+  return '<div class="chains">' + g.chain.list.map(function (c) {
+    return '<div class="chainx"><b class="cw">' + esc(c.w) + '</b>' + c.it.map(function (x) {
+      var who = '<small style="--pc:' + pcol(g, x.p) + '">' + esc(g.players[x.p].nick) + '</small>';
+      return x.s ? '<span class="cpic' + (x.ok ? ' ok' : '') + '">' + ART.mini(E.unpack(x.s)) + who + '</span>' : '<span class="ctxt' + (x.ok ? ' ok' : '') + '">«' + esc(x.w || '…') + '»' + who + '</span>';
+    }).join('') + '</div>';
+  }).join('') + '</div>';
 }
 function introBody(s) {
   var pages = [['Benvenuto a Disegna e indovina', RU.S.goal[1]], ['Disegnare', RU.S.draw[1]], ['Indovinare', RU.S.guess[1]], ['Il furto', RU.S.steal[1]]];
@@ -4318,7 +4780,9 @@ document.addEventListener('submit', function (ev) {
   if (ev.target.id !== 'gform') return; ev.preventDefault();
   var i = document.getElementById('gin'), g = G(); if (!i || !g) return;
   var w = i.value.trim(); if (!w) return;
-  i.value = ''; Sound.play('guess'); quiet({ a: 'guess', w: w });
+  i.value = ''; Sound.play('guess');
+  if (g.phase === 'chain') { quiet({ a: 'cwrite', w: w }); return; }
+  quiet({ a: 'guess', w: w });
 });
 
 /* ---------- eventi ---------- */
@@ -4366,7 +4830,11 @@ document.addEventListener('click', function (ev) {
     case 'auto': App.sheet = null; renderSheet(); send({ t: 'auto', p: +el.getAttribute('data-p'), on: !g.players[+el.getAttribute('data-p')].bot }); break;
     case 'resume': send({ t: 'back' }); break;
     // la partita
-    case 'choose': act({ a: 'choose', i: +el.getAttribute('data-i') }); break;
+    case 'choose': act({ a: 'choose', i: +el.getAttribute('data-i'), b: App.bet || 1 }); break;
+    case 'bet': App.bet = +el.getAttribute('data-b'); Game.render(); if (g && g.phase === 'hint') quiet({ a: 'bet', b: App.bet }); break;
+    case 'hintpick': App.hintI = +el.getAttribute('data-i'); Game.render(); break;
+    case 'hintgo': { var cl = Array.prototype.map.call(document.querySelectorAll('.clue'), function (x) { return x.value.trim(); }).filter(Boolean); act({ a: 'hint', i: App.hintI || 0, c: cl }); break; }
+    case 'consegna': Game.submitChain(); break;
     case 'skip': act({ a: 'skip' }); break;
     case 'pen': App.pen.c = el.getAttribute('data-c'); Game.render(); break;
     case 'size': App.pen.w = +el.getAttribute('data-w'); if (App.pen.c === '#fffdf6') App.pen.c = '#1d2333'; Game.render(); break;
@@ -4380,6 +4848,8 @@ document.addEventListener('change', function (ev) {
   if (id === 'opt-rounds') send({ t: 'opt', rounds: +ev.target.value });
   if (id === 'opt-time') send({ t: 'opt', time: +ev.target.value });
   if (id === 'opt-teams') send({ t: 'opt', teams: +ev.target.value });
+  if (id === 'opt-mode') send({ t: 'opt', mode: ev.target.value });
+  if (ev.target.getAttribute && ev.target.getAttribute('data-rule')) send({ t: 'opt', rule: ev.target.getAttribute('data-rule'), on: ev.target.checked });
 });
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);

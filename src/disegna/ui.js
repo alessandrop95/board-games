@@ -16,16 +16,19 @@ function myNick() { return (lsGet('pp-nick') || '').trim().slice(0, 18); }
 function G() { return App.doc && App.doc.game; }
 function myIdx() { var g = G(); if (!g) return -1; for (var i = 0; i < g.players.length; i++) if (g.players[i].uid === Net.uid) return i; return -1; }
 function pcol(g, p) { return PCOL[g.players[p].col % PCOL.length]; }
-function tcol(g, t) { return TCOL[g.teams[t].col % TCOL.length]; }
+function tcol(g, t) { var T = g.teams[t]; return T.pc ? PCOL[T.col % PCOL.length] : TCOL[T.col % TCOL.length]; }
 function pname(g, p) { return '<b class="pn-c" style="--pc:' + pcol(g, p) + '">' + esc(g.players[p].nick) + '</b>'; }
 function tlabel(g, t) { return '<b class="pn-c" style="--pc:' + tcol(g, t) + '">' + esc(g.teams[t].name) + '</b>'; }
+// «ai Rossi» a squadre, «a Ale» quando ognuno gioca per sé
+function tto(g, t) { return (g.teams[t].pc ? 'a ' : 'ai ') + tlabel(g, t); }
 // l'ora dell'host vista da questo telefono (i telefoni possono avere l'orologio un po' diverso)
 function hostNow() { return Date.now() + (Net.isHost ? 0 : App.off); }
 function left(g) { return Math.max(0, g.until - hostNow()); }
 
 /* ---------- regole del tavolo (girano sull'host) ---------- */
 function uniqueNick(seats, n) { var base = n, k = 2; while (seats.some(function (s) { return s.nick.toLowerCase() === n.toLowerCase(); })) n = base + ' ' + k++; return n; }
-function nTeams(doc) { var t = doc.opts && doc.opts.teams; return t == null ? 2 : +t; }
+function modeOf(doc) { var m = doc.opts && doc.opts.mode; return E.MODES.indexOf(m) >= 0 ? m : 'teams'; }
+function nTeams(doc) { if (!E.teamed(modeOf(doc))) return 0; var t = doc.opts && doc.opts.teams; return t == null ? 2 : +t; }
 // la squadra con meno giocatori (per chi arriva)
 function lightTeam(doc) { var n = nTeams(doc); if (!n) return 0; var c = []; for (var i = 0; i < n; i++) c.push(0); doc.seats.forEach(function (s) { if (s.team >= 0 && s.team < n) c[s.team]++; }); return c.indexOf(Math.min.apply(null, c)); }
 function balance(doc) { var n = nTeams(doc); doc.seats.forEach(function (s, i) { s.team = n ? i % n : 0; }); }
@@ -43,7 +46,7 @@ function seenList(doc) { var s = seenLocal(); (doc.seen || []).forEach(function 
 function tableReducer(doc, from, op) {
   var isHost = doc.host === from, seat = doc.seats.filter(function (s) { return s.uid === from; })[0];
   var hostOnly = { err: 'Solo chi ha aperto il tavolo può farlo.' };
-  doc.opts = doc.opts || {}; if (doc.opts.rounds == null) doc.opts.rounds = 2; if (doc.opts.time == null) doc.opts.time = 80; if (doc.opts.teams == null) doc.opts.teams = 2;
+  doc.opts = doc.opts || {}; if (doc.opts.rounds == null) doc.opts.rounds = 2; if (doc.opts.time == null) doc.opts.time = 80; if (doc.opts.teams == null) doc.opts.teams = 2; if (doc.opts.mode == null) doc.opts.mode = 'teams';
   // il posto di chi apre il tavolo nasce senza squadra
   doc.seats.forEach(function (s) { if (s.team == null) s.team = lightTeam({ opts: doc.opts, seats: doc.seats.filter(function (x) { return x.team != null; }) }); });
   switch (op.t) {
@@ -87,6 +90,8 @@ function tableReducer(doc, from, op) {
       if (op.rounds != null && E.OPT.rounds.indexOf(+op.rounds) >= 0) doc.opts.rounds = +op.rounds;
       if (op.time != null && E.OPT.time.indexOf(+op.time) >= 0) doc.opts.time = +op.time;
       if (op.teams != null && E.OPT.teams.indexOf(+op.teams) >= 0 && +op.teams !== doc.opts.teams) { doc.opts.teams = +op.teams; balance(doc); }
+      if (op.mode != null && E.MODES.indexOf(op.mode) >= 0 && op.mode !== doc.opts.mode) { var wasT = E.teamed(modeOf(doc)); doc.opts.mode = op.mode; if (!wasT && E.teamed(op.mode)) balance(doc); }
+      if (op.rule != null && E.RULES.indexOf(op.rule) >= 0) doc.opts[op.rule] = !!op.on;
       return {};
     }
     case 'back': {
@@ -101,7 +106,7 @@ function tableReducer(doc, from, op) {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
       if (doc.seats.length < MINP) return { err: 'Servono almeno ' + MINP + ' giocatori: aggiungi giocatori automatici.' };
-      var why = E.checkSeats(doc.seats, nTeams(doc)); if (why) return { err: why };
+      var why = E.checkSeats(doc.seats, nTeams(doc), doc.opts); if (why) return { err: why };
       rememberUsed(doc); doc.game = E.newGame(doc.seats.slice(), doc.opts, Date.now(), seenList(doc)); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; rememberUsed(doc); doc.phase = 'lobby'; doc.game = null; return {};
@@ -121,6 +126,8 @@ function tableReducer(doc, from, op) {
 Net.setReducer(tableReducer);
 function needsMe(g, me) {
   if (me < 0 || !g) return false;
+  if (g.phase === 'chain') { var tk = E.chainTask(g, me); return !!tk && !tk.done; }
+  if (g.phase === 'hint') return g.hinter === me;
   if (g.phase === 'choose' || g.phase === 'draw') return g.drawer === me || E.canGuess(g, me);
   return g.phase === 'steal' && E.canGuess(g, me);
 }
@@ -128,8 +135,11 @@ Coach.setup({ bots: 3, startText: 'Non hai mai giocato qui? Prova una partita co
   myTurn: function (g, me) { return needsMe(g, me); },
   tip: function (g, me) {
     if (!g.players[me]) return null;
+    if (g.phase === 'chain') { var tk = E.chainTask(g, me); if (!tk || tk.done) return null; return tk.kind === 'draw' ? 'Disegna <b>' + esc(tk.text) + '</b> e tocca <b>Consegna</b>: il vicino dovrà capire cos’è.' : 'Guarda il disegno del vicino e scrivi <b>che cosa rappresenta</b>.'; }
+    if (g.phase === 'hint') return g.hinter === me ? 'Scegli la parola per l’avversario e scrivi fino a <b>3 parole di aiuto</b> (senza la parola!): lui disegnerà solo con quelle.' : null;
     if (g.phase === 'choose') return g.drawer === me ? 'Tocca a te disegnare: scegli la parola. La <b>facile</b> vale 1 punto, la <b>difficile</b> 2.' : null;
-    if (g.phase === 'draw' && g.drawer === me) return 'Disegna <b>' + esc(g.word) + '</b> con il dito: niente lettere né numeri! I tuoi compagni scrivono le risposte. Se è troppo difficile tocca <b>Passo</b>.';
+    if (g.phase === 'draw' && g.drawer === me && g.opts.mode === 'blind') return 'Non sai la parola: disegna quello che ti suggeriscono gli aiuti e prova anche tu a indovinarla!';
+    if (g.phase === 'draw' && g.drawer === me) return 'Disegna <b>' + esc(g.word) + '</b> con il dito: niente lettere né numeri! Se è troppo difficile tocca <b>Passo</b>.';
     if (E.canGuess(g, me)) return 'Guarda il disegno e scrivi la parola: puoi provare quante volte vuoi.';
     return null;
   } });
@@ -138,7 +148,7 @@ Score.setup({ game: 'disegna', result: function (g) {
   return g.players.map(function (P) { return { won: (g.winners || []).indexOf(P.team) >= 0, place: place[P.team], score: g.teams[P.team].total }; });
 } });
 Turns.setup({ decider: function (g) { return E.decider(g); }, onTimeout: function () { return false; } });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; notes.push((o.teams || 2) + ' squadre'); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = [], m = modeOf(d); notes.push(m === 'teams' ? (o.teams || 2) + ' squadre' : E.MODE_NAME[m]); E.RULES.forEach(function (r) { if (o[r]) notes.push(E.RULE_NAME[r].toLowerCase()); }); if (o.rounds && o.rounds !== 2) notes.push(o.rounds + (o.rounds > 1 ? ' giri' : ' giro')); if (o.time && o.time !== 80) notes.push(o.time + ' secondi'); return { max: MAXP, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo, il tempo e i giocatori automatici.'); render(); });
 
 /* ---------- connessione al tavolo ---------- */
@@ -243,6 +253,7 @@ function driveBots() {
   if (!doc || !Net.isHost || doc.phase !== 'play' || !doc.game) return;
   var g = doc.game;
   // un tentativo ogni 5-9 secondi per ogni automatico che può indovinare (o che deve scegliere/passare al posto di un assente)
+  if (g.phase === 'hint' && g.hinter != null && g.players[g.hinter].bot) botStep(g.hinter, 2000, g.turn + ':hint');
   if (g.phase === 'choose' || g.phase === 'draw' || g.phase === 'steal') g.players.forEach(function (P, p) {
     if (!P.bot || !(p === g.drawer || E.canGuess(g, p))) return;
     var slot = Math.floor((Date.now() + p * 1300) / 7000);
@@ -253,7 +264,7 @@ function driveBots() {
 setInterval(function () {
   var d = App.doc, g = d && d.game;
   if (!g || d.phase !== 'play') return;
-  if (Net.isHost && g.phase !== 'over' && Date.now() >= g.until) {
+  if (Net.isHost && g.phase !== 'over' && (Date.now() >= g.until || (g.phase === 'draw' && g.relay && g.relay.max > 1 && Date.now() >= g.relay.next))) {
     Net.hostApply(function (cur) { var gg = cur && cur.game; if (!gg || !E.tick(gg, Date.now())) return false; if (gg.phase === 'over') cur.phase = 'over'; return true; });
   }
   if (Net.isHost) driveBots();
@@ -271,7 +282,7 @@ function onDoc() {
   if (App.screen !== 'table') { driveBots(); Turns.watch(App.doc); paintCur(); return; }
   if (g) {
     if (me >= 0 && !App.introShown) { App.introShown = true; if (!lsGet('dg-intro-done')) App.sheet = { kind: 'intro', page: 0 }; }
-    var rk = g.turn + ':' + g.pic.t; if (App.roundKey !== rk) { App.roundKey = rk; App.live = {}; }
+    var rk = g.turn + ':' + g.pic.t + ':' + (g.chain ? g.chain.k : ''); if (App.roundKey !== rk) { App.roundKey = rk; App.live = {}; App.sent = null; }
   }
   render(); if (g) Game.fx(g, me); driveBots(); Turns.watch(App.doc);
   if (g) App.seenFirstDoc = true;
@@ -310,15 +321,32 @@ function lobbyHTML() {
     '<section class="panel"><h2>Come si gioca, in 30 secondi</h2>' + RU.section('goal') + RU.section('steal') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';
 }
 Lobby.setRecentKey(KEY_RECENT);
+var MODE_DESC = {
+  teams: 'Uno disegna, i compagni indovinano; se il tempo finisce le altre squadre possono rubare la parola.',
+  ffa: 'Niente squadre: chi indovina per primo prende i punti, e li prende anche chi disegna.',
+  relay: 'A squadre, ma ogni 10 secondi la penna passa a un compagno, che vede la parola solo quando la riceve.',
+  blind: 'Un avversario sceglie la parola e scrive fino a 3 aiuti: chi disegna vede solo quelli e indovina insieme ai compagni.',
+  chain: 'Tutti insieme: si disegna, il vicino scrive cosa vede, il successivo disegna la scritta… alla fine si ride rivedendo le catene.'
+};
+var RULE_DESC = {
+  line: 'Non si alza il dito: il disegno è un unico tratto.', mono: 'Solo nero, niente gomma né annulla.', dark: 'Chi disegna non vede il proprio disegno.',
+  hand: 'Si disegna con la mano che non si usa di solito (parola d’onore!).', shrink: 'Il tempo scende di 20 secondi a ogni giro.', bet: 'Chi disegna punta 1, 2 o 3 punti: se nessuno indovina li perde.'
+};
 function optionsHTML(d, isHost) {
-  var o = d.opts || {}, teams = o.teams || 2, r = o.rounds || 2, tm = o.time || 80;
-  var desc = teams + ' squadre · ' + r + (r > 1 ? ' giri' : ' giro') + ' · ' + tm + ' secondi per disegno';
-  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.</p>';
-  function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:220px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
+  var o = d.opts || {}, m = modeOf(d), teams = o.teams || 2, r = o.rounds || 2, tm = o.time || 80;
+  var rules = E.RULES.filter(function (k) { return o[k] && !(k === 'bet' && m === 'chain'); });
+  var desc = E.MODE_NAME[m] + (E.teamed(m) ? ' · ' + teams + ' squadre' : '') + (m === 'chain' ? '' : ' · ' + r + (r > 1 ? ' giri' : ' giro')) + ' · ' + tm + ' secondi per disegno';
+  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.<br><span class="muted">' + MODE_DESC[m] + '</span></p>' + (rules.length ? '<p class="lead">Regole in più: ' + rules.map(function (k) { return '<b>' + E.RULE_NAME[k] + '</b>'; }).join(', ') + '.</p>' : '');
+  function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:240px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
   function opt(id, title, sub, cur, list) { return '<div class="tt-opt row"><label for="' + id + '" style="flex:1;min-width:160px"><b>' + title + '</b><br><span class="muted" style="font-size:14px">' + sub + '</span></label>' + sel(id, cur, list) + '</div>'; }
-  return opt('opt-teams', 'Squadre', 'Almeno 2 giocatori per squadra.', teams, [[2, '2 squadre'], [3, '3 squadre'], [4, '4 squadre']]) +
-    opt('opt-rounds', 'Giri', 'In un giro ogni persona disegna una volta.', r, [[1, '1 giro'], [2, '2 giri'], [3, '3 giri']]) +
-    opt('opt-time', 'Tempo', 'Per ogni disegno.', tm, [[60, '60 secondi'], [80, '80 secondi'], [100, '100 secondi'], [120, '2 minuti']]);
+  var h = opt('opt-mode', 'Modalità', MODE_DESC[m], m, E.MODES.map(function (k) { return [k, E.MODE_NAME[k]]; }));
+  if (E.teamed(m)) h += opt('opt-teams', 'Squadre', 'Almeno 2 giocatori per squadra.', teams, [[2, '2 squadre'], [3, '3 squadre'], [4, '4 squadre']]);
+  if (m !== 'chain') h += opt('opt-rounds', 'Giri', 'In un giro ogni persona disegna una volta.', r, [[1, '1 giro'], [2, '2 giri'], [3, '3 giri']]);
+  h += opt('opt-time', 'Tempo', m === 'chain' ? 'Per ogni disegno (per scrivere ci sono 35 secondi).' : 'Per ogni disegno.', tm, [[60, '60 secondi'], [80, '80 secondi'], [100, '100 secondi'], [120, '2 minuti']]);
+  h += '<div class="rules-pick"><b>Regole in più</b>' + E.RULES.filter(function (k) { return !(k === 'bet' && m === 'chain'); }).map(function (k) {
+    return '<label class="rpick"><input type="checkbox" data-rule="' + k + '"' + (o[k] ? ' checked' : '') + '><span><b>' + E.RULE_NAME[k] + '</b><small>' + RULE_DESC[k] + '</small></span></label>';
+  }).join('') + '</div>';
+  return h;
 }
 function roomHTML() {
   var d = App.doc, isHost = d.host === Net.uid, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), n = d.seats.length, nt = nTeams(d), seats = '';
@@ -338,9 +366,9 @@ function roomHTML() {
   return '<div class="topbar"><div class="wrap"><span class="brand">Disegna e indovina</span><span class="info">' + connInfo('Tavolo ' + esc(d.code)) + '</span>' + Sound.buttonHTML() + Chat.badgeHTML() + '<button class="iconbtn" data-act="rules">Regole</button><button class="iconbtn" data-act="leave">Esci</button></div></div>' +
     '<div class="wrap lobby">' + hostBanner() +
     '<section class="panel"><span class="lead">Codice del tavolo</span><span class="codebig">' + esc(d.code) + '</span><div class="row"><button class="btn" data-act="invite">Invita amici</button><button class="btn ghost small" data-act="copylink">Copia link</button></div>' +
-    '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi, anche da un’altra città. Da 4 a 12 giocatori: disegnano solo le persone, i giocatori automatici aiutano a indovinare.</p></section>' +
+    '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi, anche da un’altra città. Fino a 12 giocatori: disegnano solo le persone, i giocatori automatici aiutano a indovinare.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/' + MAXP + ')</h2>' + seats + (nt && isHost && n > 2 ? '<button class="btn ghost small" data-act="shuffle" style="justify-self:start">Squadre a caso</button>' : '') + Lobby.roomHTML(d, isHost) + optionsHTML(d, isHost) +
-    (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= MAXP ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < MINP ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < MINP ? '<p class="lead">Servono almeno ' + MINP + ' giocatori: aggiungi giocatori automatici.</p>' : '<p class="lead">Dura circa ' + Math.max(5, Math.round((d.opts.rounds || 2) * d.seats.filter(function (s) { return !s.bot; }).length * ((d.opts.time || 80) + 25) / 60)) + ' minuti.</p>')
+    (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= MAXP ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < MINP ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < MINP ? '<p class="lead">Servono almeno ' + MINP + ' giocatori: aggiungi giocatori automatici.</p>' : '<p class="lead">Dura circa ' + (modeOf(d) === 'chain' ? Math.max(5, Math.round(Math.min(6, d.seats.filter(function (s) { return !s.bot; }).length) * ((d.opts.time || 80) + 40) / 2 / 60 + 3)) : Math.max(5, Math.round((d.opts.rounds || 2) * d.seats.filter(function (s) { return !s.bot; }).length * ((d.opts.time || 80) + 25) / 60))) + ' minuti.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.' + (nt ? ' Puoi cambiare squadra con «Cambia».' : '') + '</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
     (isHost ? '<button class="btn ghost small" data-act="closetable" style="justify-self:start">Chiudi il tavolo</button>' : '') + '</section>' +
     '<section class="panel"><h2>Prima di cominciare</h2>' + RU.section('goal') + RU.section('steal') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';

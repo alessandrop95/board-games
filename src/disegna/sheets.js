@@ -50,11 +50,21 @@ function sheetBody(s) {
 function overBody(g, me) {
   var W = g.winners, order = g.final.order, place = g.final.place, mt = me >= 0 ? g.players[me].team : -1, iw = W.indexOf(mt) >= 0;
   var podium = order.slice(0, 3).map(function (t, k) { var T = g.teams[t]; return '<div class="pod p' + (k + 1) + '" style="--pc:' + tcol(g, t) + '"><span class="pv big">' + esc(T.name.charAt(0)) + '</span><b>' + esc(T.name) + '</b><span class="pod-s">' + T.total + '</span><span class="pod-b">' + place[t] + '</span></div>'; }).join('');
-  var title = iw ? 'Avete vinto!' : W.length > 1 ? 'Pari tra ' + W.map(function (t) { return esc(g.teams[t].name); }).join(' e ') : 'Vincono i ' + esc(g.teams[W[0]].name);
+  var solo = !!g.teams[0].pc, title = iw ? (solo ? 'Hai vinto!' : 'Avete vinto!') : W.length > 1 ? 'Pari tra ' + W.map(function (t) { return esc(g.teams[t].name); }).join(' e ') : (solo ? 'Vince ' : 'Vincono i ') + esc(g.teams[W[0]].name);
   var hits = g.log.filter(function (l) { return l.k === 'hit' || l.k === 'steal'; }).length;
+  if (g.chain) return '<div class="over"><span class="over-pen">' + ART.pencil() + '</span><h2>' + title + '</h2><p class="lead">' + g.chain.list.length + ' catene, ' + g.chain.list.reduce(function (n, c) { return n + c.it.filter(function (x) { return x.ok && x.w; }).length; }, 0) + ' parole arrivate giuste.</p>' + chainsHTML(g) + Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda il tavolo') + '</div>';
   return '<div class="over"><span class="over-pen">' + ART.pencil() + '</span><h2>' + title + '</h2><p class="lead">' + g.order.length + ' disegni, ' + hits + ' indovinati.</p>' +
     '<div class="podium">' + podium + '</div>' +
     Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda il tavolo') + '</div>';
+}
+// tutte le catene del telefono senza fili, dalla parola di partenza all'ultima scritta
+function chainsHTML(g) {
+  return '<div class="chains">' + g.chain.list.map(function (c) {
+    return '<div class="chainx"><b class="cw">' + esc(c.w) + '</b>' + c.it.map(function (x) {
+      var who = '<small style="--pc:' + pcol(g, x.p) + '">' + esc(g.players[x.p].nick) + '</small>';
+      return x.s ? '<span class="cpic' + (x.ok ? ' ok' : '') + '">' + ART.mini(E.unpack(x.s)) + who + '</span>' : '<span class="ctxt' + (x.ok ? ' ok' : '') + '">«' + esc(x.w || '…') + '»' + who + '</span>';
+    }).join('') + '</div>';
+  }).join('') + '</div>';
 }
 function introBody(s) {
   var pages = [['Benvenuto a Disegna e indovina', RU.S.goal[1]], ['Disegnare', RU.S.draw[1]], ['Indovinare', RU.S.guess[1]], ['Il furto', RU.S.steal[1]]];
@@ -68,7 +78,9 @@ document.addEventListener('submit', function (ev) {
   if (ev.target.id !== 'gform') return; ev.preventDefault();
   var i = document.getElementById('gin'), g = G(); if (!i || !g) return;
   var w = i.value.trim(); if (!w) return;
-  i.value = ''; Sound.play('guess'); quiet({ a: 'guess', w: w });
+  i.value = ''; Sound.play('guess');
+  if (g.phase === 'chain') { quiet({ a: 'cwrite', w: w }); return; }
+  quiet({ a: 'guess', w: w });
 });
 
 /* ---------- eventi ---------- */
@@ -116,7 +128,11 @@ document.addEventListener('click', function (ev) {
     case 'auto': App.sheet = null; renderSheet(); send({ t: 'auto', p: +el.getAttribute('data-p'), on: !g.players[+el.getAttribute('data-p')].bot }); break;
     case 'resume': send({ t: 'back' }); break;
     // la partita
-    case 'choose': act({ a: 'choose', i: +el.getAttribute('data-i') }); break;
+    case 'choose': act({ a: 'choose', i: +el.getAttribute('data-i'), b: App.bet || 1 }); break;
+    case 'bet': App.bet = +el.getAttribute('data-b'); Game.render(); if (g && g.phase === 'hint') quiet({ a: 'bet', b: App.bet }); break;
+    case 'hintpick': App.hintI = +el.getAttribute('data-i'); Game.render(); break;
+    case 'hintgo': { var cl = Array.prototype.map.call(document.querySelectorAll('.clue'), function (x) { return x.value.trim(); }).filter(Boolean); act({ a: 'hint', i: App.hintI || 0, c: cl }); break; }
+    case 'consegna': Game.submitChain(); break;
     case 'skip': act({ a: 'skip' }); break;
     case 'pen': App.pen.c = el.getAttribute('data-c'); Game.render(); break;
     case 'size': App.pen.w = +el.getAttribute('data-w'); if (App.pen.c === '#fffdf6') App.pen.c = '#1d2333'; Game.render(); break;
@@ -130,6 +146,8 @@ document.addEventListener('change', function (ev) {
   if (id === 'opt-rounds') send({ t: 'opt', rounds: +ev.target.value });
   if (id === 'opt-time') send({ t: 'opt', time: +ev.target.value });
   if (id === 'opt-teams') send({ t: 'opt', teams: +ev.target.value });
+  if (id === 'opt-mode') send({ t: 'opt', mode: ev.target.value });
+  if (ev.target.getAttribute && ev.target.getAttribute('data-rule')) send({ t: 'opt', rule: ev.target.getAttribute('data-rule'), on: ev.target.checked });
 });
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);

@@ -32,5 +32,14 @@ var DGArt = (function () {
       '<circle cx="380" cy="160" r="34" stroke="#f2b705" stroke-width="14"/></g>' +
       '<g transform="translate(250 330) rotate(-38)"><path d="M0 30 L44 8 H230 a14 14 0 0 1 14 14 v16 a14 14 0 0 1 -14 14 H44 Z" fill="#f2b705" stroke="#6a4400" stroke-width="6"/><path d="M0 30 L44 8 V52 Z" fill="#f4d2a6" stroke="#6a4400" stroke-width="6"/><path d="M0 30 L16 22 V38 Z" fill="#1d2333"/><rect x="214" y="8" width="30" height="44" rx="10" fill="#ef8a9a" stroke="#6a4400" stroke-width="6"/></g></svg>';
   }
-  return { defs: defs, doodle: doodle, pencil: pencil, icon: icon, logo: logo };
+  // un disegno ridotto in un riquadro SVG (tratti nel sistema 1000×750)
+  function mini(strokes) {
+    return '<svg class="mini" viewBox="0 0 1000 750" aria-hidden="true"><rect width="1000" height="750" fill="#fffdf6"/>' + (strokes || []).map(function (s) {
+      if (!s || s.length < 4) return '';
+      if (s.length === 4) return '<circle cx="' + s[2] + '" cy="' + s[3] + '" r="' + s[1] / 2 + '" fill="' + s[0] + '"/>';
+      var d = 'M' + s[2] + ' ' + s[3]; for (var i = 4; i + 1 < s.length; i += 2) d += 'L' + s[i] + ' ' + s[i + 1];
+      return '<path d="' + d + '" fill="none" stroke="' + s[0] + '" stroke-width="' + s[1] + '" stroke-linecap="round" stroke-linejoin="round"/>';
+    }).join('') + '</svg>';
+  }
+  return { mini: mini, defs: defs, doodle: doodle, pencil: pencil, icon: icon, logo: logo };
 })();

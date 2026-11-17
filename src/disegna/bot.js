@@ -7,7 +7,10 @@ var DGBot = (function () {
   function decide(g, p, now) {
     now = now || Date.now();
     var P = g.players[p]; if (!P || !P.bot) return null;
-    if (p === g.drawer) { if (g.phase === 'choose') return { a: 'choose', i: 0 }; if (g.phase === 'draw' && now - g.start > 4000) return { a: 'skip' }; return null; }
+    if (g.opts.mode === 'chain') return null;   // il telefono senza fili è solo per le persone
+    if (g.phase === 'hint' && p === g.hinter) return { a: 'hint', i: 0, auto: true };
+    if (p === g.drawer && g.phase !== 'draw' && g.phase !== 'steal') { if (g.phase === 'choose') return { a: 'choose', i: 0 }; return null; }
+    if (p === g.drawer && g.phase === 'draw' && !E.canGuess(g, p)) { if (now - g.start > 4000) return { a: 'skip' }; return null; }
     if (!E.canGuess(g, p)) return null;
     var f = g.phase === 'draw' ? Math.max(0, Math.min(1, (now - g.start) / (g.opts.time * 1000))) : .5;
     var chance = g.phase === 'draw' ? .08 + .5 * f : .3;
