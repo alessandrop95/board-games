@@ -1,5 +1,5 @@
 /* ===== Dadi del bugiardo: motore delle regole (gira sull'host; lo stato è JSON) =====
-   Gioco tradizionale di bluff con i dadi, da 2 a 8 giocatori. Ognuno ha 5 dadi (o 3, o 4) sotto il bicchiere e
+   Gioco tradizionale di bluff con i dadi, da 2 a 8 giocatori. Ognuno ha 5 dadi (da 3 a 7, a scelta) sotto il bicchiere e
    vede solo i suoi. A turno si dichiara quanti dadi di un valore ci sono IN TUTTO il tavolo («quattro 5»): chi viene
    dopo deve alzare (più dadi, oppure stessi dadi con un valore più alto) oppure dire «Dubito!». Con «Esatto!» si
    scommette che il numero sia proprio quello.
@@ -13,9 +13,17 @@ var LBEngine = (function () {
   var rand = Math.random;
   function setRandom(f) { rand = f || Math.random; }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-  var OPT = { dice: [3, 4, 5] }, SHOW_MS = 14000;
+  var OPT = { dice: [3, 4, 5, 6, 7] }, SHOW_MS = 14000;
   var NUM = ['zero', 'un', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove', 'dieci', 'undici', 'dodici', 'tredici', 'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove', 'venti'];
-  function qTxt(q) { return q < NUM.length ? NUM[q] : String(q); }
+  var TENS = ['', '', 'venti', 'trenta', 'quaranta', 'cinquanta', 'sessanta', 'settanta', 'ottanta', 'novanta'];
+  function qTxt(q) {
+    if (q < NUM.length) return NUM[q];
+    if (q > 99) return String(q);
+    var t = TENS[Math.floor(q / 10)], u = q % 10;
+    if (!u) return t;
+    if (u === 1 || u === 8) t = t.slice(0, -1);   // ventuno, trentotto
+    return t + (u === 1 ? 'uno' : u === 3 ? 'tré' : NUM[u]);
+  }
   function bidTxt(b) { return b ? (b.q === 1 ? 'un ' + b.f : qTxt(b.q) + ' ' + b.f) : ''; }
   function nick(g, p) { return g.players[p].nick; }
   function log(g, t, k, p) { g.log.push({ n: ++g.logN, t: t, k: k || '', p: p == null ? null : p }); if (g.log.length > 160) g.log.splice(0, g.log.length - 160); }

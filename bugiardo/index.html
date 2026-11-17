@@ -346,6 +346,10 @@ body { background: radial-gradient(120% 70% at 50% 0%, #6a1a26 0%, #3a0f14 50%, 
 .btn.exact { box-shadow: inset 0 0 0 2px var(--gold); color: var(--gold); }
 .tt { display: block; color: var(--bad); font-size: 13px; margin: 2px 0 0; }
 @media (min-width: 760px) { .gv-me, .gv-mid { max-width: 640px; width: calc(100% - 16px); margin-inline: auto; } }
+/* fino a 7 dadi a testa: tutto resta su una riga anche sul telefono */
+.dots.many { gap: 1.5px; } .dots.many i { width: 5px; height: 6px; }
+.myd-d { gap: 6px; } .myd-d .die { width: min(50px, 10.5vw); height: min(50px, 10.5vw); }
+.rv-d { gap: 3px; } .rv-d .die { width: min(28px, 6.2vw); height: min(28px, 6.2vw); }
 
 </style>
 </head>
@@ -355,7 +359,7 @@ body { background: radial-gradient(120% 70% at 50% 0%, #6a1a26 0%, #3a0f14 50%, 
 <script>
 window.GAME_PREFIX = 'bugiardo/v1/';
 /* ===== Dadi del bugiardo: motore delle regole (gira sull'host; lo stato è JSON) =====
-   Gioco tradizionale di bluff con i dadi, da 2 a 8 giocatori. Ognuno ha 5 dadi (o 3, o 4) sotto il bicchiere e
+   Gioco tradizionale di bluff con i dadi, da 2 a 8 giocatori. Ognuno ha 5 dadi (da 3 a 7, a scelta) sotto il bicchiere e
    vede solo i suoi. A turno si dichiara quanti dadi di un valore ci sono IN TUTTO il tavolo («quattro 5»): chi viene
    dopo deve alzare (più dadi, oppure stessi dadi con un valore più alto) oppure dire «Dubito!». Con «Esatto!» si
    scommette che il numero sia proprio quello.
@@ -369,9 +373,17 @@ var LBEngine = (function () {
   var rand = Math.random;
   function setRandom(f) { rand = f || Math.random; }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-  var OPT = { dice: [3, 4, 5] }, SHOW_MS = 14000;
+  var OPT = { dice: [3, 4, 5, 6, 7] }, SHOW_MS = 14000;
   var NUM = ['zero', 'un', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove', 'dieci', 'undici', 'dodici', 'tredici', 'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove', 'venti'];
-  function qTxt(q) { return q < NUM.length ? NUM[q] : String(q); }
+  var TENS = ['', '', 'venti', 'trenta', 'quaranta', 'cinquanta', 'sessanta', 'settanta', 'ottanta', 'novanta'];
+  function qTxt(q) {
+    if (q < NUM.length) return NUM[q];
+    if (q > 99) return String(q);
+    var t = TENS[Math.floor(q / 10)], u = q % 10;
+    if (!u) return t;
+    if (u === 1 || u === 8) t = t.slice(0, -1);   // ventuno, trentotto
+    return t + (u === 1 ? 'uno' : u === 3 ? 'tré' : NUM[u]);
+  }
   function bidTxt(b) { return b ? (b.q === 1 ? 'un ' + b.f : qTxt(b.q) + ' ' + b.f) : ''; }
   function nick(g, p) { return g.players[p].nick; }
   function log(g, t, k, p) { g.log.push({ n: ++g.logN, t: t, k: k || '', p: p == null ? null : p }); if (g.log.length > 160) g.log.splice(0, g.log.length - 160); }
@@ -581,7 +593,7 @@ var LBArt = (function () {
 var LBRules = (function () {
   var S = {
     goal: ['Lo scopo',
-      '<p>Ognuno ha <b>5 dadi</b> sotto il bicchiere e vede <b>solo i suoi</b>. A ogni giro si tirano tutti insieme. Chi sbaglia una dichiarazione o un dubbio <b>perde un dado</b>; senza dadi si è fuori.</p>' +
+      '<p>Ognuno ha <b>5 dadi</b> (o da 3 a 7, come sceglie chi apre il tavolo) sotto il bicchiere e vede <b>solo i suoi</b>. A ogni giro si tirano tutti insieme. Chi sbaglia una dichiarazione o un dubbio <b>perde un dado</b>; senza dadi si è fuori.</p>' +
       '<p>Vince <b>l’ultimo che ha ancora dadi</b>.</p>'],
     bid: ['Dichiarare',
       '<p>Al tuo turno dichiari quanti dadi di un valore ci sono <b>in tutto il tavolo</b>, contando anche quelli degli altri: per esempio «quattro 5».</p>' +
@@ -3527,7 +3539,7 @@ var CFG = {
   options: function (d, isHost) {
     var o = d.opts || {};
     if (!isHost) return '<p class="lead">Si gioca con <b>' + (o.dice || 5) + ' dadi</b> a testa' + (yes(o.ones) ? ', gli <b>1 sono jolly</b>' : ', gli 1 non sono jolly') + (yes(o.exact) ? ', con <b>«Esatto!»</b>' : '') + '.</p>' + Turns.optionHTML(d, false);
-    return selOpt('opt-dice', 'Dadi a testa', 'Con meno dadi la partita è più breve.', o.dice || 5, [[5, '5 dadi'], [4, '4 dadi'], [3, '3 dadi (breve)']]) +
+    return selOpt('opt-dice', 'Dadi a testa', 'Con meno dadi la partita è più breve, con più dadi più lunga e con dichiarazioni più alte.', o.dice || 5, [[3, '3 dadi (breve)'], [4, '4 dadi'], [5, '5 dadi'], [6, '6 dadi'], [7, '7 dadi (lunga)']]) +
       selOpt('opt-ones', 'Gli 1 sono jolly', 'Valgono come qualunque valore.', yes(o.ones) ? 1 : 0, [[1, 'Sì'], [0, 'No']]) +
       selOpt('opt-exact', '«Esatto!»', 'Si può scommettere sul numero preciso.', yes(o.exact) ? 1 : 0, [[1, 'Sì'], [0, 'No']]) + Turns.optionHTML(d, true);
   },
@@ -3985,7 +3997,7 @@ var Game = (function () {
       var turn = g.phase === 'bid' && g.turn === i, lb = g.phase === 'bid' ? lastBidOf(g, i) : null, dots = '';
       for (var k = 0; k < g.opts.dice; k++) dots += '<i class="' + (k < P.n ? 'on' : '') + '"></i>';
       return '<button class="pl' + (i === me ? ' mine' : '') + (turn ? ' turn' : '') + (P.out ? ' out' : '') + '" style="--pc:' + pcol(g, i) + '" data-act="players">' +
-        '<span class="pl-cup">' + ART.cup() + '<b>' + P.n + '</b></span><span class="pl-t"><b>' + esc(P.nick) + '</b><span class="dots">' + dots + '</span>' + (P.out ? '<small>fuori</small>' : lb ? '<small class="lb">«' + E.bidTxt(lb) + '»</small>' : turn ? '<small class="th">pensa…</small>' : '<small>&nbsp;</small>') + '</span></button>';
+        '<span class="pl-cup">' + ART.cup() + '<b>' + P.n + '</b></span><span class="pl-t"><b>' + esc(P.nick) + '</b><span class="dots' + (g.opts.dice > 5 ? ' many' : '') + '">' + dots + '</span>' + (P.out ? '<small>fuori</small>' : lb ? '<small class="lb">«' + E.bidTxt(lb) + '»</small>' : turn ? '<small class="th">pensa…</small>' : '<small>&nbsp;</small>') + '</span></button>';
     }).join('');
   }
   function bidBox(g, b, big) { return '<span class="bidv' + (big ? ' big' : '') + '"><b>' + b.q + '</b><span class="x">×</span>' + ART.die(b.f) + '</span>'; }

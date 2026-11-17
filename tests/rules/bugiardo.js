@@ -14,6 +14,9 @@ function game(n, opts, dice) {
 var g0 = E.newGame(seats(4), {}, T0);
 t('si parte con 5 dadi a testa, tirati, e qualcuno apre', g0.players.every(function (P) { return P.n === 5 && P.dice.length === 5 && P.dice.every(function (d) { return d >= 1 && d <= 6; }); }) && g0.phase === 'bid' && g0.turn >= 0);
 t('con 3 dadi a testa', E.newGame(seats(3), { dice: 3 }, T0).players[0].dice.length === 3);
+t('con 6 e con 7 dadi a testa', E.newGame(seats(3), { dice: 6 }, T0).players[0].dice.length === 6 && E.newGame(seats(8), { dice: 7 }, T0).players.every(function (P) { return P.n === 7 && P.dice.length === 7; }));
+t('8 dadi a testa no: si torna a 5', E.newGame(seats(3), { dice: 8 }, T0).players[0].n === 5);
+t('le quantità in lettere anche oltre 20', E.qTxt(21) === 'ventuno' && E.qTxt(23) === 'ventitré' && E.qTxt(28) === 'ventotto' && E.qTxt(30) === 'trenta' && E.qTxt(56) === 'cinquantasei' && E.bidTxt({ q: 1, f: 4 }) === 'un 4');
 // le dichiarazioni
 var g = game(3, {}, [[2, 2, 3, 5, 6], [1, 4, 4, 5, 6], [1, 2, 3, 3, 6]]);
 t('non si apre sugli 1 quando sono jolly', E.act(g, 0, { a: 'bid', q: 2, f: 1 }, T0) !== null);
@@ -64,9 +67,9 @@ g.players[1].dice = [3]; g.players[1].n = 1; g.players[2].dice = [4, 4]; g.playe
 E.act(g, 1, { a: 'bid', q: 3, f: 6 }, T0); E.act(g, 2, { a: 'doubt' }, T0);
 t('resta uno solo: ha vinto, classifica dall’ultimo eliminato', g.phase === 'over' && g.winners.join() === '2' && g.final.place.join() === '3,2,1');
 // partite intere tra automatici
-var bad = 0, N = 300, rounds = 0, opts = [{}, { dice: 3 }, { ones: false }, { exact: false, dice: 4 }];
+var bad = 0, N = 300, rounds = 0, opts = [{}, { dice: 3 }, { ones: false }, { exact: false, dice: 4 }, { dice: 6 }, { dice: 7, exact: false }];
 for (var k = 0; k < N; k++) {
-  var n = 2 + (k % 7), b = E.newGame(seats(n), opts[k % 4], T0), now = T0;
+  var n = 2 + (k % 7), b = E.newGame(seats(n), opts[k % 6], T0), now = T0;
   b.players.forEach(function (P) { P.bot = true; });
   for (var st = 0; st < 5000 && b.phase !== 'over'; st++) {
     now += 500;

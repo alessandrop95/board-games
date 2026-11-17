@@ -18,7 +18,7 @@ var CFG = {
   options: function (d, isHost) {
     var o = d.opts || {};
     if (!isHost) return '<p class="lead">Si gioca con <b>' + (o.dice || 5) + ' dadi</b> a testa' + (yes(o.ones) ? ', gli <b>1 sono jolly</b>' : ', gli 1 non sono jolly') + (yes(o.exact) ? ', con <b>«Esatto!»</b>' : '') + '.</p>' + Turns.optionHTML(d, false);
-    return selOpt('opt-dice', 'Dadi a testa', 'Con meno dadi la partita è più breve.', o.dice || 5, [[5, '5 dadi'], [4, '4 dadi'], [3, '3 dadi (breve)']]) +
+    return selOpt('opt-dice', 'Dadi a testa', 'Con meno dadi la partita è più breve, con più dadi più lunga e con dichiarazioni più alte.', o.dice || 5, [[3, '3 dadi (breve)'], [4, '4 dadi'], [5, '5 dadi'], [6, '6 dadi'], [7, '7 dadi (lunga)']]) +
       selOpt('opt-ones', 'Gli 1 sono jolly', 'Valgono come qualunque valore.', yes(o.ones) ? 1 : 0, [[1, 'Sì'], [0, 'No']]) +
       selOpt('opt-exact', '«Esatto!»', 'Si può scommettere sul numero preciso.', yes(o.exact) ? 1 : 0, [[1, 'Sì'], [0, 'No']]) + Turns.optionHTML(d, true);
   },

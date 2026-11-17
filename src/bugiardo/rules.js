@@ -2,7 +2,7 @@
 var LBRules = (function () {
   var S = {
     goal: ['Lo scopo',
-      '<p>Ognuno ha <b>5 dadi</b> sotto il bicchiere e vede <b>solo i suoi</b>. A ogni giro si tirano tutti insieme. Chi sbaglia una dichiarazione o un dubbio <b>perde un dado</b>; senza dadi si è fuori.</p>' +
+      '<p>Ognuno ha <b>5 dadi</b> (o da 3 a 7, come sceglie chi apre il tavolo) sotto il bicchiere e vede <b>solo i suoi</b>. A ogni giro si tirano tutti insieme. Chi sbaglia una dichiarazione o un dubbio <b>perde un dado</b>; senza dadi si è fuori.</p>' +
       '<p>Vince <b>l’ultimo che ha ancora dadi</b>.</p>'],
     bid: ['Dichiarare',
       '<p>Al tuo turno dichiari quanti dadi di un valore ci sono <b>in tutto il tavolo</b>, contando anche quelli degli altri: per esempio «quattro 5».</p>' +

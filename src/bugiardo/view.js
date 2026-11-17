@@ -33,7 +33,7 @@ var Game = (function () {
       var turn = g.phase === 'bid' && g.turn === i, lb = g.phase === 'bid' ? lastBidOf(g, i) : null, dots = '';
       for (var k = 0; k < g.opts.dice; k++) dots += '<i class="' + (k < P.n ? 'on' : '') + '"></i>';
       return '<button class="pl' + (i === me ? ' mine' : '') + (turn ? ' turn' : '') + (P.out ? ' out' : '') + '" style="--pc:' + pcol(g, i) + '" data-act="players">' +
-        '<span class="pl-cup">' + ART.cup() + '<b>' + P.n + '</b></span><span class="pl-t"><b>' + esc(P.nick) + '</b><span class="dots">' + dots + '</span>' + (P.out ? '<small>fuori</small>' : lb ? '<small class="lb">«' + E.bidTxt(lb) + '»</small>' : turn ? '<small class="th">pensa…</small>' : '<small>&nbsp;</small>') + '</span></button>';
+        '<span class="pl-cup">' + ART.cup() + '<b>' + P.n + '</b></span><span class="pl-t"><b>' + esc(P.nick) + '</b><span class="dots' + (g.opts.dice > 5 ? ' many' : '') + '">' + dots + '</span>' + (P.out ? '<small>fuori</small>' : lb ? '<small class="lb">«' + E.bidTxt(lb) + '»</small>' : turn ? '<small class="th">pensa…</small>' : '<small>&nbsp;</small>') + '</span></button>';
     }).join('');
   }
   function bidBox(g, b, big) { return '<span class="bidv' + (big ? ' big' : '') + '"><b>' + b.q + '</b><span class="x">×</span>' + ART.die(b.f) + '</span>'; }
