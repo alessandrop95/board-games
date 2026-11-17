@@ -226,9 +226,25 @@ def build_fz():
         "Il Forziere Maledetto", "Pirati a ruoli segreti: Levante contro Ponente, con un Pirata o due Corsari nascosti. Prendi una nave, spara bordate e porta il Forziere alla tua bandiera. Da 4 a 8 giocatori.", '#0f2a38',
         'family=Pirata+One&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Forziere"))
 
+def build_mn():
+    d = 'src/miniera/'
+    js = "window.GAME_PREFIX = 'miniera/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'miniera'), exist_ok=True)
+    open(os.path.join(ROOT, 'miniera', 'index.html'), 'w', encoding='utf-8').write(page(
+        "La Miniera", "Rischia o fermati: tutti insieme in una miniera piena di pepite e pericoli. A ogni galleria scegli in segreto se andare avanti o tornare al campo. Da 3 a 10 giocatori.", '#24150a',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Miniera"))
+
+def build_lb():
+    d = 'src/bugiardo/'
+    js = "window.GAME_PREFIX = 'bugiardo/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'bugiardo'), exist_ok=True)
+    open(os.path.join(ROOT, 'bugiardo', 'index.html'), 'w', encoding='utf-8').write(page(
+        "Dadi del bugiardo", "Il classico gioco di bluff con i dadi: ognuno vede solo i suoi sotto il bicchiere e si dichiara quanti ce ne sono in tutto il tavolo. Alzi o dici «Dubito!»? Da 2 a 8 giocatori.", '#3a0f14',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Bugiardo"))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere, miniera, bugiardo
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz, 'miniera': build_mn, 'bugiardo': build_lb}
 import sys
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()

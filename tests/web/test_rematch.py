@@ -8,7 +8,7 @@ import json, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 from check import t, done
 from playwright.sync_api import sync_playwright
-BOTS = {'forziere': 3, 'conquista': 3, 'fune': 3, 'sintonia': 3, 'burraco': 2, 'scopa': 2, 'briscola': 2, 'disegna': 3, 'nomicose': 3, 'prendi6': 3, 'sushigo': 2, 'nograzie': 2, 'cabo': 2, 'skyjo': 2, 'flip7': 2, 'citadels': 3, 'presagio': 2, 'gattomina': 2, 'polvere-e-piombo': 3, 'catan': 2, 'machiavelli': 1, 'binari-italia': 1, 'campi-acciaio': 1}
+BOTS = {'bugiardo': 2, 'miniera': 3, 'forziere': 3, 'conquista': 3, 'fune': 3, 'sintonia': 3, 'burraco': 2, 'scopa': 2, 'briscola': 2, 'disegna': 3, 'nomicose': 3, 'prendi6': 3, 'sushigo': 2, 'nograzie': 2, 'cabo': 2, 'skyjo': 2, 'flip7': 2, 'citadels': 3, 'presagio': 2, 'gattomina': 2, 'polvere-e-piombo': 3, 'catan': 2, 'machiavelli': 1, 'binari-italia': 1, 'campi-acciaio': 1}
 SPY = "window.__snd=0; if(window.Sound&&!Sound.__w){var o=Sound.play; Sound.play=function(){window.__snd++; return o.apply(this,arguments)}; Sound.__w=1}"
 LONG = """Net.hostApply(function(cur){var g=cur.game; if(!g) return false; if(g.fxN!=null){g.fxN+=500; (g.fx||[]).forEach(function(e){if(e.n!=null)e.n+=500})}
   if(g.flash&&g.flash.n!=null) g.flash.n+=500; if(g.logN!=null){g.logN+=500; (g.log||[]).forEach(function(l){if(l.n!=null)l.n+=500})} g.seq=(g.seq||0)+500; return true})"""
