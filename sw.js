@@ -1,6 +1,9 @@
-/* Service worker di Board Games: le pagine si caricano dalla rete (così gli aggiornamenti arrivano subito)
-   e, se la rete manca, dalla copia salvata. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v39';
+/* Service worker di Board Games: pagine e script si caricano dalla rete (così gli aggiornamenti arrivano subito,
+   saltando anche la cache del browser) e, se la rete manca o è troppo lenta, dalla copia salvata. Le immagini e i
+   font si prendono dalla copia salvata e si aggiornano dietro le quinte. version.json (la versione pubblicata di
+   ogni gioco, vedi build.py) va sempre e solo in rete. La partita vera passa da WebSocket e non tocca questo file. */
+var CACHE = 'board-games-v40';
+var NET_WAIT = 3500;   // rete lenta: oltre questa attesa si usa la copia salvata (quella nuova si salva per la volta dopo)
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js', './src/shared/account.js',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',
   './presagio/', './presagio/manifest.webmanifest', './presagio/icon-192.png',
@@ -44,17 +47,14 @@ self.addEventListener('fetch', function (e) {
   var fonts = url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com';
   if (url.origin !== location.origin && !fonts) return;
   if (/\.(mp3|ogg|oga|wav)$/.test(url.pathname)) return; // audio: lo gestisce il browser (richieste a pezzi)
-  if (req.mode === 'navigate') {
-    // pagina: rete prima, copia salvata se offline (ignorando ?t=CODICE)
-    e.respondWith(fetch(req).then(function (res) {
-      var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(url.origin + url.pathname, copy); });
-      return res;
-    }).catch(function () {
-      return caches.match(url.origin + url.pathname).then(function (r) { return r || caches.match(url.origin + url.pathname + 'index.html'); });
-    }));
+  if (/\/version\.json$/.test(url.pathname)) return;     // controllo della versione: sempre dalla rete, mai una copia
+  if (req.mode === 'navigate' && /(\/|\.html)$/.test(url.pathname)) { netFirst(e, url.origin + url.pathname, url, true); return; }   // pagina (ignorando ?t=CODICE)
+  if (req.mode === 'navigate') {   // indirizzo senza «/» finale: il server risponde con un rinvio, lo segue il browser
+    e.respondWith(fetch(req).catch(function () { return caches.match(url.origin + url.pathname + '/').then(function (r) { return r || Response.error(); }); }));
     return;
   }
-  // icone, manifest, font: copia salvata subito, aggiornata in background
+  if (url.origin === location.origin && /\.(js|css|json|webmanifest)$/.test(url.pathname)) { netFirst(e, req, url, false); return; }
+  // icone, immagini, font: copia salvata subito, aggiornata in background
   e.respondWith(caches.match(req).then(function (hit) {
     var net = fetch(req).then(function (res) {
       if (res && (res.ok || res.type === 'opaque')) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
@@ -63,6 +63,29 @@ self.addEventListener('fetch', function (e) {
     return hit || net;
   }));
 });
+
+// Rete prima (senza la cache HTTP del browser, che GitHub Pages tiene 10 minuti: dopo un aggiornamento la versione
+// nuova arriva subito); se la rete manca, o tarda più di NET_WAIT, la copia salvata. La risposta della rete, anche
+// se arriva tardi, aggiorna la copia salvata.
+function netFirst(e, key, url, page) {
+  var req = e.request;
+  var net = fetch(url.href, { cache: 'no-cache', credentials: 'same-origin' }).then(function (res) {
+    if (res.redirected) return page ? fetch(req) : res;   // una pagina rinviata altrove la apre il browser
+    if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { return c.put(key, copy); }).catch(function () {}); }
+    return res;
+  });
+  function saved() { return caches.match(key).then(function (r) { return r || (page ? caches.match(url.origin + url.pathname + 'index.html') : null); }); }
+  e.respondWith(new Promise(function (resolve) {
+    var done = false;
+    function give(r) { if (!done && r) { done = true; resolve(r); } }
+    var slow = setTimeout(function () { saved().then(give); }, NET_WAIT);
+    net.then(function (r) { clearTimeout(slow); give(r); }, function () {
+      clearTimeout(slow);
+      saved().then(function (r) { if (r) give(r); else if (!done) { done = true; resolve(Response.error()); } });
+    });
+  }));
+  e.waitUntil(net.catch(function () {}));
+}
 
 // Tocco su una notifica «nuovo tavolo»: porta alla pagina del gioco con il codice, riusando una finestra già aperta se c'è.
 self.addEventListener('notificationclick', function (e) {

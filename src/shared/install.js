@@ -30,7 +30,13 @@ var PWA = (function () {
   // service worker: serve per l'installazione su Android e per aprire il gioco anche con rete debole
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     var swUrl = document.querySelector('meta[name="pwa-sw"]');
-    if (swUrl) navigator.serviceWorker.register(swUrl.content, { scope: swUrl.getAttribute('data-scope') || './' }).catch(function () {});
+    if (swUrl) navigator.serviceWorker.register(swUrl.content, { scope: swUrl.getAttribute('data-scope') || './', updateViaCache: 'none' }).then(function (reg) {
+      // app riaperta dopo tanto tempo: si controlla subito se c'è un service worker nuovo (al massimo una volta all'ora)
+      var lastUp = Date.now();
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && Date.now() - lastUp > 3600e3) { lastUp = Date.now(); reg.update().catch(function () {}); }
+      });
+    }).catch(function () {});
   }
 
   function available() { return !standalone() && !inApp2; }

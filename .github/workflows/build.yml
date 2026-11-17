@@ -77,6 +77,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for g in $GAMES; do git add "$g/index.html"; done
+          git add version.json
           if git diff --cached --quiet; then echo "changed=no" >> "$GITHUB_OUTPUT"; echo "Pagine già aggiornate."; exit 0; fi
           first=$(printf '%s' "${MSG:-avvio manuale}" | head -n 1)
           git commit -m "Pagine dei giochi ricostruite ($first)"

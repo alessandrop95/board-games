@@ -22,6 +22,7 @@ def page(title, desc, theme, fonts, css, js, short):
 <meta name="apple-mobile-web-app-title" content="{short}">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="pwa-sw" content="../sw.js" data-scope="../">
+<meta name="pp-build" content="@@BUILD@@">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?{fonts}&display=swap">
 <style>
@@ -245,7 +246,18 @@ def build_lb():
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
 # Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere, miniera, bugiardo
 GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz, 'miniera': build_mn, 'bugiardo': build_lb}
-import sys
+import sys, hashlib, json, re
+# Versione di ogni pagina: impronta del suo contenuto, scritta nella pagina e in version.json. Le app aperte da
+# tempo confrontano la loro con quella pubblicata e si aggiornano da sole (vedi Fresh in src/shared/net.js).
+VERS = os.path.join(ROOT, 'version.json')
+try: vers = json.load(open(VERS, encoding='utf-8'))
+except Exception: vers = {}
 for name in (sys.argv[1:] or list(GAMES)):
     GAMES[name]()
+    f = os.path.join(ROOT, name, 'index.html')
+    html = open(f, encoding='utf-8').read()
+    v = hashlib.sha1(html.encode('utf-8')).hexdigest()[:12]
+    open(f, 'w', encoding='utf-8').write(html.replace('content="@@BUILD@@"', 'content="%s" data-game="%s"' % (v, name), 1))
+    vers[name] = v
+open(VERS, 'w', encoding='utf-8').write(json.dumps(dict(sorted(vers.items())), indent=1) + '\n')
 print('ok')

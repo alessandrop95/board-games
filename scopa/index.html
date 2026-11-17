@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Scopa">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="pwa-sw" content="../sw.js" data-scope="../">
+<meta name="pp-build" content="b75ecda993a9" data-game="scopa">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap">
 <style>
@@ -721,18 +722,24 @@ var SCRules = (function () {
    Modello: il dispositivo "host" del tavolo tiene la verità. Pubblica lo stato completo
    come messaggio "retained" (chi arriva lo riceve subito); gli altri inviano solo azioni.
    Robustezza: controllo continuo che il server risponda, riconnessione immediata quando
-   la pagina torna in primo piano, subentro automatico se l'host sparisce.
+   la pagina torna in primo piano (la connessione nuova si apre in parallelo, senza aspettare che la vecchia
+   muoia), subentro automatico se l'host sparisce (in pochi secondi se l'aveva sospeso il telefono).
    App in secondo piano: finché il telefono lascia girare la pagina, la connessione resta viva (battito da un
    Web Worker, che il browser non rallenta) e gli altri vedono «in pausa» invece di «offline»; se chi regge il
    tavolo smette di guardare, il comando passa subito a chi è presente e torna al titolare quando rientra. */
 
 var NETQ = new URLSearchParams(location.search);
-var NET_PING_MS = +(NETQ.get('ping') || 10000);     // ogni quanto si interroga il server
-var NET_DEAD_MS = +(NETQ.get('dead') || 15000);     // silenzio oltre il quale si verifica la connessione
+var NET_PING_MS = +(NETQ.get('ping') || 10000);     // ogni quanto si interroga il server (fuori dal tavolo)
+var NET_DEAD_MS = +(NETQ.get('dead') || 15000);     // silenzio oltre il quale si verifica la connessione (fuori dal tavolo)
+var NET_FAST_PING_MS = 4000;                        // seduti a un tavolo: ci si fa sentire più spesso…
+var NET_FAST_DEAD_MS = 8000;                        // …e una connessione muta si scopre in pochi secondi
 var NET_PROBE_MS = 5000;                            // attesa della risposta alla verifica
 var NET_WAKE_PROBE_MS = 2500;                       // la stessa attesa, più corta, quando la pagina torna in primo piano
+var NET_HEDGE_MS = +(NETQ.get('hedge') || 700);     // durante una verifica: se il server tace così a lungo, si apre già una nuova connessione in parallelo
+var NET_CONNECT_MS = 6000;                          // attesa massima di una nuova connessione
+var NET_RACE_MS = 2500;                             // connessione lenta a partire: se ne prova un'altra in parallelo, vince la prima che risponde
 var NET_KEEP_S = +(NETQ.get('keep') || 120);        // silenzio che il server tollera (×1,5) prima di scollegarci: largo, così regge anche i timer rallentati
-var NET_STALE_MS = +(NETQ.get('stale') || 30000);   // dopo un sonno così lungo non si verifica nemmeno: ci si ricollega subito
+var NET_STALE_MS = +(NETQ.get('stale') || 12000);   // dopo un sonno così lungo non si aspetta la verifica: si apre subito una nuova connessione
 
 /* ---------- battito che non si ferma in secondo piano ----------
    I timer di una pagina nascosta vengono rallentati dal browser (fino a uno al minuto). I controlli periodici
@@ -762,10 +769,15 @@ var Beat = (function () {
   return { every: every, boost: boost, onGap: function (f) { gapFn = f; }, get boosted() { return !!worker; } };
 })();
 
-/* ---------- client MQTT 3.1.1 minimo ---------- */
+/* ---------- client MQTT 3.1.1 minimo ----------
+   Riconnessione veloce: una connessione nuova si apre SENZA chiudere quella di prima («prima apri, poi chiudi»).
+   Quando la vecchia è sospetta (app tornata dal background, server muto) se ne apre subito un'altra in parallelo:
+   se la vecchia risponde si tiene quella, altrimenti appena la nuova è pronta prende il suo posto. Anche una
+   connessione lenta a partire ne fa partire un'altra in parallelo: vince la prima che risponde. */
 function MQ(url) {
   this.url = url; this.subs = {}; this.handlers = []; this.statusHandlers = [];
   this.connected = false; this.closed = false; this.pid = 1; this.buf = new Uint8Array(0); this.acks = {};
+  this.ws = null; this.att = []; this.seq = 0; this.fails = 0; this.fast = 0; this.born = Date.now(); this.lastTx = 0;
   this.backoff = 800; this.lastRx = Date.now(); this.id = 'pp' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-6);
   var self = this;
   this.ready = new Promise(function (res, rej) { self._res = res; self._rej = rej; });
@@ -780,56 +792,121 @@ MQ.packet = function (head, body) {
   out[0] = head; out.set(rl, 1); out.set(body, 1 + rl.length);
   return out;
 };
+// Nuovo tentativo di connessione (in parallelo agli altri e all'eventuale connessione attiva).
 MQ.prototype._open = function () {
   var self = this, ws;
   clearTimeout(this.retryTimer); this.retryTimer = null;
-  try { ws = new WebSocket(this.url, ['mqtt']); } catch (e) { this.ws = null; this._down(); return; }
-  ws.binaryType = 'arraybuffer'; this.ws = ws; this.buf = new Uint8Array(0);
-  this.openTimer = setTimeout(function () { if (!self.connected && self.ws === ws) self._drop(); }, 7000);
+  if (this.closed) return;
+  // ogni tentativo ha un nome diverso: con lo stesso nome il server chiuderebbe l'altra connessione
+  var a = { ws: null, buf: new Uint8Array(0), t0: Date.now(), hedge: this.connected, cid: this.id + (++this.seq % 1296).toString(36) };
+  try { ws = new WebSocket(this.url, ['mqtt']); } catch (e) { this._down(); return; }
+  a.ws = ws; ws.binaryType = 'arraybuffer'; this.att.push(a);
+  a.timer = setTimeout(function () { self._kill(a); self._fail(); }, NET_CONNECT_MS);
+  a.race = setTimeout(function () { if (self.att.indexOf(a) >= 0 && self.att.length < 2 && !self.closed) self._open(); }, NET_RACE_MS);
   ws.onopen = function () {
-    var body = MQ.str('MQTT').concat([4, 0x02, NET_KEEP_S >> 8, NET_KEEP_S & 255]).concat(MQ.str(self.id));
-    ws.send(MQ.packet(0x10, body));
+    var body = MQ.str('MQTT').concat([4, 0x02, NET_KEEP_S >> 8, NET_KEEP_S & 255]).concat(MQ.str(a.cid));
+    try { ws.send(MQ.packet(0x10, body)); } catch (e) {}
   };
   ws.onmessage = function (ev) {
-    if (self.ws !== ws) return;
-    self.lastRx = Date.now();
-    var chunk = new Uint8Array(ev.data), b = new Uint8Array(self.buf.length + chunk.length);
-    b.set(self.buf); b.set(chunk, self.buf.length); self.buf = b; self._parse();
+    if (self.ws === ws) { self._rx(ev.data); return; }
+    if (self.att.indexOf(a) < 0) return;
+    var chunk = new Uint8Array(ev.data), b = new Uint8Array(a.buf.length + chunk.length);
+    b.set(a.buf); b.set(chunk, a.buf.length); a.buf = b;
+    if (b.length < 4) return;
+    if ((b[0] >> 4) !== 2 || b[3] !== 0) { self._kill(a); self._fail(); return; }   // il server rifiuta
+    self._promote(a, b.slice(4));
   };
-  ws.onclose = function () { if (self.ws === ws) { self.ws = null; self._down(); } };
+  ws.onclose = function () {
+    if (self.ws === ws) { self.ws = null; self._down(); }
+    else if (self.att.indexOf(a) >= 0) { self._kill(a); self._fail(); }
+  };
   ws.onerror = function () {};
 };
-// Chiude subito una connessione sospetta (anche se il browser la crede ancora aperta) e riparte.
-MQ.prototype._drop = function () {
-  var ws = this.ws; this.ws = null;
+// Un tentativo è andato a buon fine: diventa LA connessione (chiudendo la vecchia e gli altri tentativi).
+MQ.prototype._promote = function (a, rest) {
+  var self = this, old = this.ws, again = this.connected;
+  this._kill(a, true);
+  this.att.slice().forEach(function (x) { self._kill(x); });
+  if (old) { old.onopen = old.onmessage = old.onclose = old.onerror = null; try { old.close(); } catch (e) {} }
+  this.ws = a.ws; this.buf = new Uint8Array(0); this.lastRx = Date.now(); this.acks = {};
+  this.connected = true; this.everUp = true; this.fails = 0; this.backoff = 800;
+  clearTimeout(this.probeTimer); this.probeTimer = null; clearTimeout(this.hedgeTimer);
+  if (!this.pinger) this.pinger = Beat.every(1000, function () { self._tickPing(); });
+  var topics = Object.keys(this.subs); if (topics.length) this._sub(topics);
+  this._res(this);
+  // anche se si era già «collegati» (cambio di connessione) chi ascolta lo sa: lo stato del tavolo va riletto
+  this.statusHandlers.forEach(function (f) { f(true, again); });
+  if (rest && rest.length) this._rx(rest);
+};
+MQ.prototype._rx = function (data) {
+  var self = this;
+  this.lastRx = Date.now();
+  // la connessione di prima risponde: i tentativi aperti per sicurezza non servono più
+  if (this.att.length) this.att.filter(function (x) { return x.hedge; }).forEach(function (x) { self._kill(x); });
+  var chunk = new Uint8Array(data), b = new Uint8Array(this.buf.length + chunk.length);
+  b.set(this.buf); b.set(chunk, this.buf.length); this.buf = b; this._parse();
+};
+// Si fa sentire dal server (lo vuole entro il tempo concordato) e controlla che lui risponda.
+MQ.prototype._tickPing = function () {
+  if (!this.connected) return;
+  var now = Date.now(), fast = this.fast > 0, every = fast ? NET_FAST_PING_MS : NET_PING_MS;
+  if (now - this.lastRx > (fast ? NET_FAST_DEAD_MS : NET_DEAD_MS)) { this.probe(fast ? NET_WAKE_PROBE_MS : NET_PROBE_MS); return; }
+  if (now - this.lastTx >= every - 500 || now - this.lastRx >= every - 500) this._raw(MQ.packet(0xC0, []));
+};
+MQ.prototype._kill = function (a, keep) {
+  this.att = this.att.filter(function (x) { return x !== a; });
+  clearTimeout(a.timer); clearTimeout(a.race);
+  if (keep || !a.ws) return;
+  var ws = a.ws; ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null; try { ws.close(); } catch (e) {}
+};
+// Un tentativo è fallito: se non resta nient'altro (né connessione né altri tentativi) si riprova più tardi.
+MQ.prototype._fail = function () { if (!this.ws && !this.att.length) this._down(); };
+// Chiude subito la connessione attiva, sospetta anche se il browser la crede aperta. keep: lascia continuare i
+// tentativi già partiti (sono la via d'uscita); senza, si riparte da zero.
+MQ.prototype._drop = function (keep) {
+  var self = this, ws = this.ws; this.ws = null;
   if (ws) { ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null; try { ws.close(); } catch (e) {} }
+  if (!keep) this.att.slice().forEach(function (a) { self._kill(a); });
   this._down();
 };
+// Nessuna connessione attiva: lo si dice a chi ascolta e, se non c'è già un tentativo in corso, si riprova.
 MQ.prototype._down = function () {
   var self = this, was = this.connected;
-  this.connected = false; if (this.pinger) { this.pinger(); this.pinger = null; } clearTimeout(this.openTimer); clearTimeout(this.probeTimer); this.probeTimer = null; this.acks = {};
+  this.connected = false; if (this.pinger) { this.pinger(); this.pinger = null; }
+  clearTimeout(this.probeTimer); this.probeTimer = null; clearTimeout(this.hedgeTimer); this.acks = {};
   if (was) this.statusHandlers.forEach(function (f) { f(false); });
-  if (this.closed) return;
-  if (!this.everUp) { this._rej(new Error('broker non raggiungibile')); this.closed = true; return; }
-  if (this.retryTimer) return;
-  this.retryTimer = setTimeout(function () { self.retryTimer = null; if (!self.closed && !self.ws) self._open(); }, this.backoff);
-  this.backoff = Math.min(this.backoff * 1.7, 8000);
+  if (this.closed || this.ws || this.att.length || this.retryTimer) return;
+  // mai collegati: un secondo tentativo se il primo è fallito subito (rete che si sta svegliando), poi si rinuncia
+  if (!this.everUp && (++this.fails >= 2 || Date.now() - this.born > 5000)) { this._rej(new Error('broker non raggiungibile')); this.closed = true; return; }
+  var wait = this.backoff;
+  this.backoff = Math.min(Math.max(800, this.backoff * 1.7), 8000);
+  this.retryTimer = setTimeout(function () { self.retryTimer = null; if (!self.closed && !self.ws && !self.att.length) self._open(); }, wait);
 };
-// Verifica attiva: manda un ping e, se entro pochi secondi non arriva nulla, considera la connessione morta.
-MQ.prototype.probe = function (ms) {
+// Verifica attiva: manda un ping; se il server tace per hedge ms apre già una nuova connessione in parallelo,
+// se tace per ms considera morta quella attiva (la nuova, se è pronta, ha già preso il suo posto).
+MQ.prototype.probe = function (ms, hedge) {
   var self = this;
   if (!this.connected || this.probeTimer) return;
   var since = Date.now();
   this._raw(MQ.packet(0xC0, []));
-  this.probeTimer = setTimeout(function () { self.probeTimer = null; if (self.connected && self.lastRx < since) self._drop(); }, ms || NET_PROBE_MS);
+  clearTimeout(this.hedgeTimer);
+  this.hedgeTimer = setTimeout(function () { if (self.connected && self.lastRx < since && !self.att.length && !self.closed) self._open(); }, hedge == null ? NET_HEDGE_MS : hedge);
+  this.probeTimer = setTimeout(function () { self.probeTimer = null; if (self.connected && self.lastRx < since) self._drop(true); }, ms || NET_PROBE_MS);
 };
 // Da chiamare quando la pagina torna visibile o la rete torna disponibile.
 MQ.prototype.wake = function () {
   if (this.closed) return;
-  // dopo un lungo sonno (app in background) il server ci ha già scollegati: inutile aspettare la verifica, si riparte subito
-  if (this.connected && Date.now() - this.lastRx > NET_STALE_MS) { this._drop(); return; }
-  if (this.connected) { this.probe(NET_WAKE_PROBE_MS); return; }
-  if (!this.ws) { this.backoff = 800; this._open(); }
+  this.backoff = 0;   // il prossimo tentativo, se serve, parte subito
+  if (!this.connected) {
+    if (this.retryTimer || !this.att.length) { this._open(); return; }
+    // un tentativo già in corso (magari partito mentre il telefono dormiva) e ancora senza risposta: se ne prova un altro
+    if (this.att.length < 2 && Date.now() - this.att[0].t0 > 1500) this._open();
+    return;
+  }
+  var age = Date.now() - this.lastRx;
+  // dopo un sonno lungo la connessione è quasi certamente morta: la nuova parte subito, la vecchia resta finché non è pronta
+  if (age > NET_STALE_MS) { this.probe(NET_WAKE_PROBE_MS, 0); return; }
+  if (age > 1500) this.probe(NET_WAKE_PROBE_MS);
 };
 MQ.prototype._parse = function () {
   var b = this.buf;
@@ -843,20 +920,8 @@ MQ.prototype._parse = function () {
   this.buf = b.slice();
 };
 MQ.prototype._handle = function (h, body) {
-  var type = h >> 4, self = this;
-  if (type === 2) { // CONNACK
-    if (body[1] !== 0) { this._drop(); return; }
-    clearTimeout(this.openTimer);
-    this.connected = true; this.everUp = true; this.backoff = 800;
-    if (this.pinger) this.pinger();
-    this.pinger = Beat.every(NET_PING_MS, function () {
-      if (Date.now() - self.lastRx > NET_DEAD_MS) self.probe();
-      else self._raw(MQ.packet(0xC0, []));
-    });
-    var topics = Object.keys(this.subs); if (topics.length) this._sub(topics);
-    this._res(this);
-    this.statusHandlers.forEach(function (f) { f(true); });
-  } else if (type === 3) { // PUBLISH
+  var type = h >> 4;
+  if (type === 3) { // PUBLISH
     var qos = (h >> 1) & 3, tl = (body[0] << 8) | body[1], topic = MQ.dec.decode(body.subarray(2, 2 + tl)), p = 2 + tl;
     if (qos > 0) { var id = [body[p], body[p + 1]]; p += 2; if (qos === 1) this._raw(MQ.packet(0x40, id)); }
     var payload = MQ.dec.decode(body.subarray(p)), retained = !!(h & 1);
@@ -866,7 +931,7 @@ MQ.prototype._handle = function (h, body) {
     if (ack) { delete this.acks[sid]; ack(); }
   }
 };
-MQ.prototype._raw = function (pkt) { if (this.ws && this.ws.readyState === 1) { try { this.ws.send(pkt); return true; } catch (e) {} } return false; };
+MQ.prototype._raw = function (pkt) { if (this.ws && this.ws.readyState === 1) { try { this.ws.send(pkt); this.lastTx = Date.now(); return true; } catch (e) {} } return false; };
 MQ.prototype._nextId = function () { this.pid = this.pid % 65000 + 1; return [this.pid >> 8, this.pid & 255]; };
 MQ.prototype._sub = function (topics) {
   var body = this._nextId(), id = this.pid;
@@ -892,6 +957,50 @@ MQ.prototype.publish = function (topic, payload, retain) {
 MQ.prototype.onMessage = function (f) { this.handlers.push(f); };
 MQ.prototype.onStatus = function (f) { this.statusHandlers.push(f); };
 
+/* ---------- versione nuova del gioco ----------
+   Un'app lasciata aperta in background per giorni continua a usare il codice di quando è stata aperta: giocherebbe
+   con regole e schermate vecchie (e se regge il tavolo le impone a tutti). Ogni pagina sa la sua versione (la scrive
+   build.py) e version.json dice quella pubblicata. Se è cambiata: avviso con «Aggiorna» e, appena l'app torna in
+   primo piano, la pagina si ricarica da sola (la connessione si sta rifacendo comunque e il tavolo si riapre da solo). */
+var Fresh = (function () {
+  var meta = document.querySelector('meta[name="pp-build"]'), mine = meta && meta.content, game = meta && meta.getAttribute('data-game');
+  var none = { check: function () {}, get stale() { return null; } };
+  if (!mine || !game || !window.fetch || !/^https?:$/.test(location.protocol)) return none;
+  var sw = document.querySelector('meta[name="pwa-sw"]'), root = new URL((sw && sw.getAttribute('data-scope')) || './', location.href).href;
+  var stale = null, last = 0, hiddenAt = 0;
+  function check(force) {
+    if (!force && Date.now() - last < 60000) return;
+    last = Date.now();
+    fetch(root + 'version.json?v=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var v = j && j[game];
+      if (!v || v === mine) return;
+      stale = v;
+      if (document.visibilityState !== 'hidden') offer();   // altrimenti si ricarica al ritorno
+    }).catch(function () {});
+  }
+  // da solo, una volta per versione: se anche dopo il ricaricamento la copia fosse vecchia (rete lentissima) non si insiste
+  function auto() {
+    try { if (sessionStorage.getItem('pp-fresh') === stale) return false; sessionStorage.setItem('pp-fresh', stale); } catch (e) {}
+    location.reload(); return true;
+  }
+  function offer() {
+    if (document.getElementById('pp-fresh')) return;
+    var d = document.createElement('div'); d.id = 'pp-fresh'; d.setAttribute('role', 'status');
+    d.setAttribute('style', 'position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:99980;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 20px);background:#1f2a1c;color:#eef6e6;border:1px solid rgba(143,240,164,.5);border-radius:12px;padding:8px 8px 8px 14px;font:15px/1.35 system-ui,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.45)');
+    d.innerHTML = '<span>È uscito un aggiornamento del gioco.</span><button type="button" data-f="go" style="font:inherit;font-weight:700;padding:7px 12px;border-radius:9px;border:0;background:#8ff0a4;color:#0d2412;cursor:pointer">Aggiorna</button><button type="button" data-f="x" aria-label="Più tardi" style="font:inherit;padding:4px 8px;border:0;background:none;color:inherit;opacity:.7;cursor:pointer">×</button>';
+    d.addEventListener('click', function (e) { var b = e.target.closest('[data-f]'); if (!b) return; if (b.getAttribute('data-f') === 'go') location.reload(); else d.remove(); });
+    document.body.appendChild(d);
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+    if (stale && auto()) return;
+    check(hiddenAt && Date.now() - hiddenAt > 30000);
+  });
+  setTimeout(function () { check(true); }, 5000);
+  setInterval(function () { if (document.visibilityState !== 'hidden') check(); }, 15 * 60e3);
+  return { check: check, get stale() { return stale; } };
+})();
+
 /* ---------- tavolo condiviso ---------- */
 var Net = (function () {
   var qs = NETQ;
@@ -905,6 +1014,9 @@ var Net = (function () {
   var STAGGER = +(qs.get('stagger') || 5000);                     // attesa extra per ogni giocatore prima di me
   var GIVEBACK = +(qs.get('giveBack') || 5000);                   // il titolare è tornato e guarda il tavolo da così tanto: gli si rende il comando
   var PROXY_MS = +(qs.get('proxyMs') || 5500);                    // host muto da così tanto: chi arriva si siede da solo
+  var SETTLE = +(qs.get('settle') || 4500);                       // collegati e con il tavolo davanti da così tanto: se l'host fosse vivo l'avremmo sentito (pinga ogni 3 s)
+  var QUICK = +(qs.get('quick') || 5000);                         // host sospeso (app in background) e muto da così tanto: si subentra subito, senza aspettare AUTO_TAKEOVER
+  var QUICK_STAGGER = 2500;                                       // attesa extra per ogni giocatore prima di me, nel subentro veloce
   var TABLE_MAX_AGE = 7 * 24 * 3600e3;                            // un tavolo fermo da una settimana è abbandonato: si chiude da solo
   var PREFIX = window.GAME_PREFIX || 'polvere-piombo/v1/';
   var uid = null; try { uid = localStorage.getItem('pp-uid'); } catch (e) {}
@@ -948,10 +1060,10 @@ var Net = (function () {
   // Ritorno in primo piano o rete di nuovo disponibile: verifica subito la connessione.
   function wakeAll() {
     Object.keys(clients).forEach(function (k) { clients[k].wake(); });
-    if (T) { T.lastPing = Math.max(T.lastPing, Date.now() - 2000); T.graceUntil = Date.now() + 8000; heartbeat(T, true); }
+    if (T) { T.lastPing = Math.max(T.lastPing, Date.now() - 2000); T.graceUntil = Math.max(T.graceUntil, Date.now() + SETTLE); heartbeat(T, true); }
   }
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') { wakeAll(); return; }
+    if (document.visibilityState === 'visible') { if (T) T.visAt = Date.now(); wakeAll(); return; }
     // la pagina va in secondo piano: gli altri lo sanno subito e, se reggo io la partita, la passo a chi sta guardando
     if (T) { heartbeat(T, true); maybeHandOver(T); }
   });
@@ -993,6 +1105,7 @@ var Net = (function () {
     return new Promise(function (resolve) {
       var pending = BROKERS.length, reached = false, closed = false, done = false;
       function finish(v) { if (!done) { done = true; resolve(v); } }
+      find.partial = false;
       BROKERS.forEach(function (_, i) {
         client(i).then(function (c) {
           reached = true;
@@ -1003,7 +1116,7 @@ var Net = (function () {
             if (!(T && T.code === code)) c.unsubscribe(topic(code, 'state'));
             if (doc && doc.closed) closed = true;
           });
-        }).catch(function () {}).then(function () { if (--pending === 0) finish(!reached ? { offline: true } : closed ? { closed: true } : null); });
+        }, function () { find.partial = true; }).catch(function () {}).then(function () { if (--pending === 0) finish(!reached ? { offline: true } : closed ? { closed: true } : null); });
       });
     });
   }
@@ -1082,19 +1195,22 @@ var Net = (function () {
   async function open(code, onDoc, onStatus) {
     close();
     var f = await find(code);
+    // qualche server non ha risposto (rete che si sta svegliando, server lento): il tavolo potrebbe essere lì, si riprova una volta
+    if (!f || f.offline) { if (f || find.partial) f = await find(code); }
     if (f && f.offline) throw 'Nessun server di gioco raggiungibile. Controlla la connessione e riprova.';
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     if (!mayEnter(f.doc, uid, keyFor(code))) { f.c.unsubscribe(topic(code, 'state')); return 'private'; }
     var c = f.c;
     T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, stops: [], graceUntil: 0, chat: [], chatIds: {},
-      seen: {}, hid: {}, visSince: {}, lost: {}, upSince: Date.now(), lastHb: 0, sentHid: null, resync: false, unpub: false, hostRev: 0 };
+      seen: {}, hid: {}, visSince: {}, lost: {}, upSince: Date.now(), lastHb: 0, sentHid: null, resync: false, unpub: false, hostRev: 0, hostHeard: 0, visAt: Date.now() };
     var me = T;
     var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tVis = topic(code, 'vis'), tReact = topic(code, 'react'), tLive = topic(code, 'live');
-    me.handler = function (t, p) {
+    me.handler = function (t, p, retained) {
       if (T !== me) return;
       if (t === tState) {
         if (!p) { me.doc = null; onDoc(null); return; }
         var d = safeParse(p); if (!d) return;
+        if (!retained && !d.closed) me.hostHeard = Date.now();   // stato appena pubblicato: chi regge il tavolo è vivo
         if (d.closed) { if (!me.doc || (d.rev || 0) >= (me.doc.rev || 0)) { me.doc = null; me.closed = true; onDoc(null); } return; }
         if (me.resync) { endResync(me, d); return; }
         if (me.doc) {
@@ -1105,7 +1221,7 @@ var Net = (function () {
         }
         me.lastPing = Date.now();
         accept(d);
-      } else if (t === tPing) { me.lastPing = Date.now(); if (me.doc) heard(me, me.doc.host); }
+      } else if (t === tPing) { me.lastPing = me.hostHeard = Date.now(); if (me.doc) heard(me, me.doc.host); }
       else if (t === tHb) { var hu = String(p || '').slice(0, 40); if (hu) heard(me, hu); }
       else if (t === tVis) { var vm = /^([^|]{1,40})\|([hv])$/.exec(String(p || '')); if (vm) heard(me, vm[1], vm[2] === 'h'); }
       else if (t === tRes) {
@@ -1133,7 +1249,9 @@ var Net = (function () {
       if (T !== me) return;
       me.up = up;
       if (up) {
-        me.lastPing = Date.now(); me.graceUntil = Date.now() + 8000; me.upSince = Date.now();
+        me.lastPing = Date.now(); me.graceUntil = Date.now() + SETTLE; me.upSince = Date.now();
+        // le mosse rimaste in sospeso ripartono subito sulla nuova connessione, senza aspettare il prossimo tentativo
+        Object.keys(me.pending).forEach(function (k) { var pd = me.pending[k]; if (pd.fire) setTimeout(function () { if (me.pending[k] === pd) pd.fire(); }, 60); });
         // Appena ricollegati si aspetta lo stato salvato sul server prima di pubblicare qualsiasi cosa:
         // se intanto un altro giocatore ha preso il comando, vale il suo stato (vedi endResync).
         me.resync = true; clearTimeout(me.resyncTimer);
@@ -1143,16 +1261,19 @@ var Net = (function () {
       if (onStatus) onStatus();
     };
     c.onStatus(me.statusFn);
+    c.fast++;   // seduti al tavolo: connessione controllata più spesso (vedi MQ._tickPing)
     c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tVis); c.subscribe(tReact); c.subscribe(tLive);
     accept(f.doc);
     heartbeat(me, true);
     if (bc) { try { bc.postMessage({ k: 'open', key: PREFIX + code, tab: TAB }); } catch (e) {} }
     Beat.boost(true);   // seduti a un tavolo: il battito non deve rallentare se l'app va in secondo piano
-    me.stops.push(Beat.every(Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4)), function () {
+    // ogni secondo (così il subentro scatta appena serve); il «ci sono» dell'host parte ogni HOST_TIMEOUT/4 (3 s)
+    var pingEvery = Math.min(5000, Math.max(1000, HOST_TIMEOUT / 4)) - 100;
+    me.stops.push(Beat.every(1000, function () {
       if (T !== me) return;
       heartbeat(me, false);
       if (me.isHost) {
-        c.publish(tPing, String(Date.now()), false);
+        if (Date.now() - (me.pingTx || 0) >= pingEvery && c.publish(tPing, String(Date.now()), false)) me.pingTx = Date.now();
         if (Date.now() - (me.lastAnn || 0) > LOBBY_BEAT) announce(true);
         maybeHandOver(me); maybeGiveBack(me);
       } else maybeTakeOver(me);
@@ -1227,10 +1348,20 @@ var Net = (function () {
     var humans = me.doc.seats.filter(function (s) { return !s.bot && s.uid !== me.doc.host; }).map(function (s) { return s.uid; });
     var rank = humans.indexOf(uid);
     if (rank < 0) return;
-    if (Date.now() - me.lastPing < AUTO_TAKEOVER * (me.doc.phase === 'lobby' ? 2 : 1) + rank * STAGGER) return;
+    if (!hostGone(me, rank) && Date.now() - me.lastPing < AUTO_TAKEOVER * (me.doc.phase === 'lobby' ? 2 : 1) + rank * STAGGER) return;
     me.lost[me.doc.host] = (me.lost[me.doc.host] || 0) + 1;
     takeHost(true);
     if (onTakeover) onTakeover();
+  }
+  /* Subentro veloce, a partita iniziata: chi regge il tavolo ha l'app in background e il telefono l'ha sospesa
+     (succede subito su iPhone). Lo si riconosce così: io sono collegato e guardo il tavolo da qualche secondo,
+     e lui non si fa sentire (un host vivo pinga ogni 3 secondi) e l'ultima volta aveva detto di andare in pausa,
+     oppure da quando sono tornato non l'ho sentito per niente. Al suo ritorno il tavolo gli viene reso. */
+  function hostGone(me, rank) {
+    var now = Date.now(), h = me.doc.host;
+    if (me.doc.phase === 'lobby' || now - me.upSince < SETTLE || now - me.visAt < SETTLE) return false;
+    if (now - me.hostHeard < QUICK + rank * QUICK_STAGGER) return false;
+    return !!me.hid[h] || me.hostHeard < me.upSince || me.hostHeard < me.visAt;
   }
   function seatedHuman(d, u) { return !!(d && d.seats && d.seats.some(function (s) { return s.uid === u && !s.bot; })); }
   // Reggo la partita ma la mia app è finita in secondo piano (il telefono può sospenderla da un momento all'altro):
@@ -1495,7 +1626,7 @@ var Net = (function () {
         }
         me.c.publish(topic(me.code, 'act'), msg, false);
       }
-      var pd = { res: res, rej: rej, timer: setInterval(fire, 3000) };
+      var pd = { res: res, rej: rej, timer: setInterval(fire, 3000), fire: fire };
       me.pending[id] = pd; fire();
     });
   }
@@ -1598,6 +1729,7 @@ var Net = (function () {
     if (!(opts && opts.quiet) && me.up && !me.resync && !me.closed && me.doc && me.doc.phase === 'over' && seatedHuman(me.doc, uid) &&
         me.doc.seats.every(function (s) { return s.bot || s.uid === uid || presence(s.uid) === 'off'; })) { tombstone(me.c, me.code, me.doc); me.closed = true; }
     T = null; clearTimeout(me.resyncTimer);
+    me.c.fast = Math.max(0, (me.c.fast || 0) - 1);
     Beat.boost(false);
     me.stops.forEach(function (f) { f(); });
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
@@ -2140,7 +2272,13 @@ var PWA = (function () {
   // service worker: serve per l'installazione su Android e per aprire il gioco anche con rete debole
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     var swUrl = document.querySelector('meta[name="pwa-sw"]');
-    if (swUrl) navigator.serviceWorker.register(swUrl.content, { scope: swUrl.getAttribute('data-scope') || './' }).catch(function () {});
+    if (swUrl) navigator.serviceWorker.register(swUrl.content, { scope: swUrl.getAttribute('data-scope') || './', updateViaCache: 'none' }).then(function (reg) {
+      // app riaperta dopo tanto tempo: si controlla subito se c'è un service worker nuovo (al massimo una volta all'ora)
+      var lastUp = Date.now();
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && Date.now() - lastUp > 3600e3) { lastUp = Date.now(); reg.update().catch(function () {}); }
+      });
+    }).catch(function () {});
   }
 
   function available() { return !standalone() && !inApp2; }
