@@ -348,3 +348,12 @@ select.field { color: #13284f; }
 .grp.match { background: #2fb36d; box-shadow: 0 0 14px rgba(143, 240, 164, .6); } .grp.match small { color: #eafff0; } .grp.match i { color: #fff; }
 .grp.me { outline: 2px solid #fff; }
 .over-logo { width: 90px; } .over-logo svg { width: 100%; height: auto; border-radius: 22px; }
+
+/* ===== regole in più ===== */
+.rules-pick { display: grid; gap: 6px; }
+.rules-pick > small { margin-top: -2px; }
+.rpick { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); cursor: pointer; }
+.rpick input { width: 20px; height: 20px; flex: none; margin-top: 2px; accent-color: var(--gold); }
+.rpick span { display: grid; gap: 1px; } .rpick small { font-size: 13.5px; color: var(--muted); }
+.rnote { margin: 6px auto 0; max-width: 520px; padding: 6px 12px; border-radius: 12px; background: rgba(255, 215, 94, .16); border: 1px solid rgba(255, 215, 94, .45); font-size: 14.5px; text-align: center; line-height: 1.35; }
+.rnote b { color: #ffe7a0; } .rnote b.big { font-size: 22px; }

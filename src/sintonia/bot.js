@@ -8,7 +8,9 @@ var STBot = (function () {
     var P = g.players[p]; if (!P) return null;
     if (g.phase === 'show') return P.ready ? null : { a: 'next' };
     if (g.phase !== 'write' || P.ans) return null;
-    var list = D.LIST[g.theme].a, r = Math.random(), k = 0;
+    var list = D.LIST[g.theme].a.filter(function (w) { return !E.ruleError(g, w); }), r = Math.random(), k = 0;
+    if (!list.length) list = D.LIST[g.theme].a.slice(-1);
+    if (E.on(g, 'unique')) return { a: 'answer', w: list[Math.floor(Math.random() * list.length)] };   // pensa diverso: risposte sparse
     while (k < list.length - 1 && r > W[k]) { r -= W[k]; k++; }
     return { a: 'answer', w: list[Math.min(k, list.length - 1)] };
   }

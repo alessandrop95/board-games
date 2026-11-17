@@ -4,6 +4,10 @@
    tanti punti quanti sono i compagni del gruppo (almeno 2); se l'hanno scritta tutti, +2. Ognuno per sé: ogni
    giocatore prende un punto per ogni altro giocatore che ha scritto la sua stessa risposta.
    Le risposte uguali si riconoscono anche senza accenti, articoli e con un errore di battitura.
+   Regole in più (opts.extra = sì): a ogni manche il gioco estrae una regola tra quelle scelte, diversa dalla
+   precedente: punti doppi; pensa diverso (punti a chi scrive una risposta che nessun altro ha scritto); lettera
+   obbligata; vietata la più ovvia; tempo lampo (10 secondi); il capitano (contano i compagni che scrivono la stessa
+   risposta del capitano estratto; ognuno per sé: chi scrive come il «bersaglio»); tutto o niente.
    Le funzioni che dipendono dall'ora ricevono «now» (millisecondi dell'host). */
 var STEngine = (function () {
   var D = (typeof STData !== 'undefined') ? STData : require('./data.js');
@@ -11,7 +15,9 @@ var STEngine = (function () {
   function setRandom(f) { rand = f || Math.random; }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   var TEAMS = [['Rossi', 0], ['Blu', 1], ['Verdi', 2], ['Gialli', 3]];
-  var OPT = { rounds: [6, 8, 10, 12], time: [20, 30, 45], teams: [0, 2, 3, 4] }, SHOW_MS = 15000;
+  var OPT = { rounds: [6, 8, 10, 12], time: [20, 30, 45], teams: [0, 2, 3, 4] }, SHOW_MS = 15000, FLASH_S = 10;
+  var RULES = ['double', 'unique', 'letter', 'ban', 'flash', 'captain', 'all'];
+  var RULE_NAME = { double: 'Punti doppi', unique: 'Pensa diverso', letter: 'Lettera obbligata', ban: 'Vietata la più ovvia', flash: 'Tempo lampo', captain: 'Il capitano', all: 'Tutto o niente' };
   function norm(s) {
     var t = String(s == null ? '' : s).toLowerCase();
     if (t.normalize) t = t.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -46,12 +52,13 @@ var STEngine = (function () {
   // seen: temi usciti nelle partite precedenti a questo tavolo (o su questo telefono), da non riproporre
   function newGame(seats, opts, now, seen) {
     opts = opts || {}; now = now || Date.now();
-    var o = { rounds: pick(OPT.rounds, opts.rounds, 8), time: pick(OPT.time, opts.time, 30), teams: pick(OPT.teams, opts.teams == null ? 2 : opts.teams, 2) };
+    var o = { rounds: pick(OPT.rounds, opts.rounds, 8), time: pick(OPT.time, opts.time, 30), teams: pick(OPT.teams, opts.teams == null ? 2 : opts.teams, 2), extra: !!opts.extra };
+    RULES.forEach(function (r) { o[r] = !!opts[r]; });
     var tm = makeTeams(seats, o.teams);
     var g = {
       v: 1, phase: 'write', seq: 0, turnN: 0, round: 0, clock: now, opts: o, teams: tm.teams,
       players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, team: tm.of[i], ans: null, ready: false, total: 0 }; }),
-      deck: freshDeck(seen), theme: null, until: 0, res: null, log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
+      deck: freshDeck(seen), theme: null, until: 0, res: null, rule: null, rd: null, log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null
     };
     startRound(g, now);
     return g;
@@ -66,9 +73,34 @@ var STEngine = (function () {
     if (!g.deck.length) g.deck = freshDeck();
     g.theme = g.deck.pop(); (g.usedQ || (g.usedQ = [])).push(D.LIST[g.theme].q);
     g.players.forEach(function (P) { P.ans = null; P.ready = false; });
-    g.until = now + g.opts.time * 1000; g.clock = now; g.turnN++;
-    log(g, 'Manche ' + g.round + ': «' + D.LIST[g.theme].q + '».', 'sys');
-    fx(g, { k: 'theme', round: g.round, q: D.LIST[g.theme].q });
+    newRule(g);
+    g.until = now + answerTime(g) * 1000; g.clock = now; g.turnN++;
+    log(g, 'Manche ' + g.round + ': «' + D.LIST[g.theme].q + '»' + (g.rule ? ' · regola: ' + RULE_NAME[g.rule] : '') + '.', 'sys');
+    fx(g, { k: 'theme', round: g.round, q: D.LIST[g.theme].q, rule: g.rule });
+  }
+  /* ---------- regole in più ---------- */
+  function on(g, r) { return !!(g && g.opts && g.opts.extra && g.rule === r); }
+  function rulePool(o) { var p = RULES.filter(function (r) { return o[r]; }); return p.length ? p : RULES.slice(); }
+  function answerTime(g) { return on(g, 'flash') ? FLASH_S : g.opts.time; }
+  function letterOf(w) { return norm(w).replace(/ /g, '').charAt(0).toUpperCase(); }
+  function newRule(g) {
+    g.rd = null;
+    if (!g.opts.extra) { g.rule = null; return; }
+    var p = rulePool(g.opts), c = p.filter(function (r) { return r !== g.rule; }); if (!c.length) c = p;
+    g.rule = c[Math.floor(rand() * c.length)];
+    var A = D.LIST[g.theme].a;
+    if (g.rule === 'letter') g.rd = { l: letterOf(A[Math.floor(rand() * Math.min(4, A.length))]) };
+    else if (g.rule === 'ban') g.rd = { w: A[0] };
+    else if (g.rule === 'captain') {
+      if (g.opts.teams) g.rd = { caps: g.teams.map(function (T, t) { var ms = members(g, t); return ms[Math.floor(rand() * ms.length)]; }) };
+      else g.rd = { target: Math.floor(rand() * g.players.length) };
+    }
+  }
+  // la risposta va bene con la regola di questa manche?
+  function ruleError(g, w) {
+    if (on(g, 'letter') && letterOf(w) !== g.rd.l) return 'Con la «Lettera obbligata» la risposta deve iniziare con la ' + g.rd.l + '.';
+    if (on(g, 'ban') && same(w, g.rd.w)) return '«' + g.rd.w + '» è vietata in questa manche: è la risposta più ovvia!';
+    return null;
   }
   // gruppi di risposte uguali dentro un insieme di giocatori
   function groups(g, ps) {
@@ -81,17 +113,39 @@ var STEngine = (function () {
     return out.sort(function (a, b) { return b.ps.length - a.ps.length; });
   }
   function reveal(g, now) {
-    var res = { teams: [], players: g.players.map(function () { return 0; }), all: groups(g, g.players.map(function (P, i) { return i; })) };
+    var res = { teams: [], players: g.players.map(function () { return 0; }), all: groups(g, g.players.map(function (P, i) { return i; })), rule: g.rule, rd: g.rd };
+    var alone = function (p) { var x = res.all.filter(function (y) { return y.ps.indexOf(p) >= 0; })[0]; return !!x && x.ps.length === 1; };
+    var mult = on(g, 'double') ? 2 : 1;
     if (g.opts.teams) {
       g.teams.forEach(function (T, t) {
-        var ms = members(g, t), gs = groups(g, ms), pts = 0, full = ms.length >= 2 && gs.length === 1 && gs[0].ps.length === ms.length;
-        gs.forEach(function (x) { if (x.ps.length >= 2) pts += x.ps.length; });
-        if (full) pts += 2;
-        res.teams.push({ pts: pts, groups: gs, full: full });
+        var ms = members(g, t), gs = groups(g, ms), pts = 0, full = ms.length >= 2 && gs.length === 1 && gs[0].ps.length === ms.length, extra = {};
+        if (on(g, 'unique')) ms.forEach(function (p) { if (g.players[p].ans && alone(p)) pts += 2; });
+        else if (on(g, 'all')) pts = full ? ms.length * 2 + 2 : 0;
+        else if (on(g, 'captain')) {
+          var cap = g.rd.caps[t], ca = g.players[cap].ans, n = ms.filter(function (p) { return p !== cap && ca && same(g.players[p].ans, ca); }).length;
+          pts = n ? n + 1 + (n === ms.length - 1 ? 2 : 0) : 0; extra.cap = cap; extra.n = n;
+        } else {
+          gs.forEach(function (x) { if (x.ps.length >= 2) pts += x.ps.length; });
+          if (full) pts += 2;
+        }
+        pts *= mult;
+        res.teams.push({ pts: pts, groups: gs, full: full && !on(g, 'unique'), cap: extra.cap, n: extra.n });
         T.total += pts; T.hist.push(pts);
       });
     } else {
-      res.all.forEach(function (x) { x.ps.forEach(function (p) { res.players[p] = x.ps.length - 1; }); });
+      var big = res.all.length ? res.all[0].ps.length : 0;
+      res.all.forEach(function (x) {
+        x.ps.forEach(function (p) {
+          if (on(g, 'unique')) res.players[p] = x.ps.length === 1 ? 3 : 0;
+          else if (on(g, 'all')) res.players[p] = x.ps.length >= 2 && x.ps.length === big ? x.ps.length : 0;
+          else if (!on(g, 'captain')) res.players[p] = x.ps.length - 1;
+        });
+      });
+      if (on(g, 'captain')) {
+        var tg = g.rd.target, ta = g.players[tg].ans;
+        g.players.forEach(function (P, p) { if (p !== tg && ta && same(P.ans, ta)) { res.players[p] = 2; res.players[tg] += 1; } });
+      }
+      res.players = res.players.map(function (x) { return x * mult; });
       g.teams.forEach(function (T, t) { var pts = res.players[t]; res.teams.push({ pts: pts }); T.total += pts; T.hist.push(pts); });
     }
     g.res = res; g.phase = 'show'; g.until = now + SHOW_MS; g.clock = now; g.turnN++;
@@ -130,6 +184,7 @@ var STEngine = (function () {
       if (a.a !== 'answer') return 'Adesso si scrive.';
       var w = String(a.w == null ? '' : a.w).replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30);
       if (!norm(w)) return 'Scrivi una risposta.';
+      var re = ruleError(g, w); if (re) return re;
       P.ans = w;
       fx(g, { k: 'answered', p: p });
       if (g.players.every(function (Q) { return Q.ans; })) reveal(g, now);
@@ -142,6 +197,6 @@ var STEngine = (function () {
     return null;
   }
   function forceNext(g, now) { now = now || Date.now(); if (g.phase === 'show') { next(g, now); g.seq++; return true; } if (g.phase === 'write') { reveal(g, now); g.seq++; return true; } return false; }
-  return { newGame: newGame, act: act, tick: tick, decider: decider, pending: pending, forceNext: forceNext, groups: groups, members: members, norm: norm, same: same, setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, D: D };
+  return { on: on, rulePool: rulePool, ruleError: ruleError, answerTime: answerTime, letterOf: letterOf, RULES: RULES, RULE_NAME: RULE_NAME, FLASH_S: FLASH_S, newGame: newGame, act: act, tick: tick, decider: decider, pending: pending, forceNext: forceNext, groups: groups, members: members, norm: norm, same: same, setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, D: D };
 })();
 if (typeof module !== 'undefined') module.exports = STEngine;

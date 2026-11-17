@@ -21,11 +21,31 @@ var Game = (function () {
     var g = G(), me = myIdx();
     setHTML('gv-info', '<b>Sintonia</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : 'Tema ' + g.round + ' di ' + g.opts.rounds) + ' · tavolo ' + esc(App.code)) + '</span>');
     setHTML('gv-teams', teams(g, me));
-    setHTML('gv-mid', '<div class="theme">' + esc(D.LIST[g.theme].q) + '</div><div class="tm"><span class="tmv" id="tmv"></span><span class="tbar2"><i id="tbar"></i></span></div>');
+    setHTML('gv-mid', '<div class="theme">' + esc(D.LIST[g.theme].q) + '</div>' + ruleBox(g, me) + '<div class="tm"><span class="tmv" id="tmv"></span><span class="tbar2"><i id="tbar"></i></span></div>');
     if (g.phase === 'write') write(g, me); else setHTML('gv-main', show(g, me));
     setHTML('gv-prompt', prompt(g, me));
     var chat = el('gv-chat'); if (chat) { var ch = Chat.badgeHTML(); if (chat._h !== ch) { chat.innerHTML = ch; chat._h = ch; } }
     clock();
+  }
+  // la regola in più della manche, scritta in chiaro per tutti
+  function ruleText(g, me, rule, rd) {
+    switch (rule) {
+      case 'double': return 'questa manche vale il doppio!';
+      case 'unique': return 'al contrario: punti a chi scrive una risposta che non scrive nessun altro';
+      case 'letter': return 'la risposta deve iniziare con la <b class="big">' + esc(rd.l) + '</b>';
+      case 'ban': return 'vietato scrivere <b>«' + esc(rd.w) + '»</b>';
+      case 'flash': return 'solo ' + E.FLASH_S + ' secondi!';
+      case 'captain':
+        if (g.opts.teams) { var mt = myTeam(g, me), c = mt >= 0 ? rd.caps[mt] : null; return c == null ? 'in ogni squadra contano solo le risposte uguali a quella del capitano' : c === me ? 'sei tu il capitano della tua squadra: i compagni devono scrivere come te' : 'il vostro capitano è ' + pname(g, c) + ': scrivete quello che scriverebbe lui'; }
+        return rd.target === me ? 'sei tu il bersaglio: gli altri devono scrivere come te' : 'il bersaglio è ' + pname(g, rd.target) + ': scrivi quello che scriverebbe lui';
+      case 'all': return g.opts.teams ? 'punti solo se tutta la squadra scrive la stessa cosa (valgono di più)' : 'punti solo a chi scrive la risposta più scritta';
+    }
+    return '';
+  }
+  function ruleBox(g, me) {
+    var rule = g.phase === 'write' ? g.rule : g.res && g.res.rule, rd = g.phase === 'write' ? g.rd : g.res && g.res.rd;
+    if (!rule || g.phase === 'over') return '';
+    return '<div class="rnote"><b>Regola: ' + esc(E.RULE_NAME[rule]) + '</b> · ' + ruleText(g, me, rule, rd) + '</div>';
   }
   function teams(g, me) {
     var mt = myTeam(g, me);
@@ -38,7 +58,7 @@ var Game = (function () {
   function clock() {
     var g = G(); if (!g || !el('tmv')) return;
     var live = g.phase === 'write' || g.phase === 'show', ms = live ? left(g) : 0, s = Math.ceil(ms / 1000);
-    var total = g.phase === 'write' ? g.opts.time * 1000 : 15000, txt = g.phase === 'write' ? s + '″' : '';
+    var total = g.phase === 'write' ? E.answerTime(g) * 1000 : 15000, txt = g.phase === 'write' ? s + '″' : '';
     if (el('tmv').textContent !== txt) el('tmv').textContent = txt;
     el('tbar').style.width = live ? Math.max(0, Math.min(100, ms / total * 100)).toFixed(1) + '%' : '0%';
     el('gv-mid').classList.toggle('low', g.phase === 'write' && s <= 5);
@@ -66,7 +86,8 @@ var Game = (function () {
     function chip(x, hi) { return '<span class="grp' + (x.ps.length > 1 ? ' match' : '') + (hi ? ' me' : '') + '"><b>' + esc(x.w) + '</b>' + (x.ps.length > 1 ? '<i>×' + x.ps.length + '</i>' : '') + '<small>' + x.ps.map(function (p) { return esc(g.players[p].nick); }).join(', ') + '</small></span>'; }
     if (g.opts.teams) return g.teams.map(function (T, t) {
       var r = R.teams[t];
-      return '<div class="card tres' + (t === mt ? ' mine' : '') + '" style="--tc:' + tcol(g, t) + '"><div class="tres-h"><b>' + esc(T.name) + '</b>' + (r.full ? '<span class="tag end">tutti in sintonia! +2</span>' : '') + '<span class="pts">+' + r.pts + '</span></div><div class="grps">' +
+      var capNote = r.cap != null ? '<span class="tag">capitano: ' + esc(g.players[r.cap].nick) + (r.n ? ', ' + r.n + (r.n > 1 ? ' compagni' : ' compagno') + ' come lui' : ', nessuno come lui') + '</span>' : '';
+      return '<div class="card tres' + (t === mt ? ' mine' : '') + '" style="--tc:' + tcol(g, t) + '"><div class="tres-h"><b>' + esc(T.name) + '</b>' + (r.full ? '<span class="tag end">tutti in sintonia!' + (R.rule === 'all' ? '' : ' +2') + '</span>' : '') + capNote + '<span class="pts">+' + r.pts + '</span></div><div class="grps">' +
         (r.groups.length ? r.groups.map(function (x) { return chip(x, me >= 0 && x.ps.indexOf(me) >= 0); }).join('') : '<span class="muted">nessuna risposta</span>') + '</div></div>';
     }).join('');
     return '<div class="card tres"><div class="grps">' + R.all.map(function (x) { return chip(x, me >= 0 && x.ps.indexOf(me) >= 0); }).join('') + '</div></div>' +
@@ -98,7 +119,7 @@ var Game = (function () {
   }
   function plan(g, me, e) {
     switch (e.k) {
-      case 'theme': enqueue(function () { Sound.play('deal'); banner(esc(e.q), 'Tema ' + e.round + ' di ' + g.opts.rounds); return sleep(300); }); break;
+      case 'theme': enqueue(function () { Sound.play('deal'); banner(esc(e.q), (e.rule ? 'Regola: ' + esc(E.RULE_NAME[e.rule]) + ' · ' : '') + 'Tema ' + e.round + ' di ' + g.opts.rounds); return sleep(300); }); break;
       case 'answered': if (e.p !== me) enqueue(function () { Sound.play('mate'); return sleep(20); }); break;
       case 'reveal': enqueue(function () { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); var mt = myTeam(G(), me), r = G().res; Sound.play('reveal'); if (r && g.opts.teams && mt >= 0 && r.teams[mt] && r.teams[mt].full) { banner('In sintonia!', 'tutta la squadra +2'); confetti(); } return sleep(200); }); break;
       case 'over': enqueue(function () { App.sheet = { kind: 'over', fresh: true }; renderSheet(); var w = G().winners || [], mt = myTeam(G(), me); Sound.play(w.indexOf(mt) >= 0 ? 'win' : 'lose'); if (w.indexOf(mt) >= 0) confetti(); return sleep(100); }); break;

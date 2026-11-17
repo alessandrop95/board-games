@@ -133,6 +133,8 @@ document.addEventListener('change', function (ev) {
   if (id === 'opt-rounds') send({ t: 'opt', rounds: +ev.target.value });
   if (id === 'opt-time') send({ t: 'opt', time: +ev.target.value });
   if (id === 'opt-teams') send({ t: 'opt', teams: +ev.target.value });
+  if (id === 'opt-extra') send({ t: 'opt', extra: ev.target.value === '1' });
+  if (ev.target.getAttribute && ev.target.getAttribute('data-rule')) send({ t: 'opt', rule: ev.target.getAttribute('data-rule'), on: ev.target.checked });
 });
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && e.target && e.target.id === 'joincode') joinTable(e.target.value);

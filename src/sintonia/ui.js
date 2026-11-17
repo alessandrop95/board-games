@@ -87,6 +87,8 @@ function tableReducer(doc, from, op) {
       if (op.rounds != null && E.OPT.rounds.indexOf(+op.rounds) >= 0) doc.opts.rounds = +op.rounds;
       if (op.time != null && E.OPT.time.indexOf(+op.time) >= 0) doc.opts.time = +op.time;
       if (op.teams != null && E.OPT.teams.indexOf(+op.teams) >= 0 && +op.teams !== doc.opts.teams) { doc.opts.teams = +op.teams; balance(doc); }
+      if (op.extra != null) doc.opts.extra = !!op.extra;
+      if (op.rule != null && E.RULES.indexOf(op.rule) >= 0) doc.opts[op.rule] = !!op.on;
       return {};
     }
     case 'back': {
@@ -137,7 +139,7 @@ Score.setup({ game: 'sintonia', result: function (g) {
   return g.players.map(function (P) { return { won: (g.winners || []).indexOf(P.team) >= 0, place: place[P.team], score: g.teams[P.team].total }; });
 } });
 Turns.setup({ decider: function (g) { return E.decider(g); }, onTimeout: function () { return false; } });
-Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; notes.push(o.teams === 0 ? 'ognuno per sé' : (o.teams || 2) + ' squadre'); if (o.rounds && o.rounds !== 8) notes.push(o.rounds + ' temi'); return { max: MAXP, note: notes.join(', ') }; });
+Net.setLobbyInfo(function (d) { var o = d.opts || {}, notes = []; notes.push(o.teams === 0 ? 'ognuno per sé' : (o.teams || 2) + ' squadre'); if (o.extra) notes.push('regole a sorpresa'); if (o.rounds && o.rounds !== 8) notes.push(o.rounds + ' temi'); return { max: MAXP, note: notes.join(', ') }; });
 Net.setOnTakeover(function () { toast('L’host non rispondeva: ora reggi tu il tavolo, il tempo e i giocatori automatici.'); render(); });
 
 /* ---------- connessione al tavolo ---------- */
@@ -303,15 +305,25 @@ function lobbyHTML() {
     '<section class="panel"><h2>Come si gioca, in 30 secondi</h2>' + RU.section('goal') + RU.section('points') + '<button class="btn ghost small" data-act="rules" style="justify-self:start">Tutte le regole</button></section></div>';
 }
 Lobby.setRecentKey(KEY_RECENT);
+var RULE_DESC = {
+  double: 'La manche vale il doppio.', unique: 'Al contrario: punti a chi scrive una risposta che nessun altro ha scritto.', letter: 'La risposta deve iniziare con una lettera estratta.',
+  ban: 'La risposta più comune del tema è proibita.', flash: 'Solo 10 secondi per rispondere.', captain: 'Contano solo i compagni che scrivono come il capitano estratto (ognuno per sé: come il «bersaglio»).',
+  all: 'Punti solo se tutta la squadra scrive la stessa cosa, ma valgono di più (ognuno per sé: solo la risposta più scritta).'
+};
 function optionsHTML(d, isHost) {
   var o = d.opts || {}, teams = o.teams == null ? 2 : o.teams, r = o.rounds || 8, tm = o.time || 30;
   var desc = (teams ? teams + ' squadre' : 'ognuno per sé') + ' · ' + r + ' temi · ' + tm + ' secondi per rispondere';
-  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.</p>';
+  var pool = o.extra ? E.rulePool(o) : [];
+  if (!isHost) return '<p class="lead">Si gioca: <b>' + desc + '</b>.</p>' + (pool.length ? '<p class="lead">Regole in più a sorpresa, una a ogni manche, tra: ' + pool.map(function (k) { return '<b>' + E.RULE_NAME[k] + '</b>'; }).join(', ') + '.</p>' : '');
   function sel(id, cur, list) { return '<select id="' + id + '" class="field" style="max-width:220px">' + list.map(function (k) { return '<option value="' + k[0] + '"' + (String(k[0]) === String(cur) ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('') + '</select>'; }
   function opt(id, title, sub, cur, list) { return '<div class="tt-opt row"><label for="' + id + '" style="flex:1;min-width:160px"><b>' + title + '</b><br><span class="muted" style="font-size:14px">' + sub + '</span></label>' + sel(id, cur, list) + '</div>'; }
   return opt('opt-teams', 'Squadre', teams ? 'Punti quando i compagni scrivono la stessa cosa.' : 'Un punto per ogni altro giocatore con la tua risposta.', teams, [[2, '2 squadre'], [3, '3 squadre'], [4, '4 squadre'], [0, 'Ognuno per sé']]) +
     opt('opt-rounds', 'Temi', 'Uno per manche.', r, [[6, '6 temi'], [8, '8 temi'], [10, '10 temi'], [12, '12 temi']]) +
-    opt('opt-time', 'Tempo', 'Per rispondere.', tm, [[20, '20 secondi'], [30, '30 secondi'], [45, '45 secondi']]);
+    opt('opt-time', 'Tempo', 'Per rispondere.', tm, [[20, '20 secondi'], [30, '30 secondi'], [45, '45 secondi']]) +
+    opt('opt-extra', 'Regole in più', o.extra ? 'A ogni manche il gioco estrae una regola tra quelle scelte qui sotto.' : 'Si gioca normale, senza regole a sorpresa.', o.extra ? 1 : 0, [[0, 'No'], [1, 'Sì, a sorpresa']]) +
+    (o.extra ? '<div class="rules-pick"><b>Quali regole possono uscire</b><small class="muted">Se non ne scegli nessuna, possono uscire tutte.</small>' + E.RULES.map(function (k) {
+      return '<label class="rpick"><input type="checkbox" data-rule="' + k + '"' + (o[k] ? ' checked' : '') + '><span><b>' + E.RULE_NAME[k] + '</b><small>' + RULE_DESC[k] + '</small></span></label>';
+    }).join('') + '</div>' : '');
 }
 function roomHTML() {
   var d = App.doc, isHost = d.host === Net.uid, seated = d.seats.some(function (s) { return s.uid === Net.uid; }), n = d.seats.length, nt = nTeams(d), seats = '';

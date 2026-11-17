@@ -48,5 +48,47 @@ t('almeno 400 temi diversi', D.LIST.length >= 400 && D.LIST.every(function (x, i
 var seenQ = D.LIST.slice(0, D.LIST.length - 30).map(function (x) { return x.q; });
 var gs = E.newGame(seats([0, 0, 1, 1]), { rounds: 8 }, T0, seenQ);
 t('i temi già usati a questo tavolo non tornano', gs.deck.length + 1 === 30 && gs.deck.concat([gs.theme]).every(function (i) { return seenQ.indexOf(D.LIST[i].q) < 0; }) && gs.usedQ.length === 1);
+// ===== regole in più a sorpresa =====
+function only(rule, teams, extra) { var o = { extra: true, rounds: 6, time: 30, teams: teams == null ? 2 : teams }; o[rule] = true; for (var k in extra || {}) o[k] = extra[k]; return o; }
+function answers(g, list, now) { list.forEach(function (w, i) { if (w != null) E.act(g, i, { a: 'answer', w: w }, now || T0 + 1000); }); }
+t('senza «Regole in più» nessuna regola', E.newGame(seats([0, 0, 1, 1]), { double: true }, T0).rule === null);
+t('se non se ne sceglie nessuna possono uscire tutte', E.rulePool({}).length === 7);
+var rr = E.newGame(seats([0, 0, 1, 1]), { extra: true, rounds: 12, double: true, flash: true }, T0), prevR = rr.rule, alt = true;
+for (var z = 0; z < 11; z++) { E.forceNext(rr, T0); E.forceNext(rr, T0); if (rr.rule === prevR) alt = false; prevR = rr.rule; }
+t('una regola nuova a ogni manche, mai uguale alla precedente', alt && rr.round === 12);
+var db = E.newGame(seats([0, 0, 1, 1]), only('double'), T0); answers(db, ['mela', 'mela', 'pera', 'kiwi']);
+t('punti doppi: 2 compagni in sintonia (+2, +2 perché tutti) valgono 8', db.teams[0].total === 8 && db.teams[1].total === 0);
+var fl = E.newGame(seats([0, 0, 1, 1]), only('flash'), T0);
+t('tempo lampo: 10 secondi', fl.until === T0 + 10000);
+var lt = E.newGame(seats([0, 0, 1, 1]), only('letter'), T0), L = lt.rd.l;
+t('lettera obbligata: estratta tra le risposte più comuni del tema', /^[A-Z]$/.test(L) && D.LIST[lt.theme].a.slice(0, 4).some(function (w) { return E.letterOf(w) === L; }));
+t('lettera obbligata: una risposta con un’altra lettera non vale', E.act(lt, 0, { a: 'answer', w: (L === 'Z' ? 'abete' : 'zebra') }, T0 + 1000) !== null && E.act(lt, 0, { a: 'answer', w: L + 'ucertola' }, T0 + 1000) === null);
+var bn = E.newGame(seats([0, 0, 1, 1]), only('ban'), T0), banned = D.LIST[bn.theme].a[0];
+t('vietata la più ovvia: la prima risposta del tema non si può scrivere', bn.rd.w === banned && E.act(bn, 0, { a: 'answer', w: banned.toUpperCase() }, T0 + 1000) !== null && E.act(bn, 0, { a: 'answer', w: D.LIST[bn.theme].a[1] }, T0 + 1000) === null);
+var un = E.newGame(seats([0, 0, 1, 1]), only('unique'), T0); answers(un, ['mela', 'pera', 'mela', 'kiwi']);
+t('pensa diverso: 2 punti per ogni risposta che nessun altro ha scritto', un.teams[0].total === 2 && un.teams[1].total === 2 && !un.res.teams[0].full);
+var al = E.newGame(seats([0, 0, 0, 1, 1, 1]), only('all'), T0); answers(al, ['mela', 'mela', 'mela', 'pera', 'pera', 'kiwi']);
+t('tutto o niente: tutta la squadra uguale vale di più, altrimenti zero', al.teams[0].total === 8 && al.teams[1].total === 0);
+var cp = E.newGame(seats([0, 0, 0, 1, 1, 1]), only('captain'), T0), c0 = cp.rd.caps[0], c1 = cp.rd.caps[1];
+var cw = ['x', 'x', 'x', 'x', 'x', 'x']; E.members(cp, 0).forEach(function (p) { cw[p] = 'mela'; }); E.members(cp, 1).forEach(function (p) { cw[p] = p === c1 ? 'pera' : 'kiwi'; });
+answers(cp, cw);
+t('il capitano: contano i compagni con la sua stessa risposta (tutti: +2)', cp.players[c0].team === 0 && cp.teams[0].total === 5 && cp.teams[1].total === 0 && cp.res.teams[0].cap === c0);
+var fc = E.newGame(seats([0, 0, 0, 0]), only('captain', 0), T0), tgt = fc.rd.target, fw = ['a1', 'a2', 'a3', 'a4']; fw[tgt] = 'mela'; fw[(tgt + 1) % 4] = 'mela';
+answers(fc, fw);
+t('ognuno per sé, il bersaglio: 2 punti a chi scrive come lui, 1 a lui per ognuno', fc.teams[(tgt + 1) % 4].total === 2 && fc.teams[tgt].total === 1 && fc.teams[(tgt + 2) % 4].total === 0);
+var fu = E.newGame(seats([0, 0, 0, 0]), only('unique', 0), T0); answers(fu, ['mela', 'mela', 'pera', 'kiwi']);
+t('ognuno per sé, pensa diverso: 3 punti alle risposte uniche', fu.teams[2].total === 3 && fu.teams[3].total === 3 && fu.teams[0].total === 0);
+// partite intere con le regole a sorpresa
+var badr = 0;
+for (var k2 = 0; k2 < 30; k2++) {
+  var gr = E.newGame(seats(k2 % 2 ? [0, 0, 0, 0, 0] : [0, 0, 1, 1, 0, 1]), { extra: true, teams: k2 % 2 ? 0 : 2, rounds: 12 }, T0), now2 = T0;
+  for (var st2 = 0; st2 < 400 && gr.phase !== 'over'; st2++) {
+    now2 += 1000;
+    gr.players.forEach(function (P, p) { var a = B.decide(gr, p); if (a) { var e = E.act(gr, p, a, now2); if (e) { badr++; if (badr < 4) console.log('regola', gr.rule, e, JSON.stringify(a)); } } });
+    E.tick(gr, now2);
+  }
+  if (gr.phase !== 'over') badr++;
+}
+t('partite intere con le regole a sorpresa senza errori (anche gli automatici rispettano le regole)', badr === 0, badr);
 console.log('Sintonia: ' + ok + ' prove superate, ' + ko + ' fallite');
 process.exit(ko ? 1 : 0);
