@@ -37,7 +37,7 @@ with sync_playwright() as p:
     # ---------- password dimenticata ----------
     A = ctx(); go(A, '')
     A.click('[data-pa="open"][data-v="login"]'); A.click('[data-pa="tab"][data-v="register"]')
-    A.fill('[name=u]', 'Ale'); A.fill('[name=p]', 'segreto1'); A.fill('[name=p2]', 'segreto1'); A.click('form [type=submit]')
+    A.fill('[name=u]', 'Ale'); A.fill('[name=p]', 'segreto1'); A.fill('[name=p2]', 'segreto1'); A.click('.k-sheet form [type=submit]')
     A.wait_for_selector('.pa-code'); code = A.inner_text('.pa-code').strip()
     A.click('[data-pa="close"]'); A.wait_for_load_state('load'); A.wait_for_timeout(1200)
     t('registrata', 'Ale' in A.inner_text('#account-slot'))
@@ -51,10 +51,10 @@ with sync_playwright() as p:
     A.click('[data-pa="logout"]'); A.wait_for_load_state('load'); A.wait_for_timeout(1000)
     A.click('[data-pa="open"][data-v="login"]'); A.click('[data-pa="go"][data-v="recover"]')
     t('«Password dimenticata?» apre il recupero', 'codice di recupero' in A.inner_text('.k-sheet'))
-    A.fill('[name=u]', 'ale'); A.fill('[name=c]', 'AAAA-BBBB-CCCC'); A.fill('[name=p]', 'nuova123'); A.click('form [type=submit]'); A.wait_for_timeout(900)
+    A.fill('[name=u]', 'ale'); A.fill('[name=c]', 'AAAA-BBBB-CCCC'); A.fill('[name=p]', 'nuova123'); A.click('.k-sheet form [type=submit]'); A.wait_for_timeout(900)
     t('codice sbagliato: errore chiaro', 'sbagliati' in A.inner_text('.k-sheet'), A.inner_text('.k-sheet')[:300])
     A.screenshot(path=os.path.join(OUT, 'recupero.png'))
-    A.fill('[name=c]', code.lower()); A.click('form [type=submit]'); A.wait_for_selector('.pa-code', timeout=8000)
+    A.fill('[name=c]', code.lower()); A.click('.k-sheet form [type=submit]'); A.wait_for_selector('.pa-code', timeout=8000)
     code2 = A.inner_text('.pa-code').strip()
     t('codice giusto: password cambiata e codice nuovo', code2 != code and len(code2) == 14, code2)
     A.click('[data-pa="close"]'); A.wait_for_load_state('load'); A.wait_for_timeout(1200)
@@ -74,7 +74,7 @@ with sync_playwright() as p:
 
     # ---------- dispositivi: un secondo telefono, poi «Esci dagli altri» ----------
     A2 = ctx(); go(A2, '')
-    A2.click('[data-pa="open"][data-v="login"]'); A2.fill('[name=u]', 'Ale'); A2.fill('[name=p]', 'nuova123'); A2.click('form [type=submit]'); A2.wait_for_load_state('load'); A2.wait_for_timeout(1300)
+    A2.click('[data-pa="open"][data-v="login"]'); A2.fill('[name=u]', 'Ale'); A2.fill('[name=p]', 'nuova123'); A2.click('.k-sheet form [type=submit]'); A2.wait_for_load_state('load'); A2.wait_for_timeout(1300)
     t('secondo dispositivo collegato', 'Ale' in A2.inner_text('#account-slot'))
     A.click('#account-slot .k-me'); A.wait_for_timeout(700); A.click('[data-pa="go"][data-v="security"]'); A.wait_for_timeout(1000)
     t('due dispositivi in elenco', A.locator('.k-sheet .k-list .k-row').count() >= 2 and 'ultimo uso' in A.inner_text('.k-sheet').lower() and A.locator('[data-pa="others"]').count() == 1, A.inner_text('.k-sheet')[-400:])
@@ -100,7 +100,7 @@ with sync_playwright() as p:
     N.locator('#olist [data-act=lobbyjoin]').first.click(); N.wait_for_selector('.k-sheet')
     N.click('[data-pa="tab"][data-v="register"]')
     t('passando da Accedi a Registrati il motivo resta', 'serve un account' in N.inner_text('.k-sheet'))
-    N.fill('[name=u]', 'Sam'); N.fill('[name=p]', 'segreto1'); N.fill('[name=p2]', 'segreto1'); N.click('form [type=submit]')
+    N.fill('[name=u]', 'Sam'); N.fill('[name=p]', 'segreto1'); N.fill('[name=p2]', 'segreto1'); N.click('.k-sheet form [type=submit]')
     N.wait_for_selector('.pa-code'); N.click('[data-pa="close"]'); N.wait_for_load_state('load')
     t('dopo l’accesso Sam si ritrova seduto al tavolo scelto', wait(N, "window.App && App.doc && App.doc.code === '%s' && App.doc.seats.some(function (s) { return s.uid === Net.uid && s.acct === 'Sam' })" % tcode, 15000), N.evaluate('location.href'))
 

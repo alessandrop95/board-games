@@ -666,20 +666,19 @@ var Net = (function () {
     hostApply(function (w) { if (w.owner === uid || !seatedHuman(w, w.owner)) return false; w.host = w.owner; return true; });
   }
   // Lo stato arriva da un server pubblico e chiunque può pubblicarne uno: il tipo delle voci del registro
-  // finisce dentro gli attributi class delle pagine, quindi si accettano solo nomi semplici (o numeri).
+  // finisce dentro gli attributi class delle pagine, quindi nella copia data alla pagina si accettano solo nomi semplici (o numeri).
   function cleanLog(d) {
     var g = d && d.game; if (!g || !Array.isArray(g.log)) return;
     g.log.forEach(function (l) { if (l && typeof l.k !== 'number' && !/^[A-Za-z0-9_-]{0,24}$/.test(String(l.k))) l.k = 'sys'; });
   }
   function accept(d) {
-    cleanLog(d);
     T.doc = d;
     var shouldHost = d.host === uid;
     if (shouldHost && !T.isHost) { T.isHost = true; T.hostRev = d.rev || 0; T.c.subscribe(topic(T.code, 'act')); T.c.publish(topic(T.code, 'ping'), String(Date.now()), false); }
     if (!shouldHost && T.isHost) { T.isHost = false; T.c.unsubscribe(topic(T.code, 'act')); }
     if (T.isHost && !d.lobbyId) { setTimeout(function () { hostApply(function (w) { if (w.lobbyId) return false; w.lobbyId = rid(); w.vis = w.vis || 'public'; return true; }); }, 0); }
     else if (T.isHost && !T.unpub && !T.resync) announce(false);
-    T.onDoc(JSON.parse(JSON.stringify(d)));
+    var view = JSON.parse(JSON.stringify(d)); cleanLog(view); T.onDoc(view);   // si ripulisce solo la copia per la pagina, non lo stato del tavolo
   }
   // Annuncio del tavolo nella lista pubblica (messaggio "retained" per tavolo, aggiornato dall'host).
   // I tavoli "solo su invito" compaiono senza codice.

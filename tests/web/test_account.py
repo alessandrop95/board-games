@@ -28,10 +28,10 @@ with sync_playwright() as p:
     A.fill('#nick', 'Ale'); A.click('[data-act=create]'); A.wait_for_timeout(400)
     t('per aprire un tavolo serve l’account', A.locator('.k-sheet').count() == 1 and 'serve un account' in A.inner_text('.k-sheet'))
     A.screenshot(path=S + 'login.png')
-    A.click('[data-pa="tab"][data-v="register"]'); A.fill('[name=u]', 'Ale'); A.fill('[name=p]', 'segreto1'); A.fill('[name=p2]', 'segreto2'); A.click('form [type=submit]'); A.wait_for_timeout(300)
+    A.click('[data-pa="tab"][data-v="register"]'); A.fill('[name=u]', 'Ale'); A.fill('[name=p]', 'segreto1'); A.fill('[name=p2]', 'segreto2'); A.click('.k-sheet form [type=submit]'); A.wait_for_timeout(300)
     t('password diverse', 'non coincidono' in A.inner_text('.k-sheet'))
     t('la scelta «Mostra» fa vedere la password', A.get_attribute('[name=p]', 'type') == 'password' and (A.click('[data-pa="eye"] >> nth=0') or True) and A.get_attribute('[name=p]', 'type') == 'text' and A.input_value('[name=p]') == 'segreto1')
-    A.fill('[name=p2]', 'segreto1'); A.click('form [type=submit]'); A.wait_for_selector('.pa-code', timeout=8000)
+    A.fill('[name=p2]', 'segreto1'); A.click('.k-sheet form [type=submit]'); A.wait_for_selector('.pa-code', timeout=8000)
     codeA = A.inner_text('.pa-code').strip()
     import re
     t('dopo la registrazione compare il codice di recupero', bool(re.match(r'^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$', codeA)), codeA)
@@ -47,9 +47,9 @@ with sync_playwright() as p:
     # Bea dalla home
     B.goto(B8 + '?' + Q); B.wait_for_timeout(1200)
     B.click('[data-pa="open"][data-v="login"]'); B.click('[data-pa="tab"][data-v="register"]')
-    B.fill('[name=u]', 'Ale'); B.fill('[name=p]', 'segreto1'); B.fill('[name=p2]', 'segreto1'); B.click('form [type=submit]'); B.wait_for_timeout(600)
+    B.fill('[name=u]', 'Ale'); B.fill('[name=p]', 'segreto1'); B.fill('[name=p2]', 'segreto1'); B.click('.k-sheet form [type=submit]'); B.wait_for_timeout(600)
     t('nome già preso', 'già preso' in B.inner_text('.k-sheet'))
-    B.fill('[name=u]', 'Bea'); B.click('form [type=submit]'); B.wait_for_selector('.pa-code', timeout=8000); B.click('[data-pa="close"]'); B.wait_for_load_state('load'); B.wait_for_timeout(1500)
+    B.fill('[name=u]', 'Bea'); B.click('.k-sheet form [type=submit]'); B.wait_for_selector('.pa-code', timeout=8000); B.click('[data-pa="close"]'); B.wait_for_load_state('load'); B.wait_for_timeout(1500)
     t('Bea registrata dalla home', 'Bea' in B.inner_text('#account-slot'))
     # Ale chiede l'amicizia a Bea
     A.click('[data-pa="open"][data-v="settings"]'); A.wait_for_timeout(600); A.click('[data-pa="go"][data-v="friends"]'); A.wait_for_timeout(400)
