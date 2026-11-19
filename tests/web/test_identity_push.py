@@ -40,7 +40,7 @@ with sync_playwright() as p:
         if not login: pg.click('[data-pa="tab"][data-v="register"]')
         pg.fill('[name=u]', name); pg.fill('[name=p]', 'segreto1')
         if not login: pg.fill('[name=p2]', 'segreto1')
-        pg.click('.k-sheet form [type=submit]')
+        pg.click('.kit-sheet form [type=submit]')
         if not login: pg.wait_for_selector('.pa-code', timeout=8000); pg.click('[data-pa="close"]')   # codice di recupero: «L’ho salvato»
         pg.wait_for_load_state('load'); pg.wait_for_timeout(1300)
 

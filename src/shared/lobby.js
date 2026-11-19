@@ -3,7 +3,7 @@ var Lobby = (function () {
   var stop = null, starting = false, list = null, failed = false, wanted = false, retryT = null;
   var css = '.vis-b{display:inline-block;font-size:11.5px;line-height:1;padding:3px 7px;border-radius:999px;border:1px solid currentColor;margin-left:6px;vertical-align:2px;white-space:nowrap;opacity:.85}' +
     '.olist{display:grid;gap:8px}' +
-    '.pinv{display:grid;gap:10px;padding:14px;border-radius:14px;background:color-mix(in srgb,var(--k-accent) 9%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--k-accent) 40%,transparent);font-family:var(--k-font)}.pinv p{margin:0;font-size:13.5px;opacity:.8;line-height:1.4}.pinv .k-btn{justify-self:start}' +
+    '.pinv{display:grid;gap:10px;padding:14px;border-radius:14px;background:color-mix(in srgb,var(--k-accent) 9%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--k-accent) 40%,transparent);font-family:var(--k-font)}.pinv p{margin:0;font-size:13.5px;opacity:.8;line-height:1.4}.pinv .kit-btn{justify-self:start}' +
     '.pi-back{position:fixed;inset:0;z-index:97;background:rgba(5,8,12,.62);display:flex;align-items:flex-end;justify-content:center}' +
     '.pi-sheet{width:100%;max-width:520px;background:#1b2128;color:#f1ece2;border:1px solid rgba(255,255,255,.12);border-bottom:0;border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;font:15px/1.4 system-ui,sans-serif}' +
     '@media(min-width:640px){.pi-back{align-items:center}.pi-sheet{border-radius:18px;border-bottom:1px solid rgba(255,255,255,.12)}}.pi-sheet h2{margin:0;font-size:20px}.pi-sheet p{margin:0;color:#cfc8ba}' +
@@ -103,15 +103,15 @@ var Lobby = (function () {
     direct: { ic: 'mail', t: 'Invita amico', d: 'Non lo vede nessuno: entra solo chi riceve da te un invito personale.' }
   };
   function choicesHTML(name, v, fr, attrs, disabled) {
-    return '<div class="k-choices" role="radiogroup" aria-label="Chi può sedersi"' + (attrs || '') + '>' + ['public', 'invite', 'friends', 'direct'].filter(function (k) { return k !== 'friends' || fr; }).map(function (k) {
+    return '<div class="kit-choices" role="radiogroup" aria-label="Chi può sedersi"' + (attrs || '') + '>' + ['public', 'invite', 'friends', 'direct'].filter(function (k) { return k !== 'friends' || fr; }).map(function (k) {
       var o = VIS[k];
-      return '<label class="k-choice"><input type="radio" name="' + name + '" value="' + k + '"' + (v === k ? ' checked' : '') + (disabled ? ' disabled' : '') + '>' + Kit.icon(o.ic, 20) + '<span><b>' + o.t + '</b><span>' + o.d + '</span></span></label>';
+      return '<label class="kit-choice"><input type="radio" name="' + name + '" value="' + k + '"' + (v === k ? ' checked' : '') + (disabled ? ' disabled' : '') + '>' + Kit.icon(o.ic, 20) + '<span><b>' + o.t + '</b><span>' + o.d + '</span></span></label>';
     }).join('') + '</div>';
   }
   function pickHTML() {
     var fr = window.Account && Account.user(), v0 = (function () { try { return localStorage.getItem('pp-vis'); } catch (x) { return null; } })();
     var v = v0 === 'invite' || v0 === 'direct' ? v0 : v0 === 'friends' && fr ? 'friends' : 'public';
-    return '<div class="vis-pick k-opt"><div class="k-opt-h"><b>Chi può sedersi</b></div>' + choicesHTML('vis', v, fr) + '</div>';
+    return '<div class="vis-pick kit-opt"><div class="kit-opt-h"><b>Chi può sedersi</b></div>' + choicesHTML('vis', v, fr) + '</div>';
   }
   function pickedVis() {
     var el = document.querySelector('input[name="vis"]:checked'), v = el && (el.value === 'invite' || el.value === 'friends' || el.value === 'direct') ? el.value : 'public';
@@ -121,20 +121,20 @@ var Lobby = (function () {
   function roomHTML(doc, isHost) {
     ensureCss();
     var v = doc.vis === 'invite' || doc.vis === 'friends' || doc.vis === 'direct' ? doc.vis : 'public', fr = v === 'friends' || (window.Account && Account.user());
-    if (doc.practice) return (window.Score ? Score.roomHTML(doc, isHost) : '') + '<p class="k-opt-d">Partita di prova: il tavolo non compare nella lista.</p>';
+    if (doc.practice) return (window.Score ? Score.roomHTML(doc, isHost) : '') + '<p class="kit-opt-d">Partita di prova: il tavolo non compare nella lista.</p>';
     var opts = ['public', 'invite', 'friends', 'direct'].filter(function (k) { return k !== 'friends' || fr; });
     var vis = isHost
-      ? choicesHTML('kseg-opt-vis', v, fr, ' data-k-for="opt-vis"') + '<select id="opt-vis" class="k-vh" data-k-done tabindex="-1" aria-hidden="true">' + opts.map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + VIS[k].t + '</option>'; }).join('') + '</select>'
-      : '<div class="k-choices"><div class="k-choice" style="cursor:default;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)">' + Kit.icon(VIS[v].ic, 20) + '<span><b>' + VIS[v].t + '</b><span>' + VIS[v].d + '</span></span></div></div>';
-    return '<div class="k-opt"><div class="k-opt-h"><b>Chi può sedersi</b>' + (isHost ? '' : '<small>lo sceglie l’host</small>') + '</div>' + vis + '</div>' +
+      ? choicesHTML('kseg-opt-vis', v, fr, ' data-k-for="opt-vis"') + '<select id="opt-vis" class="kit-vh" data-k-done tabindex="-1" aria-hidden="true">' + opts.map(function (k) { return '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + VIS[k].t + '</option>'; }).join('') + '</select>'
+      : '<div class="kit-choices"><div class="kit-choice" style="cursor:default;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)">' + Kit.icon(VIS[v].ic, 20) + '<span><b>' + VIS[v].t + '</b><span>' + VIS[v].d + '</span></span></div></div>';
+    return '<div class="kit-opt"><div class="kit-opt-h"><b>Chi può sedersi</b>' + (isHost ? '' : '<small>lo sceglie l’host</small>') + '</div>' + vis + '</div>' +
       (v === 'direct' ? privateHTML(doc, isHost) : '') + (window.Score ? Score.roomHTML(doc, isHost) : '') + (window.Account && Account.user() ? '<div>' + Account.inviteHTML() + '</div>' : '');
   }
   /* --- «Invita amico»: inviti personali (un link per persona) --- */
   function privateHTML(doc, isHost) {
     var ks = doc.keys || [], used = ks.filter(function (k) { return k.u; }).length;
-    return '<div class="pinv"><div class="k-opt-h"><b>' + Kit.icon('mail', 18).replace('class="k-ic"', 'class="k-ic" style="display:inline;vertical-align:-3px;margin-right:6px"') + 'Inviti personali</b>' + (ks.length ? '<small>' + used + ' usati su ' + ks.length + '</small>' : '') + '</div><p>' +
+    return '<div class="pinv"><div class="kit-opt-h"><b>' + Kit.icon('mail', 18).replace('class="kit-ic"', 'class="kit-ic" style="display:inline;vertical-align:-3px;margin-right:6px"') + 'Inviti personali</b>' + (ks.length ? '<small>già usati: ' + used + ' su ' + ks.length + '</small>' : '') + '</div><p>' +
       (isHost ? 'Ogni invito è un link per una sola persona: chi lo apre per primo si siede, poi per gli altri non vale più.' : 'Al tavolo entra solo chi viene invitato da chi l’ha aperto.') + '</p>' +
-      (isHost ? '<button type="button" class="k-btn" data-lobby="pinvite">Crea un invito personale</button>' : '') + '</div>';
+      (isHost ? '<button type="button" class="kit-btn" data-lobby="pinvite">Crea un invito personale</button>' : '') + '</div>';
   }
   function toast(t) { ensureCss(); var d = document.createElement('div'); d.className = 'pi-toast'; d.setAttribute('role', 'status'); d.textContent = t; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3600); }
   var api = null;

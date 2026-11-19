@@ -183,21 +183,21 @@ var Account = (function () {
       .then(function (r) { statsData = r[0]; boardData = r[1]; render(); }, function (er) { msg = { t: String(er) }; render(); });
   }
   function statsHTML() {
-    if (!statsData) return msgHTML() + '<div class="k-empty">Carico le tue partite…</div>';
+    if (!statsData) return msgHTML() + '<div class="kit-empty">Carico le tue partite…</div>';
     var gs = statsData.games, tp = 0, tw = 0; gs.forEach(function (x) { tp += x.played; tw += x.won; });
-    var h = msgHTML() + '<div class="k-stat"><div><b>' + tp + '</b><small>partite</small></div><div><b>' + tw + '</b><small>vinte</small></div><div><b>' + Math.round(100 * tw / Math.max(1, tp)) + '%</b><small>vittorie</small></div></div>';
+    var h = msgHTML() + '<div class="kit-stat"><div><b>' + tp + '</b><small>partite</small></div><div><b>' + tw + '</b><small>vinte</small></div><div><b>' + Math.round(100 * tw / Math.max(1, tp)) + '%</b><small>vittorie</small></div></div>';
     h += gs.length ? Kit.group('Per gioco', gs.map(function (x) {
-      return Kit.row({ title: esc(gameName(x.game)), sub: x.won + ' vinte su ' + x.played, right: '<span class="k-pill' + (x.won ? ' a' : '') + '">' + Math.round(100 * x.won / Math.max(1, x.played)) + '%</span>' });
-    })) : '<p class="k-note">Ancora nessuna partita registrata: si contano quelle finite da quando hai l’account (non le partite di prova).</p>';
-    h += '<section class="k-group"><h3 class="k-gtitle">Classifica tra amici</h3><div class="k-scroll-x"><button type="button" class="k-chipbtn' + (boardGame ? '' : ' on') + '" data-pa="board" data-g="">Tutti i giochi</button>' +
-      (A.GAMES || []).map(function (g) { var id = g.path.replace(/\/$/, ''); return '<button type="button" class="k-chipbtn' + (boardGame === id ? ' on' : '') + '" data-pa="board" data-g="' + id + '">' + esc(g.n) + '</button>'; }).join('') + '</div>' +
-      (boardData && boardData.length ? '<div class="k-list">' + boardData.map(function (r, i) {
-        return Kit.row({ title: esc(r.username) + (r.me ? ' <span class="k-pill a">tu</span>' : ''), sub: r.won + ' vinte · ' + r.played + ' giocate', right: '<span class="k-rv">' + (i + 1) + 'º</span>' });
-      }).join('') + '</div>' : '<p class="k-note">Nessun risultato.</p>') + '</section>';
+      return Kit.row({ title: esc(gameName(x.game)), sub: x.won + ' vinte su ' + x.played, right: '<span class="kit-pill' + (x.won ? ' a' : '') + '">' + Math.round(100 * x.won / Math.max(1, x.played)) + '%</span>' });
+    })) : '<p class="kit-note">Ancora nessuna partita registrata: si contano quelle finite da quando hai l’account (non le partite di prova).</p>';
+    h += '<section class="kit-group"><h3 class="kit-gtitle">Classifica tra amici</h3><div class="kit-scroll-x"><button type="button" class="kit-chipbtn' + (boardGame ? '' : ' on') + '" data-pa="board" data-g="">Tutti i giochi</button>' +
+      (A.GAMES || []).map(function (g) { var id = g.path.replace(/\/$/, ''); return '<button type="button" class="kit-chipbtn' + (boardGame === id ? ' on' : '') + '" data-pa="board" data-g="' + id + '">' + esc(g.n) + '</button>'; }).join('') + '</div>' +
+      (boardData && boardData.length ? '<div class="kit-list">' + boardData.map(function (r, i) {
+        return Kit.row({ title: esc(r.username) + (r.me ? ' <span class="kit-pill a">tu</span>' : ''), sub: r.won + ' vinte · ' + r.played + ' giocate', right: '<span class="kit-rv">' + (i + 1) + 'º</span>' });
+      }).join('') + '</div>' : '<p class="kit-note">Nessun risultato.</p>') + '</section>';
     if (statsData.recent.length) h += Kit.group('Ultime partite', statsData.recent.map(function (x) {
       var d = new Date(x.at), when = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
       return Kit.row({ title: esc(gameName(x.game)), sub: when + (x.rivals && x.rivals.length ? ' · con ' + x.rivals.map(esc).join(', ') : ''),
-        right: '<span class="k-pill' + (x.won ? ' ok' : '') + '">' + (x.won ? 'Vinta' : x.place ? x.place + 'º posto' : 'Persa') + (x.score != null ? ' · ' + x.score : '') + '</span>' });
+        right: '<span class="kit-pill' + (x.won ? ' ok' : '') + '">' + (x.won ? 'Vinta' : x.place ? x.place + 'º posto' : 'Persa') + (x.score != null ? ' · ' + x.score : '') + '</span>' });
     }));
     return h;
   }
@@ -212,15 +212,15 @@ var Account = (function () {
   /* ---------- grafica: pannello «Impostazioni» (profilo, amici, statistiche, notifiche, audio, app, account) ---------- */
   var TITLES = { settings: 'Impostazioni', friends: 'Amici', stats: 'Statistiche', security: 'Password e account', games: 'Nuovi tavoli', login: 'Accedi', register: 'Crea account', recover: 'Password dimenticata', code: 'Codice di recupero', invite: 'Invita un amico' };
   // stili propri del pannello (il resto viene dal kit): password con «Mostra», codice di recupero, avvisi
-  var CSS = '.pa-pw{position:relative;display:block}.pa-pw .k-input{padding-right:92px}' +
+  var CSS = '.pa-pw{position:relative;display:block}.pa-pw .kit-input{padding-right:92px}' +
     '.pa-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);appearance:none;border:0;background:var(--k-surface-3);color:var(--k-text);border-radius:9px;padding:7px 11px;font:600 13px var(--k-font);cursor:pointer}' +
     '.pa-code{font:700 24px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-align:center;padding:18px 10px;border-radius:16px;background:var(--k-surface);border:1.5px dashed var(--k-accent-ink);color:var(--k-text);user-select:all;-webkit-user-select:all}' +
-    '.k-warn{display:grid;gap:10px;padding:13px 14px;border-radius:16px;background:color-mix(in srgb,#e8a33c 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,#e8a33c 45%,transparent);font-size:14px;line-height:1.45}.k-warn .k-btn{justify-self:start}' +
-    '.k-link{appearance:none;border:0;background:none;color:var(--k-accent-ink);font:600 14.5px var(--k-font);text-decoration:underline;text-underline-offset:3px;padding:4px 0;cursor:pointer;justify-self:start}';
+    '.kit-warn{display:grid;gap:10px;padding:13px 14px;border-radius:16px;background:color-mix(in srgb,#e8a33c 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,#e8a33c 45%,transparent);font-size:14px;line-height:1.45}.kit-warn .kit-btn{justify-self:start}' +
+    '.kit-link{appearance:none;border:0;background:none;color:var(--k-accent-ink);font:600 14.5px var(--k-font);text-decoration:underline;text-underline-offset:3px;padding:4px 0;cursor:pointer;justify-self:start}';
   function css() { Kit.css(); if (!document.getElementById('pa-css')) { var s = document.createElement('style'); s.id = 'pa-css'; s.textContent = CSS; document.head.appendChild(s); } }
   function toastMsg(t) { Kit.toast(t); }
   function close() {
-    var m = document.querySelector('.k-back[data-pa-sheet]'); if (m) m.remove(); view = null; msg = null; showPw = false;
+    var m = document.querySelector('.kit-back[data-pa-sheet]'); if (m) m.remove(); view = null; msg = null; showPw = false;
     if (reloadOnClose) { reloadOnClose = false; reloadSoon(); }   // appena entrati: ora che il codice di recupero è stato visto, si riparte con l'account
   }
   function open(v, extra) {
@@ -236,33 +236,33 @@ var Account = (function () {
   function go(v) {
     // passando tra accesso, registrazione e recupero si tiene il motivo e quello che si stava facendo
     var keep = view && view.x && (view.x.why || view.x.intent) && /^(login|register|recover)$/.test(v) ? { why: view.x.why, intent: view.x.intent } : {};
-    view = { v: v, x: keep }; msg = null; render(); var s = document.querySelector('.k-back[data-pa-sheet] .k-sheet'); if (s) s.scrollTop = 0;
+    view = { v: v, x: keep }; msg = null; render(); var s = document.querySelector('.kit-back[data-pa-sheet] .kit-sheet'); if (s) s.scrollTop = 0;
     if (view.v === 'friends') refreshFriends(true).then(render, function () {});
     if (view.v === 'security') { devices = null; loadDevices(); }
     if (view.v === 'stats') { statsData = null; loadStats(); }
   }
   function render() {
     if (!view) return;
-    var back = document.querySelector('.k-back[data-pa-sheet]');
+    var back = document.querySelector('.kit-back[data-pa-sheet]');
     if (!back) {
-      back = document.createElement('div'); back.className = 'k-back'; back.setAttribute('data-pa-sheet', '');
+      back = document.createElement('div'); back.className = 'kit-back'; back.setAttribute('data-pa-sheet', '');
       back.addEventListener('click', function (e) { if (e.target === back) close(); });
       document.body.appendChild(back);
     }
     var focused = document.activeElement && back.contains(document.activeElement) ? document.activeElement.name : null, vals = {};
     back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (i.name) vals[i.name] = i.value; });
-    var sheet = back.querySelector('.k-sheet'), top = sheet ? sheet.scrollTop : 0, sub = view.v !== 'settings' && !((view.v === 'login' || view.v === 'register') && view.x.why) && view.v !== 'invite' && view.v !== 'code';
+    var sheet = back.querySelector('.kit-sheet'), top = sheet ? sheet.scrollTop : 0, sub = view.v !== 'settings' && !((view.v === 'login' || view.v === 'register') && view.x.why) && view.v !== 'invite' && view.v !== 'code';
     var auth = view.v === 'login' || view.v === 'register';
     var backTo = view.v === 'recover' ? 'login' : 'settings';
-    back.innerHTML = '<div class="k-sheet" role="dialog" aria-modal="true" aria-labelledby="pa-title"><div class="k-head">' +
-      (sub ? '<button type="button" class="k-icbtn" data-pa="go" data-v="' + backTo + '" aria-label="Indietro">' + Kit.icon('back') + '</button>' : '<span class="k-icbtn ghost"></span>') +
+    back.innerHTML = '<div class="kit-sheet" role="dialog" aria-modal="true" aria-labelledby="pa-title"><div class="kit-head">' +
+      (sub ? '<button type="button" class="kit-icbtn" data-pa="go" data-v="' + backTo + '" aria-label="Indietro">' + Kit.icon('back') + '</button>' : '<span class="kit-icbtn ghost"></span>') +
       '<h2 id="pa-title">' + (auth ? (view.v === 'register' ? 'Crea il tuo account' : 'Entra in Board Games') : TITLES[view.v] || '') + '</h2>' +
-      '<button type="button" class="k-icbtn" data-pa="close" aria-label="Chiudi">' + Kit.icon('x') + '</button></div><div class="k-body">' + body() + '</div></div>';
-    sheet = back.querySelector('.k-sheet'); sheet.scrollTop = top;
+      '<button type="button" class="kit-icbtn" data-pa="close" aria-label="Chiudi">' + Kit.icon('x') + '</button></div><div class="kit-body">' + body() + '</div></div>';
+    sheet = back.querySelector('.kit-sheet'); sheet.scrollTop = top;
     back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (vals[i.name] != null) i.value = vals[i.name]; });
     var f = focused && back.querySelector('[name="' + focused + '"]'); if (f) f.focus();
   }
-  function msgHTML() { return msg ? '<p class="k-msg ' + (msg.ok ? 'ok' : 'err') + '" role="status">' + esc(msg.t) + '</p>' : ''; }
+  function msgHTML() { return msg ? '<p class="kit-msg ' + (msg.ok ? 'ok' : 'err') + '" role="status">' + esc(msg.t) + '</p>' : ''; }
   function myNick() { return (get('pp-nick') || '').trim().slice(0, 18); }
 
   function body() {
@@ -284,13 +284,13 @@ var Account = (function () {
     var who = u ? u.username : nick || 'Ospite';
     var sub = u ? 'Account Board Games' + (d && d.friends ? ' · ' + d.friends.length + (d.friends.length === 1 ? ' amico' : ' amici') + (online ? ', ' + online + ' in linea' : '') : '')
       : configured() ? 'Accedi per ritrovare amici, inviti e notifiche su tutti i tuoi dispositivi.' : 'Giochi senza account: il nome resta su questo dispositivo.';
-    h += '<div class="k-list"><div class="k-row" style="min-height:76px">' + Kit.avatar(who === 'Ospite' ? '' : who, 'lg') + '<span class="k-rt"><b style="font-size:17px">' + esc(who) + '</b><small>' + esc(sub) + '</small></span>' +
-      (configured() && !u ? '<button type="button" class="k-btn sm" data-pa="go" data-v="login">Accedi</button>' : '') + '</div></div>';
-    if (u && hasRecovery === false) h += '<div class="k-warn"><span><b>Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso (amici e statistiche compresi).</span><button class="k-btn sm" type="button" data-pa="rec">Crea il codice di recupero</button></div>';
+    h += '<div class="kit-list"><div class="kit-row" style="min-height:76px">' + Kit.avatar(who === 'Ospite' ? '' : who, 'lg') + '<span class="kit-rt"><b style="font-size:17px">' + esc(who) + '</b><small>' + esc(sub) + '</small></span>' +
+      (configured() && !u ? '<button type="button" class="kit-btn sm" data-pa="go" data-v="login">Accedi</button>' : '') + '</div></div>';
+    if (u && hasRecovery === false) h += '<div class="kit-warn"><span><b>Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso (amici e statistiche compresi).</span><button class="kit-btn sm" type="button" data-pa="rec">Crea il codice di recupero</button></div>';
     // al tavolo
-    h += Kit.group('Al tavolo', [Kit.row({ ic: 'user', title: 'Il tuo nome', sub: 'Lo vedono gli altri al tavolo', right: '<input class="k-input" type="text" name="nick" data-pa-nick maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(nick) + '" aria-label="Il tuo nome al tavolo">', tag: 'label' })]);
+    h += Kit.group('Al tavolo', [Kit.row({ ic: 'user', title: 'Il tuo nome', sub: 'Lo vedono gli altri al tavolo', right: '<input class="kit-input" type="text" name="nick" data-pa-nick maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(nick) + '" aria-label="Il tuo nome al tavolo">', tag: 'label' })]);
     if (u) h += Kit.group('Amici e partite', [
-      Kit.row({ ic: 'users', title: 'Amici', sub: n ? n + (n === 1 ? ' richiesta di amicizia' : ' richieste di amicizia') : 'Invitali ai tavoli con una notifica', right: n ? '<span class="k-badge">' + n + '</span>' : '', attrs: 'data-pa="go" data-v="friends"', chev: true }),
+      Kit.row({ ic: 'users', title: 'Amici', sub: n ? n + (n === 1 ? ' richiesta di amicizia' : ' richieste di amicizia') : 'Invitali ai tavoli con una notifica', right: n ? '<span class="kit-badge">' + n + '</span>' : '', attrs: 'data-pa="go" data-v="friends"', chev: true }),
       Kit.row({ ic: 'chart', title: 'Statistiche', sub: 'Le tue partite e la classifica tra amici', attrs: 'data-pa="go" data-v="stats"', chev: true })
     ]);
     if (window.Alerts && Alerts.notifyHTML) h += Alerts.notifyHTML();
@@ -299,8 +299,8 @@ var Account = (function () {
       Kit.row({ ic: 'sound', title: 'Effetti sonori', right: Kit.sw('data-pa-snd="s" aria-label="Effetti sonori"', Sound.sfxOn), tag: 'label' })
     ]);
     var app = [];
-    app.push('<div class="k-row" style="flex-wrap:wrap;row-gap:10px"><span class="k-ri">' + Kit.icon('sun', 18) + '</span><span class="k-rt"><b>Aspetto</b><small>Automatico segue il tema del telefono</small></span>' +
-      '<div style="flex:1 1 100%">' + Kit.seg('k-theme-pick', [['auto', 'Automatico'], ['dark', 'Scuro'], ['light', 'Chiaro']], Kit.themePref()) + '</div></div>');
+    app.push('<div class="kit-row" style="flex-wrap:wrap;row-gap:10px"><span class="kit-ri">' + Kit.icon('sun', 18) + '</span><span class="kit-rt"><b>Aspetto</b><small>Automatico segue il tema del telefono</small></span>' +
+      '<div style="flex:1 1 100%">' + Kit.seg('kit-theme-pick', [['auto', 'Automatico'], ['dark', 'Scuro'], ['light', 'Chiaro']], Kit.themePref()) + '</div></div>');
     if (window.PWA && PWA.available && PWA.available()) app.push(Kit.row({ ic: 'download', title: PWA.apk && PWA.apk() ? 'Scarica l’app' : 'Installa l’app', sub: 'Si apre a tutto schermo, come un’app vera', attrs: 'data-pa="install"', chev: true }));
     if (A.here) app.push(Kit.row({ ic: 'grid', title: 'Tutti i giochi', sub: 'Torna alla home di Board Games', href: ROOT, chev: true }));
     if (app.length) h += Kit.group('App', app);
@@ -311,81 +311,81 @@ var Account = (function () {
     return h;
   }
   function authHTML(reg) {
-    return (view.x.why ? '<p class="k-note" style="font-size:15px;color:var(--k-text)">' + esc(view.x.why) + '</p>' : '') +
-      '<div class="k-tabs" role="tablist"><button type="button" role="tab" class="' + (!reg ? 'on' : '') + '" data-pa="tab" data-v="login">Accedi</button><button type="button" role="tab" class="' + (reg ? 'on' : '') + '" data-pa="tab" data-v="register">Registrati</button></div>' +
-      '<form class="k-form" data-pa-form="' + (reg ? 'register' : 'login') + '" autocomplete="on"><label class="k-field">Nome utente<input class="k-input" type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></label>' +
+    return (view.x.why ? '<p class="kit-note" style="font-size:15px;color:var(--k-text)">' + esc(view.x.why) + '</p>' : '') +
+      '<div class="kit-tabs" role="tablist"><button type="button" role="tab" class="' + (!reg ? 'on' : '') + '" data-pa="tab" data-v="login">Accedi</button><button type="button" role="tab" class="' + (reg ? 'on' : '') + '" data-pa="tab" data-v="register">Registrati</button></div>' +
+      '<form class="kit-form" data-pa-form="' + (reg ? 'register' : 'login') + '" autocomplete="on"><label class="kit-field">Nome utente<input class="kit-input" type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></label>' +
       pwField('Password', 'p', reg ? 'new-password' : 'current-password', reg ? 'next' : 'go') +
       (reg ? pwField('Ripeti la password', 'p2', 'new-password', 'go') : '') + msgHTML() +
-      '<button class="k-btn block" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : reg ? 'Crea account' : 'Accedi') + '</button></form>' +
-      (reg ? '' : '<button type="button" class="k-link" data-pa="go" data-v="recover">Password dimenticata?</button>') +
-      '<p class="k-note">' + (reg ? 'Nome da 3 a 18 caratteri tra lettere, numeri, punto e trattini; password di almeno 6. Niente email: subito dopo ricevi un <b>codice di recupero</b>, che serve se dimentichi la password.' : 'Con l’account ritrovi amici, inviti, statistiche e notifiche su tutti i tuoi dispositivi, e resti collegato finché non esci tu.') + '</p>' +
-      (view.x.why ? '<button class="k-btn sec block" data-pa="close" type="button">Non ora</button>' : '');
+      '<button class="kit-btn block" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : reg ? 'Crea account' : 'Accedi') + '</button></form>' +
+      (reg ? '' : '<button type="button" class="kit-link" data-pa="go" data-v="recover">Password dimenticata?</button>') +
+      '<p class="kit-note">' + (reg ? 'Nome da 3 a 18 caratteri tra lettere, numeri, punto e trattini; password di almeno 6. Niente email: subito dopo ricevi un <b>codice di recupero</b>, che serve se dimentichi la password.' : 'Con l’account ritrovi amici, inviti, statistiche e notifiche su tutti i tuoi dispositivi, e resti collegato finché non esci tu.') + '</p>' +
+      (view.x.why ? '<button class="kit-btn sec block" data-pa="close" type="button">Non ora</button>' : '');
   }
   function recoverHTML() {
-    return '<p class="k-note">Scrivi il tuo nome utente, il <b>codice di recupero</b> che hai ricevuto quando hai creato l’account (12 caratteri, tipo ABCD-EFGH-JKLM) e la nuova password.</p>' +
-      '<form class="k-form" data-pa-form="recover" autocomplete="off"><label class="k-field">Nome utente<input class="k-input" type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>' +
-      '<label class="k-field">Codice di recupero<input class="k-input" type="text" name="c" maxlength="20" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH-JKLM" required></label>' +
+    return '<p class="kit-note">Scrivi il tuo nome utente, il <b>codice di recupero</b> che hai ricevuto quando hai creato l’account (12 caratteri, tipo ABCD-EFGH-JKLM) e la nuova password.</p>' +
+      '<form class="kit-form" data-pa-form="recover" autocomplete="off"><label class="kit-field">Nome utente<input class="kit-input" type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>' +
+      '<label class="kit-field">Codice di recupero<input class="kit-input" type="text" name="c" maxlength="20" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH-JKLM" required></label>' +
       pwField('Nuova password', 'p', 'new-password', 'go') + msgHTML() +
-      '<button class="k-btn block" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : 'Cambia password ed entra') + '</button></form>' +
-      '<p class="k-note">Non hai il codice? Se sei ancora collegato su un altro dispositivo, da lì puoi crearne uno nuovo (Impostazioni → Password e account) o cambiare la password. Altrimenti l’account non si può recuperare: creane uno nuovo.</p>';
+      '<button class="kit-btn block" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : 'Cambia password ed entra') + '</button></form>' +
+      '<p class="kit-note">Non hai il codice? Se sei ancora collegato su un altro dispositivo, da lì puoi crearne uno nuovo (Impostazioni → Password e account) o cambiare la password. Altrimenti l’account non si può recuperare: creane uno nuovo.</p>';
   }
   function codeHTML() {
     return '<p>Se un giorno dimentichi la password, con questo codice ne scegli una nuova. <b>Lo vedi solo adesso</b>: scrivilo, copialo nelle note o fai uno screenshot.</p>' +
       '<div class="pa-code" data-code>' + esc(view.x.code) + '</div>' + msgHTML() +
-      '<button class="k-btn sec block" type="button" data-pa="copycode">Copia il codice</button>' +
-      '<p class="k-note">Vale una volta sola: quando lo usi ne ricevi uno nuovo.' + (view.x.fresh ? '' : ' Il codice di prima non vale più.') + '</p>' +
-      '<button class="k-btn block" type="button" data-pa="close">L’ho salvato</button>';
+      '<button class="kit-btn sec block" type="button" data-pa="copycode">Copia il codice</button>' +
+      '<p class="kit-note">Vale una volta sola: quando lo usi ne ricevi uno nuovo.' + (view.x.fresh ? '' : ' Il codice di prima non vale più.') + '</p>' +
+      '<button class="kit-btn block" type="button" data-pa="close">L’ho salvato</button>';
   }
   // Campo password con «Mostra»: sul telefono si sbaglia facilmente a scrivere alla cieca.
   function pwField(lab, name, auto, hint) {
-    return '<label class="k-field">' + lab + '<span class="pa-pw"><input class="k-input" type="' + (showPw ? 'text' : 'password') + '" name="' + name + '" maxlength="72" autocomplete="' + auto + '" autocapitalize="none" autocorrect="off" spellcheck="false"' + (hint ? ' enterkeyhint="' + hint + '"' : '') + ' required>' +
+    return '<label class="kit-field">' + lab + '<span class="pa-pw"><input class="kit-input" type="' + (showPw ? 'text' : 'password') + '" name="' + name + '" maxlength="72" autocomplete="' + auto + '" autocapitalize="none" autocorrect="off" spellcheck="false"' + (hint ? ' enterkeyhint="' + hint + '"' : '') + ' required>' +
       '<button type="button" class="pa-eye" data-pa="eye" aria-pressed="' + showPw + '" aria-label="' + (showPw ? 'Nascondi la password' : 'Mostra la password') + '">' + (showPw ? 'Nascondi' : 'Mostra') + '</button></span></label>';
   }
   function friendsHTML() {
     var d = friendsData, fr = d ? d.friends : null, inc = d ? d.incoming : [], out = d ? d.outgoing : [];
-    var h = msgHTML() + '<form class="k-inline" data-pa-form="friend"><input class="k-input" type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" aria-label="Nome utente dell’amico" required><button class="k-btn" type="submit">Aggiungi</button></form>';
+    var h = msgHTML() + '<form class="kit-inline" data-pa-form="friend"><input class="kit-input" type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" aria-label="Nome utente dell’amico" required><button class="kit-btn" type="submit">Aggiungi</button></form>';
     if (inc.length) h += Kit.group('Richieste di amicizia', inc.map(function (n) {
-      return Kit.row({ title: esc(n), sub: 'vuole essere tuo amico', right: '<button type="button" class="k-btn sm" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button type="button" class="k-btn sm sec" data-pa="decline" data-u="' + esc(n) + '">Rifiuta</button>' });
+      return Kit.row({ title: esc(n), sub: 'vuole essere tuo amico', right: '<button type="button" class="kit-btn sm" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button type="button" class="kit-btn sm sec" data-pa="decline" data-u="' + esc(n) + '">Rifiuta</button>' });
     }));
-    if (fr == null) h += '<div class="k-empty">Carico i tuoi amici…</div>';
-    else if (!fr.length) h += '<div class="k-empty">' + Kit.icon('users', 28) + '<b style="color:var(--k-text)">Nessun amico per ora</b>Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica e confrontare le statistiche.</div>';
+    if (fr == null) h += '<div class="kit-empty">Carico i tuoi amici…</div>';
+    else if (!fr.length) h += '<div class="kit-empty">' + Kit.icon('users', 28) + '<b style="color:var(--k-text)">Nessun amico per ora</b>Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica e confrontare le statistiche.</div>';
     else h += Kit.group('I tuoi amici', fr.map(function (f) {
       var j = joinHref(f);
-      return '<div class="k-row">' + Kit.avatar(f.username, 'sm') + '<span class="k-rt"><b>' + esc(f.username) + '</b><small><span class="k-dot' + (f.online ? ' on' : '') + '" style="display:inline-block;margin-right:6px;vertical-align:1px"></span>' + esc(friendLine(f)) + '</small></span>' +
-        (j ? '<a class="k-btn sm" href="' + esc(j) + '">' + (f.phase === 'lobby' ? 'Raggiungi' : 'Guarda') + '</a>' : '') +
-        (view.x.unf === f.username ? '<button type="button" class="k-btn sm danger" data-pa="unfriend" data-u="' + esc(f.username) + '">Togli</button>'
-          : '<button type="button" class="k-icbtn" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici" title="Togli dagli amici">' + Kit.icon('x', 16) + '</button>') + '</div>';
+      return '<div class="kit-row">' + Kit.avatar(f.username, 'sm') + '<span class="kit-rt"><b>' + esc(f.username) + '</b><small><span class="kit-dot' + (f.online ? ' on' : '') + '" style="display:inline-block;margin-right:6px;vertical-align:1px"></span>' + esc(friendLine(f)) + '</small></span>' +
+        (j ? '<a class="kit-btn sm" href="' + esc(j) + '">' + (f.phase === 'lobby' ? 'Raggiungi' : 'Guarda') + '</a>' : '') +
+        (view.x.unf === f.username ? '<button type="button" class="kit-btn sm danger" data-pa="unfriend" data-u="' + esc(f.username) + '">Togli</button>'
+          : '<button type="button" class="kit-icbtn" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici" title="Togli dagli amici">' + Kit.icon('x', 16) + '</button>') + '</div>';
     }));
-    if (out.length) h += '<p class="k-note">In attesa di risposta: ' + out.map(esc).join(', ') + '</p>';
+    if (out.length) h += '<p class="kit-note">In attesa di risposta: ' + out.map(esc).join(', ') + '</p>';
     return h;
   }
   function inviteListHTML() {
     var x = view.x, fr = friendsData ? friendsData.friends : null;
-    var h = '<p class="k-note">Gli arriva una notifica: toccandola si siede al tavolo <b style="color:var(--k-text)">' + esc(x.code) + '</b>.</p>' + msgHTML();
-    if (fr == null) return h + '<div class="k-empty">Carico i tuoi amici…</div>';
-    if (!fr.length) return h + '<div class="k-empty">' + Kit.icon('users', 28) + 'Non hai ancora amici nella lista.</div><button type="button" class="k-btn sec block" data-pa="go" data-v="friends">Aggiungi amici</button>';
+    var h = '<p class="kit-note">Gli arriva una notifica: toccandola si siede al tavolo <b style="color:var(--k-text)">' + esc(x.code) + '</b>.</p>' + msgHTML();
+    if (fr == null) return h + '<div class="kit-empty">Carico i tuoi amici…</div>';
+    if (!fr.length) return h + '<div class="kit-empty">' + Kit.icon('users', 28) + 'Non hai ancora amici nella lista.</div><button type="button" class="kit-btn sec block" data-pa="go" data-v="friends">Aggiungi amici</button>';
     return h + Kit.group('', fr.map(function (f) {
       var sent = inviteSent[x.code + ':' + f.username];
-      return '<div class="k-row">' + Kit.avatar(f.username, 'sm') + '<span class="k-rt"><b>' + esc(f.username) + '</b><small><span class="k-dot' + (f.online ? ' on' : '') + '" style="display:inline-block;margin-right:6px;vertical-align:1px"></span>' + esc(friendLine(f)) + '</small></span>' +
-        '<button type="button" class="k-btn sm' + (sent ? ' sec' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato' : 'Invita') + '</button></div>';
-    })) + '<button type="button" class="k-btn sec block" data-pa="go" data-v="friends">Aggiungi amici</button>';
+      return '<div class="kit-row">' + Kit.avatar(f.username, 'sm') + '<span class="kit-rt"><b>' + esc(f.username) + '</b><small><span class="kit-dot' + (f.online ? ' on' : '') + '" style="display:inline-block;margin-right:6px;vertical-align:1px"></span>' + esc(friendLine(f)) + '</small></span>' +
+        '<button type="button" class="kit-btn sm' + (sent ? ' sec' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato' : 'Invita') + '</button></div>';
+    })) + '<button type="button" class="kit-btn sec block" data-pa="go" data-v="friends">Aggiungi amici</button>';
   }
   function securityHTML() {
     var h = msgHTML();
-    h += '<section class="k-group"><h3 class="k-gtitle">Dispositivi collegati</h3>';
-    if (devices == null) h += '<div class="k-empty">Carico…</div>';
+    h += '<section class="kit-group"><h3 class="kit-gtitle">Dispositivi collegati</h3>';
+    if (devices == null) h += '<div class="kit-empty">Carico…</div>';
     else if (devices.length) {
-      h += '<div class="k-list">' + devices.map(function (dv) { return Kit.row({ ic: 'phone', title: esc(dv.device), sub: dv.here ? 'Questo dispositivo' : 'Ultimo uso ' + ago(dv.used), right: dv.here ? '<span class="k-pill ok">Qui</span>' : '' }); }).join('') + '</div>';
-      h += devices.length > 1 ? '<button type="button" class="k-btn sec" data-pa="others">Esci dagli altri dispositivi</button>' : '<p class="k-note" style="padding:0 4px">Sei collegato solo da qui. L’accesso resta attivo finché non esci tu (o per 6 mesi senza usarlo).</p>';
+      h += '<div class="kit-list">' + devices.map(function (dv) { return Kit.row({ ic: 'phone', title: esc(dv.device), sub: dv.here ? 'Questo dispositivo' : 'Ultimo uso ' + ago(dv.used), right: dv.here ? '<span class="kit-pill ok">Qui</span>' : '' }); }).join('') + '</div>';
+      h += devices.length > 1 ? '<button type="button" class="kit-btn sec" data-pa="others">Esci dagli altri dispositivi</button>' : '<p class="kit-note" style="padding:0 4px">Sei collegato solo da qui. L’accesso resta attivo finché non esci tu (o per 6 mesi senza usarlo).</p>';
     }
     h += '</section>';
-    h += '<section class="k-group" id="pa-rec"><h3 class="k-gtitle">Codice di recupero</h3><form class="k-form" data-pa-form="recovery"><p class="k-note">' +
+    h += '<section class="kit-group" id="pa-rec"><h3 class="kit-gtitle">Codice di recupero</h3><form class="kit-form" data-pa-form="recovery"><p class="kit-note">' +
       (hasRecovery === false ? '<b style="color:var(--k-text)">Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso. ' : 'Serve se dimentichi la password. ') +
-      'Per crearne uno nuovo scrivi la tua password: il codice di prima, se c’era, non varrà più.</p>' + pwField('Password', 'r', 'current-password') + '<button class="k-btn" type="submit">Crea il codice</button></form></section>';
-    h += '<section class="k-group"><h3 class="k-gtitle">Cambia password</h3><form class="k-form" data-pa-form="password">' + pwField('Password attuale', 'o', 'current-password') + pwField('Nuova password', 'n', 'new-password') +
-      '<button class="k-btn" type="submit">Cambia password</button><p class="k-note">Gli altri dispositivi dovranno accedere di nuovo.</p></form></section>';
-    h += '<section class="k-group"><h3 class="k-gtitle" style="color:var(--k-danger)">Cancella account</h3><form class="k-form" data-pa-form="delete"><p class="k-note">Cancelli account, amici, statistiche e notifiche. Non si può annullare.</p>' +
-      pwField('Password', 'd', 'current-password') + '<button class="k-btn danger" type="submit">Cancella per sempre</button></form></section>';
+      'Per crearne uno nuovo scrivi la tua password: il codice di prima, se c’era, non varrà più.</p>' + pwField('Password', 'r', 'current-password') + '<button class="kit-btn" type="submit">Crea il codice</button></form></section>';
+    h += '<section class="kit-group"><h3 class="kit-gtitle">Cambia password</h3><form class="kit-form" data-pa-form="password">' + pwField('Password attuale', 'o', 'current-password') + pwField('Nuova password', 'n', 'new-password') +
+      '<button class="kit-btn" type="submit">Cambia password</button><p class="kit-note">Gli altri dispositivi dovranno accedere di nuovo.</p></form></section>';
+    h += '<section class="kit-group"><h3 class="kit-gtitle" style="color:var(--k-danger)">Cancella account</h3><form class="kit-form" data-pa-form="delete"><p class="kit-note">Cancelli account, amici, statistiche e notifiche. Non si può annullare.</p>' +
+      pwField('Password', 'd', 'current-password') + '<button class="kit-btn danger" type="submit">Cancella per sempre</button></form></section>';
     return h;
   }
   function repaint() {
@@ -397,12 +397,12 @@ var Account = (function () {
     css();
     var u = user(), n = incoming(), name = u ? u.username : myNick();
     var label = u ? esc(u.username) : configured() ? 'Accedi' : name ? esc(name) : 'Impostazioni';
-    return '<span data-pa-chip style="display:inline-flex;max-width:100%"><button type="button" class="k-me" data-pa="open" data-v="' + (u || !configured() ? 'settings' : 'login') + '" aria-label="Profilo e impostazioni">' +
-      Kit.avatar(u ? u.username : name, 'sm') + '<span>' + label + '</span>' + (n ? '<span class="k-badge" title="Richieste di amicizia">' + n + '</span>' : '') + Kit.icon('gear', 17) + '</button></span>';
+    return '<span data-pa-chip style="display:inline-flex;max-width:100%"><button type="button" class="kit-me" data-pa="open" data-v="' + (u || !configured() ? 'settings' : 'login') + '" aria-label="Profilo e impostazioni">' +
+      Kit.avatar(u ? u.username : name, 'sm') + '<span>' + label + '</span>' + (n ? '<span class="kit-badge" title="Richieste di amicizia">' + n + '</span>' : '') + Kit.icon('gear', 17) + '</button></span>';
   }
   function inviteHTML() {
     if (!user()) return '';
-    return '<button type="button" class="k-me" style="padding-left:12px" data-pa="openinvite">' + Kit.icon('mail', 17) + '<span>Invita un amico</span></button>';
+    return '<button type="button" class="kit-me" style="padding-left:12px" data-pa="openinvite">' + Kit.icon('mail', 17) + '<span>Invita un amico</span></button>';
   }
   // Prima di sedersi a un tavolo: con il server attivo serve l'account.
   function allow() {
@@ -452,7 +452,7 @@ var Account = (function () {
       var n = t.value.trim().slice(0, 18); if (!n) { t.value = myNick(); return; }
       set('pp-nick', n); document.querySelectorAll('input#nick').forEach(function (i) { i.value = n; }); repaint(); toastMsg('Nome salvato: ' + n);
     }
-    if (t.id === 'k-theme-pick') { Kit.setTheme(t.value); return; }
+    if (t.id === 'kit-theme-pick') { Kit.setTheme(t.value); return; }
     var s = t.getAttribute('data-pa-snd');
     if (s && window.Sound) { if (s === 'm') Sound.setMusic(t.checked); else Sound.setSfx(t.checked); }
   });

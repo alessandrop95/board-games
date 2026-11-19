@@ -83,9 +83,9 @@ var Turns = (function () {
   }
   function optionHTML(doc, isHost) {
     var s = secs(doc);
-    return '<div class="k-opt"><div class="k-opt-h"><b>Timer di turno</b></div>' +
+    return '<div class="kit-opt"><div class="kit-opt-h"><b>Timer di turno</b></div>' +
       Kit.seg('opt-timer', [[0, 'Nessuno'], [30, '30 s'], [60, '60 s'], [120, '2 min']], s, !isHost) +
-      '<p class="k-opt-d">' + (s ? 'Chi resta fermo più di ' + (s >= 120 ? s / 60 + ' minuti' : s + ' secondi') + ' lascia giocare l’automatico al suo posto, finché non torna.' : 'Nessun limite: l’automatico gioca solo per chi è offline da un po’.') + '</p></div>';
+      '<p class="kit-opt-d">' + (s ? 'Chi resta fermo più di ' + (s >= 120 ? s / 60 + ' minuti' : s + ' secondi') + ' lascia giocare l’automatico al suo posto, finché non torna.' : 'Nessun limite: l’automatico gioca solo per chi è offline da un po’.') + '</p></div>';
   }
   function awayLog(g, p) {
     if (!g.log) return;

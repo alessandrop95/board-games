@@ -170,7 +170,7 @@ var Sound = (function () {
     var old = document.querySelector('.snd-pop'); if (old) { old.remove(); return; }
     unlock();
     var r = btn.getBoundingClientRect(), p = document.createElement('div'); p.className = 'snd-pop';
-    p.innerHTML = '<label><span>Musica di sottofondo</span><span class="k-sw"><input type="checkbox" role="switch" id="snd-m"' + (musicOn ? ' checked' : '') + '><i></i></span></label><label><span>Effetti sonori</span><span class="k-sw"><input type="checkbox" role="switch" id="snd-s"' + (sfxOn ? ' checked' : '') + '><i></i></span></label><small>' + (cfg.credit || '') + '</small>';
+    p.innerHTML = '<label><span>Musica di sottofondo</span><span class="kit-sw"><input type="checkbox" role="switch" id="snd-m"' + (musicOn ? ' checked' : '') + '><i></i></span></label><label><span>Effetti sonori</span><span class="kit-sw"><input type="checkbox" role="switch" id="snd-s"' + (sfxOn ? ' checked' : '') + '><i></i></span></label><small>' + (cfg.credit || '') + '</small>';
     document.body.appendChild(p);
     var w = p.offsetWidth; p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px'; p.style.top = (r.bottom + 6) + 'px';
     p.addEventListener('change', function (e) { if (e.target.id === 'snd-m') setMusic(e.target.checked); if (e.target.id === 'snd-s') setSfx(e.target.checked); });

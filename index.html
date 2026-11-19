@@ -28,10 +28,10 @@ html:root { --k-accent: #e8ab4c; }   /* pannelli e pulsanti del kit con l'oro de
 :root[data-k-theme="light"] body::before { opacity: .7; }
 :root[data-k-theme="light"] .install:hover, :root[data-k-theme="light"] .install:focus-visible { background: #f0bd66; }
 :root[data-k-theme="light"] .brand img, :root[data-k-theme="light"] .game img { box-shadow: 0 3px 10px rgba(70,45,20,.18); }
-:root[data-k-theme="light"] .k-me { background: rgba(70,45,20,.05); box-shadow: inset 0 0 0 1px rgba(70,45,20,.14); }
-:root[data-k-theme="light"] .k-me:hover { background: rgba(70,45,20,.08); }
-:root[data-k-theme="light"] .panel .k-status { background: #fffdf9; box-shadow: inset 0 0 0 1px var(--line); }
-:root[data-k-theme="light"] .panel .k-status .k-sti { background: rgba(70,45,20,.06); }
+:root[data-k-theme="light"] .kit-me { background: rgba(70,45,20,.05); box-shadow: inset 0 0 0 1px rgba(70,45,20,.14); }
+:root[data-k-theme="light"] .kit-me:hover { background: rgba(70,45,20,.08); }
+:root[data-k-theme="light"] .panel .kit-status { background: #fffdf9; box-shadow: inset 0 0 0 1px var(--line); }
+:root[data-k-theme="light"] .panel .kit-status .kit-sti { background: rgba(70,45,20,.06); }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; }
 body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -76,9 +76,9 @@ main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; padding-
 .h-rt { flex: 1; min-width: 0; display: grid; }
 .h-rt b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .h-rt small { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 480px) { .h-row .k-pill { display: none; } }
-.panel .k-empty { padding: 14px 8px; color: var(--muted); }
-.panel .k-status { background: var(--rowbg); box-shadow: inset 0 0 0 1px var(--line); }
+@media (max-width: 480px) { .h-row .kit-pill { display: none; } }
+.panel .kit-empty { padding: 14px 8px; color: var(--muted); }
+.panel .kit-status { background: var(--rowbg); box-shadow: inset 0 0 0 1px var(--line); }
 
 /* libreria */
 .lib-h { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
@@ -172,7 +172,7 @@ footer .row { display: flex; flex-wrap: wrap; gap: 8px; }
     <form class="join" id="join" autocomplete="off">
       <span class="ic" id="join-ic"></span>
       <input id="join-code" maxlength="4" placeholder="Hai un codice? Entra qui" aria-label="Codice del tavolo (4 lettere)" autocapitalize="characters" spellcheck="false">
-      <button class="k-btn" type="submit">Entra</button>
+      <button class="kit-btn" type="submit">Entra</button>
     </form>
     <div class="join-msg" id="join-msg" role="status"></div>
     <div id="install-slot"></div>
@@ -484,7 +484,7 @@ footer .row { display: flex; flex-wrap: wrap; gap: 8px; }
 <script>
 function paintSlots() {
   document.getElementById('account-slot').innerHTML = Account.chipHTML(); document.getElementById('alerts-slot').innerHTML = Alerts.controlHTML();
-  document.getElementById('footer-actions').innerHTML = '<button type="button" class="k-btn sec sm" data-pa="open" data-v="settings">' + Kit.icon('gear', 16) + 'Impostazioni</button>';
+  document.getElementById('footer-actions').innerHTML = '<button type="button" class="kit-btn sec sm" data-pa="open" data-v="settings">' + Kit.icon('gear', 16) + 'Impostazioni</button>';
 }
 paintSlots(); Account.ready.then(paintSlots); Alerts.mountHome(document.getElementById('open-tables')); Alerts.mountContinue(document.getElementById('continue-slot'));
 // colore della barra del telefono uguale allo sfondo della home

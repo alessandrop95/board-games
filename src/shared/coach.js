@@ -48,7 +48,7 @@ var Coach = (function () {
   function flash(t) { flashTxt = t; clearTimeout(flashT); flashT = setTimeout(function () { flashTxt = null; paint(); }, 5000); paint(); }
   function paint() {
     // nascosta mentre è aperta una finestra del gioco (benvenuto, scelte, regole): quella spiega già cosa fare
-    var d = window.App && App.doc, on = d && d.practice && App.screen === 'table' && d.game && cfg && !App.sheet && !document.querySelector('.pa-back,.px-back,.k-back');
+    var d = window.App && App.doc, on = d && d.practice && App.screen === 'table' && d.game && cfg && !App.sheet && !document.querySelector('.pa-back,.px-back,.kit-back');
     var bar = document.querySelector('.cx-bar'), pill = document.querySelector('.cx-pill');
     if (!on) { if (bar) bar.remove(); if (pill) pill.remove(); lastHTML = ''; return; }
     css();

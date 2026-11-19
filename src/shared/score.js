@@ -57,9 +57,9 @@ var Score = (function () {
   function roomHTML(doc, isHost) {
     css();
     var t = doc.series ? doc.series.target || 0 : 0;
-    return '<div class="k-opt"><div class="k-opt-h"><b>Serie di partite</b></div>' +
+    return '<div class="kit-opt"><div class="kit-opt-h"><b>Serie di partite</b></div>' +
       Kit.seg('opt-series', [[0, 'Singole'], [3, 'Al meglio di 3'], [5, 'Al meglio di 5']], t, !isHost) +
-      '<p class="k-opt-d">Con «Nuova partita con lo stesso tavolo» le vittorie si sommano' + (t ? ': vince chi arriva prima a ' + Math.ceil(t / 2) + '.' : '.') + '</p></div>' + standings(doc);
+      '<p class="kit-opt-d">Con «Nuova partita con lo stesso tavolo» le vittorie si sommano' + (t ? ': vince chi arriva prima a ' + Math.ceil(t / 2) + '.' : '.') + '</p></div>' + standings(doc);
   }
   function endHTML(doc) { css(); return standings(doc); }
   document.addEventListener('change', function (e) {

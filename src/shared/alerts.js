@@ -227,27 +227,27 @@ var Alerts = (function () {
       rows.push(Kit.row({ ic: 'bell', icCls: on ? 'a' : '', title: 'Notifiche su questo dispositivo',
         sub: !sup ? (isIOS && !standalone() ? 'Su iPhone e iPad: aggiungi Board Games alla schermata Home e aprilo da lì' : 'Questo browser non le supporta') : perm === 'denied' ? 'Bloccate nelle impostazioni del browser' : on ? 'Attive: arrivano anche ad app chiusa' : u ? 'Spente' : 'Accedi per attivarle',
         right: Kit.sw('data-pp="master" aria-label="Notifiche su questo dispositivo"', on, !sup || perm === 'denied'), tag: 'label' }));
-      rows.push(Kit.row({ ic: 'grid', title: 'Nuovi tavoli', sub: 'Quando qualcuno apre un tavolo', right: '<span class="k-rv">' + gamesSummary() + '</span>', attrs: 'data-pa="go" data-v="games"', chev: true }));
+      rows.push(Kit.row({ ic: 'grid', title: 'Nuovi tavoli', sub: 'Quando qualcuno apre un tavolo', right: '<span class="kit-rv">' + gamesSummary() + '</span>', attrs: 'data-pa="go" data-v="games"', chev: true }));
       rows.push(Kit.row({ ic: 'mail', title: 'Inviti e amicizie', sub: 'Quando un amico ti invita o ti aggiunge', right: Kit.sw('data-pp="inv" aria-label="Inviti e amicizie"', p.invites), tag: 'label' }));
       rows.push(Kit.row({ ic: 'clock', title: 'Tocca a te', sub: 'Quando arriva il tuo turno e non hai il gioco davanti', right: Kit.sw('data-pp="turns" aria-label="Tocca a te"', p.turns), tag: 'label' }));
       if (perm === 'denied') note = 'Per riattivarle: tocca il lucchetto accanto all’indirizzo (o le impostazioni dell’app) → Notifiche → Consenti, poi torna qui.';
     } else {
       rows.push(Kit.row({ ic: 'bell', icCls: enabled() ? 'a' : '', title: 'Avvisi dei nuovi tavoli', sub: enabled() ? 'Accesi' : 'Spenti', right: Kit.sw('data-pp="inapp" aria-label="Avvisi dei nuovi tavoli"', enabled()), tag: 'label' }));
       rows.push(Kit.row({ ic: 'phone', title: 'Anche come notifica del telefono', sub: perm === 'granted' ? 'Consentite: arrivano anche con l’app in sottofondo' : perm === 'denied' ? 'Bloccate nelle impostazioni del browser' : perm === 'none' ? 'Non disponibili in questo browser' : 'Serve il tuo permesso',
-        right: perm === 'default' ? '<button type="button" class="k-btn sm" data-alerts="perm">Consenti</button>' : perm === 'granted' ? '<span class="k-pill ok">' + Kit.icon('check', 14) + 'Attive</span>' : '' }));
-      rows.push(Kit.row({ ic: 'grid', title: 'Per quali giochi', right: '<span class="k-rv">' + gamesSummary() + '</span>', attrs: 'data-pa="go" data-v="games"', chev: true }));
+        right: perm === 'default' ? '<button type="button" class="kit-btn sm" data-alerts="perm">Consenti</button>' : perm === 'granted' ? '<span class="kit-pill ok">' + Kit.icon('check', 14) + 'Attive</span>' : '' }));
+      rows.push(Kit.row({ ic: 'grid', title: 'Per quali giochi', right: '<span class="kit-rv">' + gamesSummary() + '</span>', attrs: 'data-pa="go" data-v="games"', chev: true }));
     }
     if (srvMode()) rows.push(Kit.row({ ic: 'phone', title: 'Avvisi dentro l’app', sub: 'Un banner in alto mentre usi l’app', right: Kit.sw('data-pp="inapp" aria-label="Avvisi dentro l’app"', enabled()), tag: 'label' }));
     rows.push(Kit.row({ ic: 'play', title: 'Prova una notifica', sub: 'Controlla che questo dispositivo la mostri', attrs: 'data-alerts="test"' }));
-    return (pushMsg ? '<p class="k-msg err" role="status">' + esc(pushMsg) + '</p>' : '') + Kit.group('Notifiche', rows, note);
+    return (pushMsg ? '<p class="kit-msg err" role="status">' + esc(pushMsg) + '</p>' : '') + Kit.group('Notifiche', rows, note);
   }
   function gamesHTML() {
     var p = prefs(), ids = gameIds(p);
-    return '<p class="k-note">Scegli per quali giochi ricevere un avviso quando qualcuno apre un tavolo. Inviti e richieste degli amici arrivano sempre, se sono attivi.</p>' +
-      '<div class="k-inline"><button type="button" class="k-btn sm sec" data-alerts="all">Tutti</button><button type="button" class="k-btn sm sec" data-alerts="none">Nessuno</button></div>' +
-      '<div class="k-list">' + GAMES.map(function (g) {
+    return '<p class="kit-note">Scegli per quali giochi ricevere un avviso quando qualcuno apre un tavolo. Inviti e richieste degli amici arrivano sempre, se sono attivi.</p>' +
+      '<div class="kit-inline"><button type="button" class="kit-btn sm sec" data-alerts="all">Tutti</button><button type="button" class="kit-btn sm sec" data-alerts="none">Nessuno</button></div>' +
+      '<div class="kit-list">' + GAMES.map(function (g) {
         var id = g.path.replace(/\/$/, '');
-        return '<label class="k-row"><img src="' + esc(ROOT + g.path + 'icon-192.png') + '" alt="" width="32" height="32" style="border-radius:9px;flex:none"><span class="k-rt"><b>' + esc(g.n) + '</b></span>' + Kit.sw('data-pp="game" value="' + id + '" aria-label="' + esc(g.n) + '"', ids.indexOf(id) >= 0) + '</label>';
+        return '<label class="kit-row"><img src="' + esc(ROOT + g.path + 'icon-192.png') + '" alt="" width="32" height="32" style="border-radius:9px;flex:none"><span class="kit-rt"><b>' + esc(g.n) + '</b></span>' + Kit.sw('data-pp="game" value="' + id + '" aria-label="' + esc(g.n) + '"', ids.indexOf(id) >= 0) + '</label>';
       }).join('') + '</div>';
   }
   function testNotify() {
@@ -290,7 +290,7 @@ var Alerts = (function () {
     css();
     var old = document.querySelector('.ppa-banner'); if (old) old.remove();
     var b = document.createElement('div'); b.className = 'ppa-banner'; b.setAttribute('role', 'status');
-    b.innerHTML = '<span class="ppa-bi">' + Kit.icon('bell', 19) + '</span><div class="ppa-tx"><b>' + esc(title) + '</b><span>' + esc(body) + '</span></div><a class="k-btn sm" href="' + esc(url) + '">' + esc(go || 'Siediti') + '</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">' + Kit.icon('x', 18) + '</button>';
+    b.innerHTML = '<span class="ppa-bi">' + Kit.icon('bell', 19) + '</span><div class="ppa-tx"><b>' + esc(title) + '</b><span>' + esc(body) + '</span></div><a class="kit-btn sm" href="' + esc(url) + '">' + esc(go || 'Siediti') + '</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">' + Kit.icon('x', 18) + '</button>';
     b.querySelector('.ppa-x').onclick = function () { b.remove(); };
     document.body.appendChild(b);
     requestAnimationFrame(function () { requestAnimationFrame(function () { b.classList.add('in'); }); });
@@ -299,18 +299,18 @@ var Alerts = (function () {
   // Riga di stato delle notifiche (home e lobby dei giochi): dice com'è adesso e porta alle impostazioni.
   function controlHTML() {
     css();
-    var on, title, sub, btn, manage = '<button type="button" class="k-btn sm sec" data-pa="open" data-v="settings">Gestisci</button>';
+    var on, title, sub, btn, manage = '<button type="button" class="kit-btn sm sec" data-pa="open" data-v="settings">Gestisci</button>';
     if (srvMode()) {
       on = pushOn(); title = on ? 'Notifiche attive' : 'Notifiche spente';
       sub = on ? 'Nuovi tavoli e inviti arrivano anche ad app chiusa' : 'Ricevi un avviso quando qualcuno apre un tavolo o ti invita';
-      btn = on ? manage : '<button type="button" class="k-btn sm" data-alerts="push">Attiva</button>';
+      btn = on ? manage : '<button type="button" class="kit-btn sm" data-alerts="push">Attiva</button>';
     } else {
       on = enabled(); var perm = canSys() ? Notification.permission : 'none';
       title = on ? 'Avvisi accesi' : 'Avvisi spenti';
       sub = on ? 'Nuovi tavoli: ' + (perm === 'granted' ? 'anche con l’app in sottofondo' : 'mentre l’app è aperta') : 'Ti avviso quando qualcuno apre un tavolo';
-      btn = on ? manage : '<button type="button" class="k-btn sm" data-alerts="on">Accendi</button>';
+      btn = on ? manage : '<button type="button" class="kit-btn sm" data-alerts="on">Accendi</button>';
     }
-    return '<div class="k-status' + (on ? ' on' : '') + '" data-k-alerts><span class="k-st"><span class="k-sti">' + Kit.icon('bell', 18) + '</span><span><b>' + title + '</b><small>' + sub + '</small></span></span>' + btn + '</div>';
+    return '<div class="kit-status' + (on ? ' on' : '') + '" data-k-alerts><span class="kit-st"><span class="kit-sti">' + Kit.icon('bell', 18) + '</span><span><b>' + title + '</b><small>' + sub + '</small></span></span>' + btn + '</div>';
   }
   function repaint() { Array.prototype.forEach.call(document.querySelectorAll('[data-k-alerts]'), function (el) { el.outerHTML = controlHTML(); }); }
   function askPerm() {
@@ -336,14 +336,14 @@ var Alerts = (function () {
     var l = list().filter(visible);
     if (homeEl.parentNode && homeEl.parentNode.setAttribute) homeEl.parentNode.setAttribute('data-count', l.length);
     if (!l.length) {
-      homeEl.innerHTML = '<div class="k-empty">' + (waited || started && Object.keys(tables).length ? Kit.icon('users', 26) + '<b style="color:var(--k-text)">Nessun tavolo aperto in questo momento</b>Aprine uno tu da un gioco qui sotto: comparirà qui per tutti.' : 'Cerco i tavoli aperti…') + '</div>';
+      homeEl.innerHTML = '<div class="kit-empty">' + (waited || started && Object.keys(tables).length ? Kit.icon('users', 26) + '<b style="color:var(--k-text)">Nessun tavolo aperto in questo momento</b>Aprine uno tu da un gioco qui sotto: comparirà qui per tutti.' : 'Cerco i tavoli aperti…') + '</div>';
       return;
     }
     homeEl.innerHTML = '<div class="h-rows">' + l.slice(0, 8).map(function (t) {
       var code = codeOf(t), e = Object.assign({}, t.e, { code: code }), full = e.max && e.n >= e.max, pub = /^[A-Z]{4}$/.test(code || '');
-      var state = e.phase === 'play' ? '<span class="k-pill">In partita</span>' : full ? '<span class="k-pill">Completo</span>' : '<span class="k-pill ok">In attesa</span>';
+      var state = e.phase === 'play' ? '<span class="kit-pill">In partita</span>' : full ? '<span class="kit-pill">Completo</span>' : '<span class="kit-pill ok">In attesa</span>';
       var cta = !pub ? 'Ho il codice' : e.phase === 'play' || full ? 'Guarda' : 'Siediti';
-      return '<a class="h-row" href="' + esc(urlFor(t.g, pub ? e.code : null)) + '">' + icon(t.g) + '<span class="h-rt"><b>' + esc(nameOf(t)) + '</b><small>Tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + ' · ' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori' + (t.e.vis === 'friends' ? ' · solo amici' : pub ? '' : ' · su invito') + '</small></span>' + state + '<span class="k-btn sm' + (cta === 'Siediti' ? '' : ' sec') + '">' + cta + '</span></a>';
+      return '<a class="h-row" href="' + esc(urlFor(t.g, pub ? e.code : null)) + '">' + icon(t.g) + '<span class="h-rt"><b>' + esc(nameOf(t)) + '</b><small>Tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + ' · ' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori' + (t.e.vis === 'friends' ? ' · solo amici' : pub ? '' : ' · su invito') + '</small></span>' + state + '<span class="kit-btn sm' + (cta === 'Siediti' ? '' : ' sec') + '">' + cta + '</span></a>';
     }).join('') + '</div>';
   }
 
@@ -356,7 +356,7 @@ var Alerts = (function () {
       var l = GAMES.map(function (g) { return cards[g.path]; }).filter(Boolean);
       box.hidden = !l.length;
       el.innerHTML = '<div class="h-rows">' + l.map(function (c) {
-        return '<a class="h-row" href="' + esc(urlFor(c.g, c.d.code)) + '">' + icon(c.g) + '<span class="h-rt"><b>' + esc(c.g.n) + (c.d.practice ? ' · prova' : '') + '</b><small>Tavolo ' + esc(c.d.code) + ' · ' + esc(c.st) + (c.others.length ? ' · con ' + esc(c.others.join(', ')) : '') + '</small></span><span class="k-btn sm">Continua</span></a>';
+        return '<a class="h-row" href="' + esc(urlFor(c.g, c.d.code)) + '">' + icon(c.g) + '<span class="h-rt"><b>' + esc(c.g.n) + (c.d.practice ? ' · prova' : '') + '</b><small>Tavolo ' + esc(c.d.code) + ' · ' + esc(c.st) + (c.others.length ? ' · con ' + esc(c.others.join(', ')) : '') + '</small></span><span class="kit-btn sm">Continua</span></a>';
       }).join('') + '</div>';
     }
     css(); paint();
