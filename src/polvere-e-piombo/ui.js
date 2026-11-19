@@ -229,7 +229,7 @@ function addBot() { run(function () { return Net.send({ t: 'addbot' }); }); }
 function removeSeat(uid) { run(function () { return Net.send({ t: 'kick', uid: uid }); }); }
 function startGame() { run(function () { return Net.send({ t: 'start' }); }); }
 function rematch() { run(function () { return Net.send({ t: 'rematch' }); }); }
-function takeHost() { Net.takeHost(); toast('Ora sei tu a reggere il tavolo e a muovere i pistoleri automatici.'); }
+function takeHost() { if (!Net.takeHost()) { toast('Solo chi è seduto al tavolo può prendere il comando.'); return; } toast('Ora sei tu a reggere il tavolo e a muovere i pistoleri automatici.'); }
 function setAuto(p, on) { run(function () { return Net.send({ t: 'auto', p: p, on: on }); }); }
 function act(a) {
   App.mode = 'idle'; App.sel = null; App.picks = []; App.pend = null; closeSheet();
@@ -303,7 +303,7 @@ function myIdx() { var g = App.doc && App.doc.game; if (!g) return -1; for (var 
 function onDoc() {
   var g = App.doc.game;
   // partita nuova sullo stesso tavolo (rivincita con le stesse persone): fogli, animazioni e suoni ripartono da zero
-  if (App.gidSeen && App.doc.gid !== App.gid) { App.sheet = null; App.mode = 'idle'; App.sel = null; App.pend = null; App.picks = []; App.overShown = null; }
+  if (App.gidSeen && App.doc.gid !== App.gid) { App.botKey = null; App.sheet = null; App.mode = 'idle'; App.sel = null; App.pend = null; App.picks = []; App.overShown = null; }
   App.gid = App.doc.gid; App.gidSeen = true;
   if (g && !App.flashInit) { App.lastFlash = g.flash ? g.flash.n : 0; App.flashInit = true; }
   if (!g) App.flashInit = false;

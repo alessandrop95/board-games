@@ -82,10 +82,10 @@ var Turns = (function () {
     el.textContent = rem > 0 && rem <= 20 ? ' Ancora ' + rem + ' s, poi gioca l’automatico.' : '';
   }
   function optionHTML(doc, isHost) {
-    var s = secs(doc), opts = [[0, 'Nessun limite'], [30, '30 secondi'], [60, '60 secondi'], [120, '2 minuti']];
-    return '<label class="tt-opt" style="display:grid;gap:6px"><span><b>Timer di turno</b><br><span class="muted" style="font-size:15px">Se un giocatore resta fermo oltre questo tempo, gioca l’automatico al suo posto finché non torna.</span></span>' +
-      '<select id="opt-timer" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px">' +
-      opts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === s ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>';
+    var s = secs(doc);
+    return '<div class="kit-opt"><div class="kit-opt-h"><b>Timer di turno</b></div>' +
+      Kit.seg('opt-timer', [[0, 'Nessuno'], [30, '30 s'], [60, '60 s'], [120, '2 min']], s, !isHost) +
+      '<p class="kit-opt-d">' + (s ? 'Chi resta fermo più di ' + (s >= 120 ? s / 60 + ' minuti' : s + ' secondi') + ' lascia giocare l’automatico al suo posto, finché non torna.' : 'Nessun limite: l’automatico gioca solo per chi è offline da un po’.') + '</p></div>';
   }
   function awayLog(g, p) {
     if (!g.log) return;

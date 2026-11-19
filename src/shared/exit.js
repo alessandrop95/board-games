@@ -6,16 +6,16 @@
    Ogni gioco chiama Exit.ask() dal suo pulsante «Esci»: se risponde false, l'uscita è quella semplice di sempre
    (sala d'attesa da non host, oppure chi guarda soltanto). Usa le funzioni globali dei giochi: App, leaveTable. */
 var Exit = (function () {
-  var CSS = '.px-back{position:fixed;inset:0;z-index:96;background:rgba(5,8,12,.62);display:flex;align-items:flex-end;justify-content:center;animation:pxfade .2s}' +
+  var CSS = '.px-back{position:fixed;inset:0;z-index:96;background:rgba(6,8,12,.66);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;animation:pxfade .18s}' +
     '@keyframes pxfade{from{opacity:0}}' +
-    '.px-sheet{width:100%;max-width:520px;background:#1b2128;color:#f1ece2;border:1px solid rgba(255,255,255,.12);border-bottom:0;border-radius:18px 18px 0 0;padding:18px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:grid;gap:10px;font:16px/1.45 system-ui,-apple-system,sans-serif;box-shadow:0 -12px 34px rgba(0,0,0,.5)}' +
-    '@media(min-width:640px){.px-back{align-items:center}.px-sheet{border-radius:18px;border-bottom:1px solid rgba(255,255,255,.12)}}' +
-    '.px-sheet h2{margin:0 0 2px;font-size:21px}.px-sheet p{margin:0;color:#cfc8ba;font-size:15px}' +
-    '.px-opt{appearance:none;display:grid;gap:2px;text-align:left;width:100%;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:inherit;border-radius:12px;padding:12px 14px;font:inherit;cursor:pointer;min-height:52px}' +
-    '.px-opt b{font-size:16px}.px-opt span{font-size:13.5px;color:#b9b3a6}.px-opt.main{background:linear-gradient(180deg,#f0d58f,#d9b45a);color:#231a06;border-color:transparent}.px-opt.main span{color:#4a3a14}' +
-    '.px-opt.red{background:#7a2a1f;border-color:#b6402e}.px-opt.red span{color:#f2c5bb}.px-opt:disabled{opacity:.55}' +
-    '.px-cancel{appearance:none;border:0;background:none;color:inherit;font:600 15px system-ui,sans-serif;padding:10px;cursor:pointer;opacity:.85}' +
-    '.px-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:9999;background:#2a2118;color:#f6ead2;border:1px solid rgba(242,193,78,.5);border-radius:12px;padding:10px 14px;font:15px system-ui,sans-serif;max-width:calc(100vw - 24px);box-shadow:0 10px 26px rgba(0,0,0,.45)}';
+    '.px-sheet{width:100%;max-width:480px;background:var(--k-bg);color:var(--k-text);border:1px solid var(--k-line-2);border-bottom:0;border-radius:22px 22px 0 0;padding:20px max(18px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:grid;gap:10px;font:15.5px/1.45 var(--k-font);-webkit-font-smoothing:antialiased;box-shadow:0 -18px 50px var(--k-shadow);animation:kup .24s cubic-bezier(.2,.8,.2,1)}' +
+    '@media(min-width:640px){.px-back{align-items:center}.px-sheet{border-radius:22px;border-bottom:1px solid var(--k-line-2)}}' +
+    '.px-sheet h2{margin:0 0 2px;font-size:19px;font-weight:700;letter-spacing:-.01em}.px-sheet p{margin:0 0 4px;color:var(--k-muted);font-size:14.5px}' +
+    '.px-opt{appearance:none;display:grid;gap:2px;text-align:left;width:100%;border:0;background:var(--k-surface);box-shadow:inset 0 0 0 1px var(--k-line);color:inherit;border-radius:16px;padding:13px 16px;font:inherit;cursor:pointer;min-height:56px;transition:background .15s}.px-opt:hover{background:var(--k-surface-2)}' +
+    '.px-opt b{font-size:15.5px;font-weight:650}.px-opt span{font-size:13.5px;color:var(--k-muted)}.px-opt.main{background:var(--k-accent);color:var(--k-on-accent);box-shadow:none}.px-opt.main span{color:inherit;opacity:.75}' +
+    '.px-opt.red{background:rgba(255,106,92,.1);box-shadow:inset 0 0 0 1px rgba(255,106,92,.35)}.px-opt.red b{color:var(--k-danger)}.px-opt:disabled{opacity:.55}' +
+    '.px-cancel{appearance:none;border:0;background:none;color:var(--k-muted);font:600 15px var(--k-font);padding:12px;cursor:pointer}.px-cancel:hover{color:var(--k-text)}' +
+    '.px-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:9999;background:var(--k-toast-bg);color:var(--k-text);border-radius:14px;padding:11px 16px;font:600 14.5px var(--k-font);max-width:calc(100vw - 24px);box-shadow:0 14px 34px var(--k-shadow),inset 0 0 0 1px var(--k-line-2)}';
   var busy = false;
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function css() { if (!document.getElementById('px-css')) { var s = document.createElement('style'); s.id = 'px-css'; s.textContent = CSS; document.head.appendChild(s); } }

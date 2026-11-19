@@ -256,7 +256,7 @@ setInterval(function () {
 /* ---------- stato in arrivo ---------- */
 function onDoc() {
   var g = G(), me = myIdx();
-  if (App.gidSeen && App.doc.gid !== App.gid) { resetLocal(); App.lastFxN = 0; }
+  if (App.gidSeen && App.doc.gid !== App.gid) { App.botKeys = {}; resetLocal(); App.lastFxN = 0; }
   App.gid = App.doc.gid; App.gidSeen = true;
   if (!g && App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
   if (g && g.clock !== App.clock) { App.clock = g.clock; App.off = g.clock - Date.now(); }
@@ -413,7 +413,7 @@ document.addEventListener('click', function (ev) {
     case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + esc(el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); return; }
     case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); return;
     case 'closeyes': App.sheet = null; renderSheet(); App.closing = true; if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); } return;
-    case 'takehost': App.sheet = null; renderSheet(); Net.takeHost(); toast('Ora sei tu a reggere il tavolo, il tempo e i giocatori automatici.'); return;
+    case 'takehost': App.sheet = null; renderSheet(); if (!Net.takeHost()) { toast('Solo chi è seduto al tavolo può prendere il comando.'); return; } toast('Ora sei tu a reggere il tavolo, il tempo e i giocatori automatici.'); return;
     case 'auto': App.sheet = null; renderSheet(); send({ t: 'auto', p: +el.getAttribute('data-p'), on: !g.players[+el.getAttribute('data-p')].bot }); return;
     case 'resume': send({ t: 'back' }); return;
     case 'nextround': send({ t: 'nextround' }); return;

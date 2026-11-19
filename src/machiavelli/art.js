@@ -24,14 +24,36 @@ var MCArt = (function () {
     else art = '<g transform="translate(50 64)"><path d="M-16 2c2-10 10-14 16-14s14 4 16 14z" fill="' + col + '"/><rect x="-18" y="1" width="36" height="5" rx="2" fill="' + gold + '"/><path d="M8-10C14-22 26-22 28-14 22-16 16-14 10-6z" fill="' + gold + '" stroke="' + col + '" stroke-width="1"/><circle cx="0" cy="-4" r="2.6" fill="' + gold + '"/></g>';
     return frame + art + suitPath(s, 50, 92, .62);
   }
+  // disposizione classica dei semi sulle carte da 2 a 10 (colonne 36/50/64, righe dall'alto in basso);
+  // quelli nella metà bassa sono capovolti, come nei mazzi veri
+  var X1 = 36, X2 = 50, X3 = 64;
+  var PIPS = {
+    2: [[X2, 30], [X2, 110]], 3: [[X2, 30], [X2, 70], [X2, 110]],
+    4: [[X1, 30], [X3, 30], [X1, 110], [X3, 110]], 5: [[X1, 30], [X3, 30], [X2, 70], [X1, 110], [X3, 110]],
+    6: [[X1, 30], [X3, 30], [X1, 70], [X3, 70], [X1, 110], [X3, 110]],
+    7: [[X1, 30], [X3, 30], [X2, 50], [X1, 70], [X3, 70], [X1, 110], [X3, 110]],
+    8: [[X1, 30], [X3, 30], [X2, 50], [X1, 70], [X3, 70], [X2, 90], [X1, 110], [X3, 110]],
+    9: [[X1, 30], [X3, 30], [X1, 56.7], [X3, 56.7], [X2, 70], [X1, 83.3], [X3, 83.3], [X1, 110], [X3, 110]],
+    10: [[X1, 30], [X3, 30], [X2, 43.3], [X1, 56.7], [X3, 56.7], [X1, 83.3], [X3, 83.3], [X2, 96.7], [X1, 110], [X3, 110]]
+  };
+  function pips(r, s) {
+    return (PIPS[r] || []).map(function (p) {
+      var g = suitPath(s, 0, 0, .78);
+      return '<g transform="translate(' + p[0] + ' ' + p[1] + ')' + (p[1] > 70 ? ' rotate(180)' : '') + '">' + g + '</g>';
+    }).join('');
+  }
+  function corner(L, s, col) {
+    return '<text x="13" y="29" class="pc-r" text-anchor="middle" fill="' + col + '"' + (L.length > 1 ? ' textLength="20" lengthAdjust="spacingAndGlyphs"' : '') + '>' + L + '</text>' + suitPath(s, 13, 41, .58);
+  }
   function card(c, cls) {
     var r = E.rank(c), s = E.suit(c), col = suitColor(s), L = RL[r] || String(r), big = r > 10;
-    var center = big ? emblem(r, s, col) : r === 1 ? suitPath(s, 50, 74, 2.6) + '<circle cx="50" cy="74" r="31" fill="none" stroke="' + col + '" stroke-width="1" opacity=".35"/>' : suitPath(s, 50, 78, 2.1);
+    var center = big ? emblem(r, s, col)
+      : r === 1 ? '<circle cx="50" cy="70" r="27" fill="none" stroke="' + col + '" stroke-width="1" opacity=".28"/><circle cx="50" cy="70" r="31" fill="none" stroke="' + col + '" stroke-width=".6" opacity=".2"/>' + suitPath(s, 50, 70, 2.2)
+      : pips(r, s);
     return '<svg class="pc ' + (cls || '') + '" viewBox="0 0 100 140" data-c="' + c + '" aria-label="' + E.cname(c) + '">' +
-      '<rect x="1" y="1" width="98" height="138" rx="9" fill="#fffdf6" stroke="#b9ad93" stroke-width="2"/>' +
-      '<text x="' + (L.length > 1 ? 6 : 9) + '" y="33" class="pc-r" fill="' + col + '"' + (L.length > 1 ? ' textLength="34" lengthAdjust="spacingAndGlyphs"' : '') + '>' + L + '</text>' + suitPath(s, 21, 48, .95) +
-      '<g transform="rotate(180 50 70)"><text x="' + (L.length > 1 ? 6 : 9) + '" y="33" class="pc-r" fill="' + col + '"' + (L.length > 1 ? ' textLength="34" lengthAdjust="spacingAndGlyphs"' : '') + '>' + L + '</text>' + suitPath(s, 21, 48, .95) + '</g>' +
-      center + '</svg>';
+      '<rect x="1" y="1" width="98" height="138" rx="9" fill="#fffcf3" stroke="#c9bea4" stroke-width="1.6"/>' +
+      '<rect x="4.5" y="4.5" width="91" height="131" rx="6.5" fill="none" stroke="' + col + '" stroke-width=".6" opacity=".22"/>' +
+      corner(L, s, col) + '<g transform="rotate(180 50 70)">' + corner(L, s, col) + '</g>' + center + '</svg>';
   }
   function back(cls) {
     return '<svg class="pc back ' + (cls || '') + '" viewBox="0 0 100 140" aria-hidden="true"><rect x="1" y="1" width="98" height="138" rx="9" fill="#7a1f24" stroke="#3a0d10" stroke-width="2"/>' +

@@ -40,7 +40,7 @@ with sync_playwright() as p:
         if not login: pg.click('[data-pa="tab"][data-v="register"]')
         pg.fill('[name=u]', name); pg.fill('[name=p]', 'segreto1')
         if not login: pg.fill('[name=p2]', 'segreto1')
-        pg.click('form [type=submit]')
+        pg.click('.kit-sheet form [type=submit]')
         if not login: pg.wait_for_selector('.pa-code', timeout=8000); pg.click('[data-pa="close"]')   # codice di recupero: «L’ho salvato»
         pg.wait_for_load_state('load'); pg.wait_for_timeout(1300)
 
@@ -57,7 +57,7 @@ with sync_playwright() as p:
 
     # 2) interruttore degli avvisi nella pagina
     A.evaluate("localStorage.setItem('pp-alerts','off')"); A.reload(); A.wait_for_timeout(900)
-    A.click('[data-pa="open"][data-v="account"]'); A.wait_for_timeout(500)
+    A.click('[data-pa="open"][data-v="settings"]'); A.wait_for_timeout(500)
     box = A.locator('[data-pp="inapp"]')
     t('interruttore «anche dentro l’app» presente e spento', box.count() == 1 and not box.is_checked())
     box.check(); A.wait_for_timeout(200)

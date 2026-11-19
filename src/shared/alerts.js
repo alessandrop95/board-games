@@ -215,31 +215,54 @@ var Alerts = (function () {
   }
   setTimeout(function () { if (window.Account && Account.ready) Account.ready.then(heal); }, 1500);
   function setPrefs(p) { set(PREFS, JSON.stringify(p)); if (pushOn()) registration().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) { if (sub) return save(sub); }).catch(function (e) { pushMsg = String(e); repaintAll(); }); }
-  function settingsHTML() {
-    var p = prefs(), on = pushOn(), h = '';
-    if (!pushSupported()) {
-      h += '<p class="pa-note">' + (isIOS && !standalone() ? 'Su iPhone e iPad le notifiche arrivano quando il gioco è sulla schermata Home (iOS 16.4 o successivo): tocca Condividi → «Aggiungi alla schermata Home», poi apri Board Games da lì e torna qui.' : 'Questo browser non supporta le notifiche.') + '</p>';
-    } else if (Notification.permission === 'denied') {
-      h += '<p class="pa-err">Le notifiche per questo sito sono bloccate. Riattivale dalle impostazioni del browser (lucchetto accanto all’indirizzo → Notifiche) e poi torna qui.</p>';
+  /* --- impostazioni delle notifiche (pannello Impostazioni) --- */
+  function gameIds(p) { var ids = allGames(); return p.games.filter(function (x) { return ids.indexOf(x) >= 0; }); }
+  function gamesSummary() { var n = gameIds(prefs()).length; return n >= GAMES.length ? 'Tutti i giochi' : n ? n + (n === 1 ? ' gioco' : ' giochi') : 'Nessuno'; }
+  function srvMode() { return !!(window.Account && Account.configured()); }
+  function notifyHTML() {
+    Kit.css();
+    var p = prefs(), rows = [], note = '', perm = canSys() ? Notification.permission : 'none';
+    if (srvMode()) {
+      var on = pushOn(), u = Account.user(), sup = pushSupported();
+      rows.push(Kit.row({ ic: 'bell', icCls: on ? 'a' : '', title: 'Notifiche su questo dispositivo',
+        sub: !sup ? (isIOS && !standalone() ? 'Su iPhone e iPad: aggiungi Board Games alla schermata Home e aprilo da lì' : 'Questo browser non le supporta') : perm === 'denied' ? 'Bloccate nelle impostazioni del browser' : on ? 'Attive: arrivano anche ad app chiusa' : u ? 'Spente' : 'Accedi per attivarle',
+        right: Kit.sw('data-pp="master" aria-label="Notifiche su questo dispositivo"', on, !sup || perm === 'denied'), tag: 'label' }));
+      rows.push(Kit.row({ ic: 'grid', title: 'Nuovi tavoli', sub: 'Quando qualcuno apre un tavolo', right: '<span class="kit-rv">' + gamesSummary() + '</span>', attrs: 'data-pa="go" data-v="games"', chev: true }));
+      rows.push(Kit.row({ ic: 'mail', title: 'Inviti e amicizie', sub: 'Quando un amico ti invita o ti aggiunge', right: Kit.sw('data-pp="inv" aria-label="Inviti e amicizie"', p.invites), tag: 'label' }));
+      rows.push(Kit.row({ ic: 'clock', title: 'Tocca a te', sub: 'Quando arriva il tuo turno e non hai il gioco davanti', right: Kit.sw('data-pp="turns" aria-label="Tocca a te"', p.turns), tag: 'label' }));
+      if (perm === 'denied') note = 'Per riattivarle: tocca il lucchetto accanto all’indirizzo (o le impostazioni dell’app) → Notifiche → Consenti, poi torna qui.';
     } else {
-      h += '<label class="pa-check"><input type="checkbox" data-pp="master"' + (on ? ' checked' : '') + '> <b>Notifiche su questo dispositivo</b></label>';
+      rows.push(Kit.row({ ic: 'bell', icCls: enabled() ? 'a' : '', title: 'Avvisi dei nuovi tavoli', sub: enabled() ? 'Accesi' : 'Spenti', right: Kit.sw('data-pp="inapp" aria-label="Avvisi dei nuovi tavoli"', enabled()), tag: 'label' }));
+      rows.push(Kit.row({ ic: 'phone', title: 'Anche come notifica del telefono', sub: perm === 'granted' ? 'Consentite: arrivano anche con l’app in sottofondo' : perm === 'denied' ? 'Bloccate nelle impostazioni del browser' : perm === 'none' ? 'Non disponibili in questo browser' : 'Serve il tuo permesso',
+        right: perm === 'default' ? '<button type="button" class="kit-btn sm" data-alerts="perm">Consenti</button>' : perm === 'granted' ? '<span class="kit-pill ok">' + Kit.icon('check', 14) + 'Attive</span>' : '' }));
+      rows.push(Kit.row({ ic: 'grid', title: 'Per quali giochi', right: '<span class="kit-rv">' + gamesSummary() + '</span>', attrs: 'data-pa="go" data-v="games"', chev: true }));
     }
-    h += '<p class="pa-note">Avvisami quando qualcuno apre un tavolo di:</p><div class="pa-games">' + GAMES.map(function (g) { var id = g.path.replace(/\/$/, ''); return '<label class="pa-check"><input type="checkbox" data-pp="game" value="' + id + '"' + (p.games.indexOf(id) >= 0 ? ' checked' : '') + '> ' + esc(g.n) + '</label>'; }).join('') + '</div>' +
-      '<label class="pa-check"><input type="checkbox" data-pp="inv"' + (p.invites ? ' checked' : '') + '> Inviti e richieste di amicizia</label>' +
-      '<label class="pa-check"><input type="checkbox" data-pp="turns"' + (p.turns ? ' checked' : '') + '> «Tocca a te», quando arriva il mio turno e non ho il gioco davanti</label>' +
-      '<label class="pa-check"><input type="checkbox" data-pp="inapp"' + (enabled() ? ' checked' : '') + '> Avvisi dei nuovi tavoli anche dentro l’app, mentre la usi</label>' +
-      (pushMsg ? '<p class="pa-err">' + esc(pushMsg) + '</p>' : '') +
-      '<p class="pa-note">Con l’app aperta gli avvisi compaiono in alto nella pagina; ad app chiusa arrivano come notifiche del telefono.</p>';
-    return h;
+    if (srvMode()) rows.push(Kit.row({ ic: 'phone', title: 'Avvisi dentro l’app', sub: 'Un banner in alto mentre usi l’app', right: Kit.sw('data-pp="inapp" aria-label="Avvisi dentro l’app"', enabled()), tag: 'label' }));
+    rows.push(Kit.row({ ic: 'play', title: 'Prova una notifica', sub: 'Controlla che questo dispositivo la mostri', attrs: 'data-alerts="test"' }));
+    return (pushMsg ? '<p class="kit-msg err" role="status">' + esc(pushMsg) + '</p>' : '') + Kit.group('Notifiche', rows, note);
+  }
+  function gamesHTML() {
+    var p = prefs(), ids = gameIds(p);
+    return '<p class="kit-note">Scegli per quali giochi ricevere un avviso quando qualcuno apre un tavolo. Inviti e richieste degli amici arrivano sempre, se sono attivi.</p>' +
+      '<div class="kit-inline"><button type="button" class="kit-btn sm sec" data-alerts="all">Tutti</button><button type="button" class="kit-btn sm sec" data-alerts="none">Nessuno</button></div>' +
+      '<div class="kit-list">' + GAMES.map(function (g) {
+        var id = g.path.replace(/\/$/, '');
+        return '<label class="kit-row"><img src="' + esc(ROOT + g.path + 'icon-192.png') + '" alt="" width="32" height="32" style="border-radius:9px;flex:none"><span class="kit-rt"><b>' + esc(g.n) + '</b></span>' + Kit.sw('data-pp="game" value="' + id + '" aria-label="' + esc(g.n) + '"', ids.indexOf(id) >= 0) + '</label>';
+      }).join('') + '</div>';
+  }
+  function testNotify() {
+    var title = 'Board Games', body = 'Le notifiche funzionano su questo dispositivo.';
+    if (canSys() && Notification.permission === 'granted') { sysNotify(title, body, new URL(ROOT, location.href).href, 'pp-test'); Kit.toast('Notifica di prova inviata.'); }
+    else banner(title, body + ' Per riceverle anche ad app chiusa, attiva le notifiche.', ROOT, 'OK');
   }
   document.addEventListener('change', function (e) {
     var t = e.target; if (!t.getAttribute || !t.getAttribute('data-pp')) return;
     var k = t.getAttribute('data-pp'), p = prefs();
     if (k === 'master') { (t.checked ? enablePush() : disablePush()); return; }
-    if (k === 'game') { p.games = Array.prototype.map.call(document.querySelectorAll('[data-pp="game"]:checked'), function (x) { return x.value; }); setPrefs(p); }
+    if (k === 'game') { p.games = Array.prototype.map.call(document.querySelectorAll('[data-pp="game"]:checked'), function (x) { return x.value; }); setPrefs(p); repaintAll(); }
     if (k === 'inv') { p.invites = t.checked; setPrefs(p); }
     if (k === 'turns') { p.turns = t.checked; setPrefs(p); }
-    if (k === 'inapp') { set(KEY, t.checked ? 'on' : 'off'); if (t.checked) start(); }
+    if (k === 'inapp') { set(KEY, t.checked ? 'on' : 'off'); if (t.checked) start(); repaintAll(); }
   });
   function repaintAll() { repaint(); if (window.Account && Account.render) Account.render(); }
   // notifica arrivata mentre l'app è aperta: il service worker la passa alla pagina
@@ -251,77 +274,76 @@ var Alerts = (function () {
     banner(d.data.title || 'Board Games', d.data.body || '', d.data.url || ROOT, d.data.kind === 'friend' || d.data.kind === 'turn' ? 'Apri' : 'Siediti');
   });
 
-  /* --- grafica: avviso nella pagina, interruttore, lista in home --- */
-  var DIE = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="#f2c14e"/><g fill="#2a1d10"><circle cx="8" cy="8" r="1.7"/><circle cx="16" cy="8" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="8" cy="16" r="1.7"/><circle cx="16" cy="16" r="1.7"/></g></svg>';
-  var BELL = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+  /* --- grafica: avviso in alto nella pagina e riga di stato --- */
   function css() {
+    Kit.css();
     if (document.getElementById('ppa-css')) return;
     var s = document.createElement('style'); s.id = 'ppa-css';
     s.textContent =
-      '.ppa-banner{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translate(-50%,-140%);z-index:9998;width:min(440px,calc(100vw - 20px));display:flex;gap:10px;align-items:center;padding:10px 10px 10px 12px;border-radius:14px;background:#221a12;color:#f6ead2;border:1px solid rgba(242,193,78,.55);box-shadow:0 12px 34px rgba(0,0,0,.5);font:15px/1.35 system-ui,-apple-system,sans-serif;transition:transform .35s cubic-bezier(.2,.9,.3,1.2)}' +
-      '.ppa-banner.in{transform:translate(-50%,0)}.ppa-banner .ppa-tx{flex:1;min-width:0}.ppa-banner .ppa-tx span{opacity:.8;font-size:13.5px}' +
-      '.ppa-go{flex:none;text-decoration:none;font-weight:700;background:#f2c14e;color:#1b130b;border-radius:10px;padding:9px 13px}.ppa-x{flex:none;appearance:none;border:0;background:none;color:inherit;opacity:.65;font-size:22px;line-height:1;padding:4px 6px;cursor:pointer}' +
-      '.ppa-ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 12px;border:1px dashed rgba(255,255,255,.2);border-radius:12px;font-size:14.5px;line-height:1.35}' +
-      '.ppa-ctl .ppa-st{flex:1;min-width:190px;display:flex;gap:8px;align-items:center}.ppa-ctl button{appearance:none;font:inherit;font-size:14px;cursor:pointer;border-radius:999px;padding:7px 13px;border:1px solid currentColor;background:transparent;color:inherit}' +
-      '.ppa-ctl button.on{background:#f2c14e;border-color:#f2c14e;color:#1b130b;font-weight:700}.ppa-ctl .ppa-lnk{border:0;padding:7px 2px;text-decoration:underline;opacity:.85}' +
-      '.ppa-sheet{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:16px;background:rgba(6,6,10,.78)}.ppa-card{max-width:420px;width:100%;max-height:calc(100vh - 32px);overflow:auto;background:#1f1912;color:#f3e8d2;border:1px solid rgba(242,193,78,.4);border-radius:16px;padding:20px;font:15.5px/1.5 system-ui,-apple-system,sans-serif;display:grid;gap:12px}' +
-      '.ppa-card h3{margin:0;font-size:19px}.ppa-card ol{margin:0;padding-left:20px;display:grid;gap:8px}.ppa-card code{background:rgba(255,255,255,.1);padding:2px 6px;border-radius:6px;word-break:break-all}.ppa-card a{color:#f2c14e}' +
-      '.ppa-card .row{display:flex;gap:8px;flex-wrap:wrap}.ppa-card button{appearance:none;font:inherit;font-weight:700;cursor:pointer;border-radius:10px;padding:10px 14px;border:1px solid #f2c14e;background:transparent;color:inherit}.ppa-card button.main{background:#f2c14e;color:#1b130b}' +
-      '.ppa-home{display:grid;gap:8px}.ppa-row{display:flex;gap:12px;align-items:center;padding:10px 12px;border:1px solid rgba(241,228,198,.14);border-radius:12px}.ppa-row .g{flex:1;min-width:0}.ppa-row small{display:block;opacity:.75}' +
-      '.ppa-row a{flex:none;text-decoration:none;border-radius:999px;padding:8px 14px;border:1px solid #d9a441;color:inherit}.ppa-row a.sit{background:#d9a441;color:#1d140e;font-weight:700}';
+      '.ppa-banner{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translate(-50%,-150%);z-index:9998;width:min(440px,calc(100vw - 20px));display:flex;gap:12px;align-items:center;padding:10px 10px 10px 12px;border-radius:16px;background:var(--k-toast-bg);color:var(--k-text);box-shadow:0 16px 40px var(--k-shadow),inset 0 0 0 1px var(--k-line-2);font:14.5px/1.35 var(--k-font);transition:transform .35s cubic-bezier(.2,.9,.3,1.2)}' +
+      '.ppa-banner.in{transform:translate(-50%,0)}.ppa-banner .ppa-tx{flex:1;min-width:0}.ppa-banner .ppa-tx b{display:block;font-weight:650}.ppa-banner .ppa-tx span{color:var(--k-muted);font-size:13.5px}' +
+      '.ppa-banner .ppa-bi{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:var(--k-accent);color:var(--k-on-accent);flex:none}' +
+      '.ppa-x{flex:none;appearance:none;border:0;background:none;color:var(--k-muted);padding:6px;cursor:pointer;border-radius:8px}.ppa-x:hover{color:var(--k-text)}';
     document.head.appendChild(s);
   }
   function banner(title, body, url, go) {
     css();
     var old = document.querySelector('.ppa-banner'); if (old) old.remove();
     var b = document.createElement('div'); b.className = 'ppa-banner'; b.setAttribute('role', 'status');
-    b.innerHTML = DIE + '<div class="ppa-tx"><b>' + esc(title) + '</b><br><span>' + esc(body) + '</span></div><a class="ppa-go" href="' + esc(url) + '">' + esc(go || 'Siediti') + '</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">×</button>';
+    b.innerHTML = '<span class="ppa-bi">' + Kit.icon('bell', 19) + '</span><div class="ppa-tx"><b>' + esc(title) + '</b><span>' + esc(body) + '</span></div><a class="kit-btn sm" href="' + esc(url) + '">' + esc(go || 'Siediti') + '</a><button class="ppa-x" type="button" aria-label="Chiudi l’avviso">' + Kit.icon('x', 18) + '</button>';
     b.querySelector('.ppa-x').onclick = function () { b.remove(); };
     document.body.appendChild(b);
     requestAnimationFrame(function () { requestAnimationFrame(function () { b.classList.add('in'); }); });
     setTimeout(function () { b.classList.remove('in'); setTimeout(function () { b.remove(); }, 400); }, 14000);
   }
+  // Riga di stato delle notifiche (home e lobby dei giochi): dice com'è adesso e porta alle impostazioni.
   function controlHTML() {
     css();
-    if (window.Account && Account.configured()) {
-      var on = pushOn(), st = on ? 'Notifiche attive: nuovi tavoli e inviti arrivano anche ad app chiusa' : 'Ricevi una notifica quando qualcuno apre un tavolo o ti invita, anche ad app chiusa';
-      var btn = on ? '<button type="button" class="on" data-pa="open" data-v="account">Impostazioni</button>' : '<button type="button" data-alerts="push">Attiva le notifiche</button>';
-      return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st + '</span></span>' + btn + '</div>';
+    var on, title, sub, btn, manage = '<button type="button" class="kit-btn sm sec" data-pa="open" data-v="settings">Gestisci</button>';
+    if (srvMode()) {
+      on = pushOn(); title = on ? 'Notifiche attive' : 'Notifiche spente';
+      sub = on ? 'Nuovi tavoli e inviti arrivano anche ad app chiusa' : 'Ricevi un avviso quando qualcuno apre un tavolo o ti invita';
+      btn = on ? manage : '<button type="button" class="kit-btn sm" data-alerts="push">Attiva</button>';
+    } else {
+      on = enabled(); var perm = canSys() ? Notification.permission : 'none';
+      title = on ? 'Avvisi accesi' : 'Avvisi spenti';
+      sub = on ? 'Nuovi tavoli: ' + (perm === 'granted' ? 'anche con l’app in sottofondo' : 'mentre l’app è aperta') : 'Ti avviso quando qualcuno apre un tavolo';
+      btn = on ? manage : '<button type="button" class="kit-btn sm" data-alerts="on">Accendi</button>';
     }
-    var en = enabled(), perm = canSys() ? Notification.permission : 'none', st2, btns;
-    if (!en) { st2 = 'Avvisi dei nuovi tavoli <b>spenti</b>'; btns = '<button type="button" data-alerts="on">Accendi</button>'; }
-    else if (perm === 'granted') { st2 = 'Ti avviso quando qualcuno apre un tavolo, anche con l’app in sottofondo'; btns = '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>'; }
-    else {
-      st2 = 'Ti avviso quando qualcuno apre un tavolo, mentre l’app è aperta';
-      btns = (perm === 'default' ? '<button type="button" data-alerts="perm">Anche come notifica</button>' : '') + '<button type="button" class="on" data-alerts="off" aria-pressed="true">Avvisi accesi</button>';
-    }
-    return '<div class="ppa-ctl"><span class="ppa-st">' + BELL + '<span>' + st2 + '</span></span>' + btns + '</div>';
+    return '<div class="kit-status' + (on ? ' on' : '') + '" data-k-alerts><span class="kit-st"><span class="kit-sti">' + Kit.icon('bell', 18) + '</span><span><b>' + title + '</b><small>' + sub + '</small></span></span>' + btn + '</div>';
   }
-  function repaint() { Array.prototype.forEach.call(document.querySelectorAll('.ppa-ctl'), function (el) { el.outerHTML = controlHTML(); }); }
+  function repaint() { Array.prototype.forEach.call(document.querySelectorAll('[data-k-alerts]'), function (el) { el.outerHTML = controlHTML(); }); }
   function askPerm() {
-    if (!canSys() || Notification.permission !== 'default') { repaint(); return; }
-    try { var r = Notification.requestPermission(function () { repaint(); }); if (r && r.then) r.then(repaint, repaint); } catch (e) { repaint(); }
+    if (!canSys() || Notification.permission !== 'default') { repaintAll(); return; }
+    try { var r = Notification.requestPermission(function () { repaintAll(); }); if (r && r.then) r.then(repaintAll, repaintAll); } catch (e) { repaintAll(); }
   }
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-alerts]'); if (!b) return;
     var k = b.getAttribute('data-alerts');
-    if (k === 'on') { set(KEY, 'on'); start(); askPerm(); repaint(); }
-    else if (k === 'off') { set(KEY, 'off'); repaint(); }
+    if (k === 'on') { set(KEY, 'on'); start(); askPerm(); repaintAll(); }
+    else if (k === 'off') { set(KEY, 'off'); repaintAll(); }
     else if (k === 'perm') askPerm();
     else if (k === 'push') enablePush();
+    else if (k === 'test') testNotify();
+    else if (k === 'all' || k === 'none') { var p = prefs(); p.games = k === 'all' ? allGames() : []; setPrefs(p); repaintAll(); }
   });
 
   /* --- home: tutti i tavoli aperti adesso, di tutti i giochi --- */
+  function icon(g) { return '<img src="' + esc(ROOT + g.path + 'icon-192.png') + '" alt="" width="44" height="44" loading="lazy">'; }
   function mountHome(el) { homeEl = el; css(); start(); paintHome(); setTimeout(function () { if (homeEl && !list().length) paintHome(true); }, 6000); }
   function paintHome(waited) {
     if (!homeEl) return;
     var l = list().filter(visible);
-    if (!l.length) { homeEl.innerHTML = '<p>' + (waited || started && Object.keys(tables).length ? 'Nessun tavolo aperto in questo momento: aprine uno tu da un gioco qui sotto, comparirà qui per tutti.' : 'Cerco i tavoli aperti…') + '</p>'; return; }
-    homeEl.innerHTML = '<div class="ppa-home">' + l.slice(0, 8).map(function (t) {
+    if (homeEl.parentNode && homeEl.parentNode.setAttribute) homeEl.parentNode.setAttribute('data-count', l.length);
+    if (!l.length) {
+      homeEl.innerHTML = '<div class="kit-empty">' + (waited || started && Object.keys(tables).length ? Kit.icon('users', 26) + '<b style="color:var(--k-text)">Nessun tavolo aperto in questo momento</b>Aprine uno tu da un gioco qui sotto: comparirà qui per tutti.' : 'Cerco i tavoli aperti…') + '</div>';
+      return;
+    }
+    homeEl.innerHTML = '<div class="h-rows">' + l.slice(0, 8).map(function (t) {
       var code = codeOf(t), e = Object.assign({}, t.e, { code: code }), full = e.max && e.n >= e.max, pub = /^[A-Z]{4}$/.test(code || '');
-      var state = e.phase === 'play' ? 'in partita' : full ? 'completo' : 'in attesa di giocatori';
-      var btn = !pub ? '<a href="' + esc(urlFor(t.g)) + '">Ho il codice</a>' : e.phase === 'play' || full ? '<a href="' + esc(urlFor(t.g, e.code)) + '">Guarda</a>' : '<a class="sit" href="' + esc(urlFor(t.g, e.code)) + '">Siediti</a>';
-      return '<div class="ppa-row"><div class="g"><b>' + esc(nameOf(t)) + '</b> · tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + '<small>' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori · ' + state + (t.e.vis === 'friends' ? ' · solo amici' : pub ? '' : ' · solo su invito') + '</small></div>' + btn + '</div>';
+      var state = e.phase === 'play' ? '<span class="kit-pill">In partita</span>' : full ? '<span class="kit-pill">Completo</span>' : '<span class="kit-pill ok">In attesa</span>';
+      var cta = !pub ? 'Ho il codice' : e.phase === 'play' || full ? 'Guarda' : 'Siediti';
+      return '<a class="h-row" href="' + esc(urlFor(t.g, pub ? e.code : null)) + '">' + icon(t.g) + '<span class="h-rt"><b>' + esc(nameOf(t)) + '</b><small>Tavolo di ' + esc(String(e.host || '…').slice(0, 18)) + ' · ' + (+e.n || 0) + (e.max ? '/' + e.max : '') + ' giocatori' + (t.e.vis === 'friends' ? ' · solo amici' : pub ? '' : ' · su invito') + '</small></span>' + state + '<span class="kit-btn sm' + (cta === 'Siediti' ? '' : ' sec') + '">' + cta + '</span></a>';
     }).join('') + '</div>';
   }
 
@@ -333,12 +355,11 @@ var Alerts = (function () {
     function paint() {
       var l = GAMES.map(function (g) { return cards[g.path]; }).filter(Boolean);
       box.hidden = !l.length;
-      el.innerHTML = l.map(function (c) {
-        return '<div class="ppa-row"><div class="g"><b>' + esc(c.g.n) + '</b> · tavolo ' + esc(c.d.code) + (c.d.practice ? ' (prova)' : '') +
-          '<small>' + esc(c.st) + (c.others.length ? ' · con ' + esc(c.others.join(', ')) : '') + '</small></div><a class="sit" href="' + esc(urlFor(c.g, c.d.code)) + '">Continua</a></div>';
-      }).join('');
+      el.innerHTML = '<div class="h-rows">' + l.map(function (c) {
+        return '<a class="h-row" href="' + esc(urlFor(c.g, c.d.code)) + '">' + icon(c.g) + '<span class="h-rt"><b>' + esc(c.g.n) + (c.d.practice ? ' · prova' : '') + '</b><small>Tavolo ' + esc(c.d.code) + ' · ' + esc(c.st) + (c.others.length ? ' · con ' + esc(c.others.join(', ')) : '') + '</small></span><span class="kit-btn sm">Continua</span></a>';
+      }).join('') + '</div>';
     }
-    css(); el.classList.add('ppa-home'); paint();
+    css(); paint();
     GAMES.forEach(function (g) {
       var code = get(SEAT[g.path]); if (!/^[A-Z]{4}$/.test(code || '')) return;
       Net.peekAt(g.p, code).then(function (f) {
@@ -350,6 +371,7 @@ var Alerts = (function () {
       });
     });
   }
+
 
   /* --- chi apre un tavolo pubblico lo fa annunciare dal server a chi ha le notifiche attive --- */
   function created(prefix, code, nick, vis) {
@@ -364,5 +386,5 @@ var Alerts = (function () {
 
   if (enabled()) setTimeout(start, 1200);
   return { start: start, controlHTML: controlHTML, mountHome: mountHome, created: created, list: list, enabled: enabled, _tables: tables,
-    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: settingsHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, turnsOn: function () { return prefs().turns; }, endpoint: function () { return get(SUBK); }, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
+    GAMES: GAMES, ROOT: ROOT, here: here, settingsHTML: notifyHTML, notifyHTML: notifyHTML, gamesHTML: gamesHTML, enablePush: enablePush, disablePush: disablePush, resync: resync, forget: forget, pushOn: pushOn, turnsOn: function () { return prefs().turns; }, endpoint: function () { return get(SUBK); }, banner: banner, paintHome: function () { paintHome(); }, mountContinue: mountContinue };
 })();

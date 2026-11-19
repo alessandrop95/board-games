@@ -192,9 +192,10 @@ MQ.prototype.wake = function () {
 MQ.prototype._parse = function () {
   var b = this.buf;
   while (b.length >= 2) {
-    var mult = 1, len = 0, i = 1, d;
-    do { if (i >= b.length) return; d = b[i++]; len += (d & 127) * mult; mult *= 128; } while (d & 128);
-    if (b.length < i + len) break;
+    var mult = 1, len = 0, i = 1, d, partial = false;
+    // lunghezza non ancora arrivata per intero: si esce dal ciclo (non con return) così sotto si salva solo il resto non letto
+    do { if (i >= b.length) { partial = true; break; } d = b[i++]; len += (d & 127) * mult; mult *= 128; } while (d & 128);
+    if (partial || b.length < i + len) break;
     this._handle(b[0], b.subarray(i, i + len));
     b = b.subarray(i + len);
   }
@@ -664,6 +665,12 @@ var Net = (function () {
     if (!since || Date.now() - since < GIVEBACK * (1 + 3 * Math.min(4, me.lost[d.owner] || 0))) return;
     hostApply(function (w) { if (w.owner === uid || !seatedHuman(w, w.owner)) return false; w.host = w.owner; return true; });
   }
+  // Lo stato arriva da un server pubblico e chiunque può pubblicarne uno: il tipo delle voci del registro
+  // finisce dentro gli attributi class delle pagine, quindi nella copia data alla pagina si accettano solo nomi semplici (o numeri).
+  function cleanLog(d) {
+    var g = d && d.game; if (!g || !Array.isArray(g.log)) return;
+    g.log.forEach(function (l) { if (l && typeof l.k !== 'number' && !/^[A-Za-z0-9_-]{0,24}$/.test(String(l.k))) l.k = 'sys'; });
+  }
   function accept(d) {
     T.doc = d;
     var shouldHost = d.host === uid;
@@ -671,7 +678,7 @@ var Net = (function () {
     if (!shouldHost && T.isHost) { T.isHost = false; T.c.unsubscribe(topic(T.code, 'act')); }
     if (T.isHost && !d.lobbyId) { setTimeout(function () { hostApply(function (w) { if (w.lobbyId) return false; w.lobbyId = rid(); w.vis = w.vis || 'public'; return true; }); }, 0); }
     else if (T.isHost && !T.unpub && !T.resync) announce(false);
-    T.onDoc(JSON.parse(JSON.stringify(d)));
+    var view = JSON.parse(JSON.stringify(d)); cleanLog(view); T.onDoc(view);   // si ripulisce solo la copia per la pagina, non lo stato del tavolo
   }
   // Annuncio del tavolo nella lista pubblica (messaggio "retained" per tavolo, aggiornato dall'host).
   // I tavoli "solo su invito" compaiono senza codice.
@@ -703,7 +710,7 @@ var Net = (function () {
   /* Lista dei tavoli aperti. Oltre ai messaggi in arrivo, ogni pochi secondi (e appena l'app torna in primo piano)
      la lista si richiede al server: così si vedono i tavoli aperti mentre il telefono dormiva e spariscono quelli chiusi. */
   async function watchLobby(cb) {
-    var base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false, att = [], reached = 0, failed = 0;
+    var base = PREFIX + 'lobby/', filt = base + '+', items = {}, stopped = false, att = [], reached = 0, failed = 0, sus = {}, CLEAN_WAIT = LOBBY_BEAT * 2 + 5000;
     function alive(e) { var now = Date.now(); return (e.rx && now - e.rx < LOBBY_TTL) || now - e.t < LOBBY_TTL; }
     function emit() {
       if (stopped) return;
@@ -718,8 +725,25 @@ var Net = (function () {
         if (!p) { delete items[id]; emit(); return; }
         var e = safeParse(p);
         if (!e || e.id !== id || typeof e.t !== 'number') return;
-        if (retained && Date.now() - e.t > 3600e3) { c.publish(t, '', true); return; } // pulizia dei tavoli abbandonati da tempo
+        var old0 = items[id];
+        if (!retained && sus[id]) { clearTimeout(sus[id]); delete sus[id]; }   // l'host l'ha appena ripetuto dal vivo: è vivo
+        // Pulizia dei tavoli abbandonati da tempo. L'età si misura con l'orologio dell'host, che può essere indietro:
+        // quindi non si cancella subito, ma solo se in CLEAN_WAIT non arriva nessuna conferma dal vivo (l'host ne manda una ogni LOBBY_BEAT).
+        if (retained && Date.now() - e.t > 3600e3 && !(old0 && old0.rx && Date.now() - old0.rx < LOBBY_TTL)) {
+          if (!sus[id]) sus[id] = setTimeout(function () {
+            delete sus[id];
+            var it = items[id]; if (stopped || (it && it.rx && Date.now() - it.rx < CLEAN_WAIT)) return;
+            c.publish(t, '', true);
+          }, CLEAN_WAIT);
+          return;
+        }
+        // l'annuncio arriva da un server pubblico: ogni campo mostrato nella pagina va ripulito
         e.host = String(e.host || '').slice(0, 18); e.note = String(e.note || '').slice(0, 40);
+        e.n = Math.max(0, Math.min(99, Math.floor(+e.n) || 0)); e.max = Math.max(0, Math.min(99, Math.floor(+e.max) || 0)) || null;
+        e.code = typeof e.code === 'string' && /^[A-Z]{4}$/.test(e.code) ? e.code : null;
+        e.vis = e.vis === 'invite' || e.vis === 'friends' || e.vis === 'direct' ? e.vis : 'public';
+        e.phase = e.phase === 'play' || e.phase === 'over' ? e.phase : 'lobby';
+        e.u = typeof e.u === 'string' ? e.u.slice(0, 18) : null;
         if (retained && e.t > Date.now()) e.t = Date.now(); // orologio dell'host avanti: il tavolo non resta in lista più del dovuto
         var old = items[id];
         if (old && old.t > e.t) { old.seen = Date.now(); return; }
@@ -757,7 +781,7 @@ var Net = (function () {
     document.addEventListener('visibilitychange', onVis); window.addEventListener('focus', onVis); window.addEventListener('online', onVis);
     var iv = setInterval(refresh, LOBBY_REFRESH);
     var stop = function () {
-      stopped = true; clearInterval(iv); clearTimeout(sweepT);
+      stopped = true; clearInterval(iv); clearTimeout(sweepT); Object.keys(sus).forEach(function (k) { clearTimeout(sus[k]); });
       document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); window.removeEventListener('online', onVis);
       att.forEach(function (a) { if (!a) return; a.c.handlers = a.c.handlers.filter(function (x) { return x !== a.h; }); a.c.unsubscribe(filt); });
     };
@@ -921,7 +945,7 @@ var Net = (function () {
   // auto = subentro automatico perché l'host non risponde: il titolare resta lui e al ritorno riavrà il comando.
   // Senza auto è «Prendi il comando» premuto apposta: il tavolo diventa di chi lo prende.
   function takeHost(auto) {
-    if (!T || !T.doc) return false;
+    if (!T || !T.doc || !seatedIn(T.doc, uid)) return false;   // uno spettatore non prende il comando
     var work = JSON.parse(JSON.stringify(T.doc));
     if (!work.owner) work.owner = work.host;   // tavolo aperto con una versione precedente
     if (auto !== true) work.owner = uid;

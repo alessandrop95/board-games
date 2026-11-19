@@ -202,7 +202,7 @@ document.addEventListener('click', function (ev) {
     case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + esc(el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); break; }
     case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); break;
     case 'closeyes': App.sheet = null; renderSheet(); App.closing = true; if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); } break;
-    case 'takehost': App.sheet = null; renderSheet(); Net.takeHost(); toast('Ora sei tu a reggere il tavolo e il tempo.'); break;
+    case 'takehost': App.sheet = null; renderSheet(); if (!Net.takeHost()) { toast('Solo chi è seduto al tavolo può prendere il comando.'); break; } toast('Ora sei tu a reggere il tavolo e il tempo.'); break;
     // tavolo
     case 'open':
       if (!g) return;

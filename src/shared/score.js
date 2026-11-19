@@ -49,18 +49,17 @@ var Score = (function () {
       '<div class="sc-rows">' + rows.map(function (u) { return '<span class="sc-p' + (u === s.champ ? ' on' : '') + (window.Net && u === Net.uid ? ' me' : '') + '">' + esc(s.names[u] || '…') + ' <b>' + s.wins[u] + '</b></span>'; }).join('') + '</div>' +
       (champ ? '<div class="sc-note">Con una nuova partita comincia un’altra serie.</div>' : '') + '</div>';
   }
-  var CSS = '.sc-box{display:grid;gap:6px;padding:10px 12px;border-radius:12px;border:1px solid rgba(230,197,111,.45);background:rgba(230,197,111,.08);font-size:15px;line-height:1.35;text-align:left}' +
-    '.sc-champ{font-weight:800;font-size:17px}.sc-rows{display:flex;flex-wrap:wrap;gap:6px}.sc-p{padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.08);white-space:nowrap}.sc-p.on{background:rgba(230,197,111,.35)}.sc-p.me{box-shadow:inset 0 0 0 1px currentColor}' +
-    '.sc-note,.sc-head{font-size:13.5px;opacity:.85}';
+  var CSS = '.sc-box{display:grid;gap:8px;padding:12px 14px;border-radius:16px;background:color-mix(in srgb,var(--k-accent) 10%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--k-accent) 40%,transparent);font:14.5px/1.4 var(--k-font);text-align:left}' +
+    '.sc-champ{font-weight:800;font-size:17px;letter-spacing:-.01em}.sc-rows{display:flex;flex-wrap:wrap;gap:6px}.sc-p{padding:4px 11px;border-radius:999px;background:rgba(255,255,255,.08);white-space:nowrap;font-weight:600}.sc-p b{margin-left:2px}.sc-p.on{background:var(--k-accent);color:var(--k-on-accent)}.sc-p.me{box-shadow:inset 0 0 0 1px currentColor}' +
+    '.sc-note,.sc-head{font-size:13px;opacity:.8}';
   function css() { if (!document.getElementById('sc-css')) { var st = document.createElement('style'); st.id = 'sc-css'; st.textContent = CSS; document.head.appendChild(st); } }
   // Sala d'attesa: scelta della serie (host) e classifica della serie in corso.
   function roomHTML(doc, isHost) {
     css();
     var t = doc.series ? doc.series.target || 0 : 0;
-    return '<label style="display:grid;gap:6px"><span><b>Serie di partite</b><br><span class="muted" style="font-size:15px">Con «Nuova partita con lo stesso tavolo» le vittorie si sommano.</span></span>' +
-      '<select id="opt-series" class="field"' + (isHost ? '' : ' disabled') + ' style="font-size:16px;min-height:44px">' +
-      [[0, 'Partite singole (conto le vittorie)'], [3, 'Al meglio di 3'], [5, 'Al meglio di 5']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === t ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
-      '</select></label>' + standings(doc);
+    return '<div class="kit-opt"><div class="kit-opt-h"><b>Serie di partite</b></div>' +
+      Kit.seg('opt-series', [[0, 'Singole'], [3, 'Al meglio di 3'], [5, 'Al meglio di 5']], t, !isHost) +
+      '<p class="kit-opt-d">Con «Nuova partita con lo stesso tavolo» le vittorie si sommano' + (t ? ': vince chi arriva prima a ' + Math.ceil(t / 2) + '.' : '.') + '</p></div>' + standings(doc);
   }
   function endHTML(doc) { css(); return standings(doc); }
   document.addEventListener('change', function (e) {

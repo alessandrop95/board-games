@@ -215,7 +215,7 @@ function driveBots() {
 function onDoc() {
   var g = G(), me = myIdx();
   // partita nuova sullo stesso tavolo (rivincita con le stesse persone): fogli, animazioni e suoni ripartono da zero
-  if (App.gidSeen && App.doc.gid !== App.gid) { App.sheetKey = null; App.sheet = null; App.lastFxN = 0; App.hide = {}; App.mode = null; App.sel = []; App.drop = []; App.card = null; }
+  if (App.gidSeen && App.doc.gid !== App.gid) { App.botKeys = {}; App.sheetKey = null; App.sheet = null; App.lastFxN = 0; App.hide = {}; App.mode = null; App.sel = []; App.drop = []; App.card = null; }
   App.gid = App.doc.gid; App.gidSeen = true;
   if (!g && App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
   if (App.screen !== 'table') { driveBots(); Turns.watch(App.doc); paintCur(); return; }

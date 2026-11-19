@@ -253,7 +253,7 @@ setInterval(function () {
 function onDoc() {
   var g = G(), me = myIdx();
   // partita nuova sullo stesso tavolo (rivincita): gli effetti ripartono da zero, compreso il primo
-  if (App.gidSeen && App.doc.gid !== App.gid) { resetLocal(); App.lastFxN = 0; }
+  if (App.gidSeen && App.doc.gid !== App.gid) { App.botKeys = {}; resetLocal(); App.lastFxN = 0; }
   App.gid = App.doc.gid; App.gidSeen = true;
   if (!g && App.lastFxN) { App.lastFxN = 0; App.hide = {}; }
   if (g && g.clock !== App.clock) { App.clock = g.clock; App.off = g.clock - Date.now(); }

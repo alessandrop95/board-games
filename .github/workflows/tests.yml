@@ -47,7 +47,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          # avviate a mano provano il ramo scelto (per esempio quello di una pull request); altrimenti main
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || 'main' }}
           fetch-depth: 0
       - name: Scegli le prove
         id: which
