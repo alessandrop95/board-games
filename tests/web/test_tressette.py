@@ -45,7 +45,7 @@ with sync_playwright() as p:
     a = js(A, 'myIdx()'); b = js(B, 'myIdx()')
     t('i compagni sono seduti di fronte', (a + 2) % 4 == b, [a, b])
     t('10 carte a testa, niente tallone', js(A, 'G().players.every(function(P){return P.hand.length===10}) && G().deck.length===0 && G().opts.target===21'))
-    t('vedo le mie 10 carte e il compagno di fronte', A.locator('.hcard').count() == 10 and 'Bea' in A.inner_text('.seat-t.n') and 'compagno' in A.inner_text('.seat-t.n'))
+    t('vedo le mie 10 carte e il compagno di fronte', A.locator('.hcard').count() == 10 and 'Bea' in A.inner_text('.seat-t.n') and 'compagno' in A.inner_text('.seat-t.n').lower())
     # una mano controllata: apre Ale con «Busso» a coppe
     o1, o2 = (a + 1) % 4, (a + 3) % 4
     host(A, "g.players.forEach(function(P){P.bot=false}); g.acc={}; g.trick=[]; g.turn=g.lead=%d; g.players[%d].hand=[%d,%d]; g.players[%d].hand=[%d,%d]; g.players[%d].hand=[%d,%d]; g.players[%d].hand=[%d,%d]" % (
