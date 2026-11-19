@@ -31,8 +31,8 @@ with sync_playwright() as p:
     # ---- amici online ----
     go(Ap, 'gattomina/'); go(Bp, 'gattomina/'); go(Cp, 'gattomina/')
     Bp.evaluate('Account.presence()'); time.sleep(1); Ap.evaluate('Account.presence()'); time.sleep(1.2)
-    Bp.click('[data-pa="open"][data-v="account"]'); Bp.wait_for_timeout(900)
-    s = Bp.inner_text('.pa-sheet'); t('Bea vede Ale collegato a Exploding Kittens', 'sta guardando Exploding Kittens' in s, s[:400])
+    Bp.click('[data-pa="open"][data-v="settings"]'); Bp.wait_for_timeout(500); Bp.click('[data-pa="go"][data-v="friends"]'); Bp.wait_for_timeout(900)
+    s = Bp.inner_text('.k-sheet'); t('Bea vede Ale collegato a Exploding Kittens', 'sta guardando Exploding Kittens' in s, s[:400])
     Bp.click('[data-pa="close"]')
 
     # ---- tavolo «solo amici» ----
@@ -55,7 +55,7 @@ with sync_playwright() as p:
     go(Cp, 'gattomina/')
     Bp.evaluate('Account.presence()'); time.sleep(1); Ap.evaluate('Account.refreshFriends(true)'); time.sleep(1)
     Ap.click('[data-pa="openinvite"]') if Ap.locator('[data-pa="openinvite"]').count() else None; Ap.wait_for_timeout(800)
-    s = Ap.inner_text('.pa-sheet') if Ap.locator('.pa-sheet').count() else ''
+    s = Ap.inner_text('.k-sheet') if Ap.locator('.k-sheet').count() else ''
     t('invito: si vede dov’è l’amica', 'è al tavolo di Exploding Kittens' in s, s[:300])
     Ap.evaluate('Account.close()')
 
@@ -80,9 +80,9 @@ with sync_playwright() as p:
     time.sleep(4)
     Bp.evaluate("App.sheet = null; renderSheet && renderSheet()"); Bp.wait_for_timeout(300)
     Bp.evaluate("Account.open('stats')")
-    try: Bp.wait_for_function("document.querySelector('.pa-sheet') && document.querySelector('.pa-sheet').textContent.includes('Ultime partite')", timeout=8000)
+    try: Bp.wait_for_function("document.querySelector('.k-sheet') && document.querySelector('.k-sheet').textContent.includes('Ultime partite')", timeout=8000)
     except Exception: pass
-    s = Bp.inner_text('.pa-sheet'); t('statistiche di Bea', '0 vinte su 2' in s and 'Ale' in s and 'ultime partite' in s.lower(), s[:600])
+    s = Bp.inner_text('.k-sheet'); t('statistiche di Bea', '0 vinte su 2' in s and 'Ale' in s and 'ultime partite' in s.lower(), s[:600])
     Bp.screenshot(path=os.path.join(os.environ.get('OUT', '/tmp'), 'stats.png'))
     Bp.evaluate('Account.close()')
 

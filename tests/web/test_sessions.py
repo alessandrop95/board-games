@@ -108,7 +108,7 @@ with sync_playwright() as p:
     time.sleep(4)
     ok('nessun avviso per i tavoli su invito', H.evaluate("!document.querySelector('.ppa-banner')"))
     # --- avviso di sistema quando la pagina è in sottofondo ---
-    ok('interruttore avvisi nella lista dei tavoli', C.evaluate("(()=>{leaveTable(); return new Promise(r=>setTimeout(()=>r(!!document.querySelector('.ppa-ctl')),600))})()"))
+    ok('interruttore avvisi nella lista dei tavoli', C.evaluate("(()=>{leaveTable(); return new Promise(r=>setTimeout(()=>r(!!document.querySelector('[data-k-alerts]')),600))})()"))
     print('errori pagina', errs[:6])
     br.close()
 print('%d/%d prove superate' % (sum(1 for _, c in res if c), len(res)))

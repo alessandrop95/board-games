@@ -125,12 +125,15 @@ var Game = (function () {
     var fl = App.flash && Date.now() - App.flash.at < 2500 ? App.flash : null;
     var html = groups.map(function (x) {
       var k = E.kind(x.c), bad = !k, flash = fl && !mine && fl.groups && fl.groups.indexOf(+String(x.id).slice(1)) >= 0;
-      return '<div class="grp' + (bad ? ' bad' : '') + (flash ? ' flash' : '') + '" data-drop="' + x.id + '"' + (mine ? ' data-act="grp" data-g="' + x.id + '"' : '') + '>' +
-        x.c.map(function (c) { return cardHTML(c, (fresh[c] ? ' fresh' : '') + (mine && W.sel.indexOf(c) >= 0 ? ' sel' : '') + (fl && !mine && fl.cards.indexOf(c) >= 0 ? ' fresh' : '')); }).join('') +
-        (bad ? '<span class="gtag">' + (x.c.length < 3 ? 'incompleta' : 'non valida') + '</span>' : '') + '</div>';
+      // etichetta del vassoio: che combinazione è (o perché non va ancora)
+      var lab = bad ? '<span class="glab bad">' + (x.c.length < 3 ? 'Incompleta' : 'Non valida') + '</span>'
+        : k === 'set' ? '<span class="glab">' + (x.c.length === 4 ? 'Poker' : 'Tris') + ' di ' + esc(E.label(x.c[0]).replace(/[^0-9A-Z]/g, '')) + '</span>'
+        : '<span class="glab">Scala ' + ART.suitIcon(E.suit(x.c[0]), 12) + '<i>' + x.c.length + '</i></span>';
+      return '<div class="grp' + (bad ? ' bad' : '') + (flash ? ' flash' : '') + '" data-drop="' + x.id + '"' + (mine ? ' data-act="grp" data-g="' + x.id + '"' : '') + '>' + lab +
+        '<div class="gcards">' + x.c.map(function (c) { return cardHTML(c, (fresh[c] ? ' fresh' : '') + (mine && W.sel.indexOf(c) >= 0 ? ' sel' : '') + (fl && !mine && fl.cards.indexOf(c) >= 0 ? ' fresh' : '')); }).join('') + '</div></div>';
     }).join('');
     if (mine) html += '<button class="grp newg" data-drop="new" data-act="newg">' + IC('plus') + '<span>Nuova combinazione</span></button>';
-    if (!groups.length && !mine) html = '<p class="empty">Il tavolo è vuoto. ' + (g.phase === 'play' ? 'La prima combinazione la cala chi ci riesce.' : '') + '</p>';
+    if (!groups.length && !mine) html = '<div class="empty"><span class="empty-ic">' + ART.suitIcon(1, 18) + ART.suitIcon(0, 18) + ART.suitIcon(2, 18) + ART.suitIcon(3, 18) + '</span><b>Il tavolo è vuoto</b>' + (g.phase === 'play' ? '<span>La prima combinazione la cala chi ci riesce.</span>' : '') + '</div>';
     var head = draft ? '<div class="tline">' + pname(g, g.turn) + ' sta riorganizzando il tavolo…</div>' : '';
     return head + '<div class="groups">' + html + '</div>';
   }

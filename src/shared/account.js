@@ -11,6 +11,7 @@ var Account = (function () {
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   var sig = null, cfg = jget('pp-server'), session = jget('pp-session'), friendsData = null, view = null, busy = false, msg = null, inviteSent = {};
   var showPw = false, hasRecovery = null, devices = null, reloadOnClose = false;
+  var NEED_USER = { friends: 1, stats: 1, security: 1, invite: 1, settings: 0 };
   var readyRes; var ready = new Promise(function (r) { readyRes = r; });
 
   /* ---------- server ---------- */
@@ -52,7 +53,7 @@ var Account = (function () {
   function check() {
     if (session && configured()) rpc('me', { p_token: session.token }).then(function (m) {
       if (m && m.username !== session.username) { session.username = m.username; set('pp-session', JSON.stringify(session)); repaint(); }
-      if (m && typeof m.recovery === 'boolean') { hasRecovery = m.recovery; if (view && view.v === 'account') render(); }
+      if (m && typeof m.recovery === 'boolean') { hasRecovery = m.recovery; if (view && (view.v === 'settings' || view.v === 'security')) render(); }
       refreshFriends(true);
     }, function () {});
   }
@@ -62,7 +63,7 @@ var Account = (function () {
     var was = session && session.token; session = jget('pp-session');
     if ((session && session.token) === was) return;
     friendsData = null; hasRecovery = null; devices = null; presSig = null;
-    repaint(); paintLists(); if (view) { if (!session && view.v !== 'login' && view.v !== 'register' && view.v !== 'recover') close(); else render(); }
+    repaint(); paintLists(); if (view) { if (!session && NEED_USER[view.v]) close(); else render(); }
     if (session) check();
   });
   function user() { return configured() && session ? session : null; }
@@ -120,7 +121,7 @@ var Account = (function () {
   }
   function loadDevices() {
     if (!user()) return;
-    rpc('my_sessions', { p_token: session.token }).then(function (l) { devices = Array.isArray(l) ? l : []; if (view && view.v === 'account') render(); }, function () { devices = []; });
+    rpc('my_sessions', { p_token: session.token }).then(function (l) { devices = Array.isArray(l) ? l : []; if (view && view.v === 'security') render(); }, function () { devices = []; });
   }
   function ago(ts) {
     var m = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
@@ -161,7 +162,7 @@ var Account = (function () {
     if (!force && sig === presSig && Date.now() - presAt < 60000) return;
     presBusy = true; presSig = sig; presAt = Date.now();
     rpc('presence', { p_token: session.token, p_game: w.g, p_table: w.t, p_vis: w.v, p_phase: w.ph })
-      .then(function (d) { friendsData = d; repaint(); paintLists(); if (view && (view.v === 'account' || view.v === 'invite')) render(); }, function () { presSig = null; })
+      .then(function (d) { friendsData = d; repaint(); paintLists(); if (view && (view.v === 'settings' || view.v === 'friends' || view.v === 'invite')) render(); }, function () { presSig = null; })
       .then(function () { presBusy = false; });
   }
   setInterval(function () { presenceTick(false); }, 4000);
@@ -182,24 +183,23 @@ var Account = (function () {
       .then(function (r) { statsData = r[0]; boardData = r[1]; render(); }, function (er) { msg = { t: String(er) }; render(); });
   }
   function statsHTML() {
-    var h = '<h2>Statistiche</h2>' + msgHTML();
-    if (!statsData) return h + '<p class="pa-note">Carico…</p><button class="pa-btn g" data-pa="go" data-v="account">Indietro</button>';
+    if (!statsData) return msgHTML() + '<div class="k-empty">Carico le tue partite…</div>';
     var gs = statsData.games, tp = 0, tw = 0; gs.forEach(function (x) { tp += x.played; tw += x.won; });
-    h += '<section class="pa-sec">' + secHead('chart', 'Le tue partite');
-    h += gs.length ? '<div class="pa-list">' + gs.map(function (x) { return '<div class="pa-row"><b>' + esc(gameName(x.game)) + '</b><span class="pa-num">' + x.won + ' vinte su ' + x.played + '</span><span class="pa-pct">' + Math.round(100 * x.won / Math.max(1, x.played)) + '%</span></div>'; }).join('') +
-      '<div class="pa-row pa-tot"><b>Totale</b><span class="pa-num">' + tw + ' vinte su ' + tp + '</span><span class="pa-pct">' + Math.round(100 * tw / Math.max(1, tp)) + '%</span></div></div>'
-      : '<p class="pa-note">Ancora nessuna partita registrata: si contano quelle finite da quando hai l’account (non le partite di prova).</p>';
-    h += '</section>';
-    h += '<section class="pa-sec">' + secHead('friends', 'Classifica tra amici') + '<div class="pa-bar pa-filter"><button type="button" class="pa-btn s' + (boardGame ? ' g' : '') + '" data-pa="board" data-g="">Tutti i giochi</button>' +
-      (A.GAMES || []).map(function (g) { var id = g.path.replace(/\/$/, ''); return '<button type="button" class="pa-btn s' + (boardGame === id ? '' : ' g') + '" data-pa="board" data-g="' + id + '">' + esc(g.n) + '</button>'; }).join('') + '</div>';
-    h += boardData && boardData.length ? '<div class="pa-list">' + boardData.map(function (r, i) { return '<div class="pa-row' + (r.me ? ' pa-me' : '') + '"><span class="pa-pos">' + (i + 1) + '</span><b>' + esc(r.username) + (r.me ? ' (tu)' : '') + '</b><span class="pa-num">' + r.won + ' vinte · ' + r.played + ' giocate</span></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun risultato.</p>';
-    h += '</section>';
-    if (statsData.recent.length) h += '<section class="pa-sec"><h3>Ultime partite</h3><div class="pa-list">' + statsData.recent.map(function (x) {
-      var d = new Date(x.at), when = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-      return '<div class="pa-row"><span class="pa-res">' + (x.won ? '🏆' : '·') + '</span><span style="flex:1;min-width:0"><b>' + esc(gameName(x.game)) + '</b> · ' + (x.won ? 'vinta' : x.place ? x.place + 'º posto' : 'persa') + (x.score != null ? ' · ' + x.score + ' punti' : '') +
-        '<br><span class="pa-note">' + when + (x.rivals && x.rivals.length ? ' · con ' + x.rivals.map(esc).join(', ') : '') + '</span></span></div>';
-    }).join('') + '</div></section>';
-    return h + '<button class="pa-btn g" data-pa="go" data-v="account">‹ Torna al profilo</button>';
+    var h = msgHTML() + '<div class="k-stat"><div><b>' + tp + '</b><small>partite</small></div><div><b>' + tw + '</b><small>vinte</small></div><div><b>' + Math.round(100 * tw / Math.max(1, tp)) + '%</b><small>vittorie</small></div></div>';
+    h += gs.length ? Kit.group('Per gioco', gs.map(function (x) {
+      return Kit.row({ title: esc(gameName(x.game)), sub: x.won + ' vinte su ' + x.played, right: '<span class="k-pill' + (x.won ? ' a' : '') + '">' + Math.round(100 * x.won / Math.max(1, x.played)) + '%</span>' });
+    })) : '<p class="k-note">Ancora nessuna partita registrata: si contano quelle finite da quando hai l’account (non le partite di prova).</p>';
+    h += '<section class="k-group"><h3 class="k-gtitle">Classifica tra amici</h3><div class="k-scroll-x"><button type="button" class="k-chipbtn' + (boardGame ? '' : ' on') + '" data-pa="board" data-g="">Tutti i giochi</button>' +
+      (A.GAMES || []).map(function (g) { var id = g.path.replace(/\/$/, ''); return '<button type="button" class="k-chipbtn' + (boardGame === id ? ' on' : '') + '" data-pa="board" data-g="' + id + '">' + esc(g.n) + '</button>'; }).join('') + '</div>' +
+      (boardData && boardData.length ? '<div class="k-list">' + boardData.map(function (r, i) {
+        return Kit.row({ title: esc(r.username) + (r.me ? ' <span class="k-pill a">tu</span>' : ''), sub: r.won + ' vinte · ' + r.played + ' giocate', right: '<span class="k-rv">' + (i + 1) + 'º</span>' });
+      }).join('') + '</div>' : '<p class="k-note">Nessun risultato.</p>') + '</section>';
+    if (statsData.recent.length) h += Kit.group('Ultime partite', statsData.recent.map(function (x) {
+      var d = new Date(x.at), when = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      return Kit.row({ title: esc(gameName(x.game)), sub: when + (x.rivals && x.rivals.length ? ' · con ' + x.rivals.map(esc).join(', ') : ''),
+        right: '<span class="k-pill' + (x.won ? ' ok' : '') + '">' + (x.won ? 'Vinta' : x.place ? x.place + 'º posto' : 'Persa') + (x.score != null ? ' · ' + x.score : '') + '</span>' });
+    }));
+    return h;
   }
   function incoming() { return friendsData && friendsData.incoming ? friendsData.incoming.length : 0; }
   function addFriend(name) {
@@ -209,173 +209,200 @@ var Account = (function () {
     });
   }
 
-  /* ---------- grafica ---------- */
-  var CSS = '.pa-back{position:fixed;inset:0;z-index:95;background:rgba(8,5,3,.66);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;animation:pafade .2s}' +
-    '@keyframes pafade{from{opacity:0}}@keyframes paup{from{transform:translateY(28px);opacity:0}}' +
-    '.pa-sheet{position:relative;width:100%;max-width:540px;max-height:calc(94vh - env(safe-area-inset-top,0px));overflow-y:auto;overscroll-behavior:contain;background:linear-gradient(180deg,#241b14,#19130e 160px);color:#f6ecdc;border:1px solid rgba(255,228,186,.13);border-bottom:0;border-radius:22px 22px 0 0;padding:22px max(18px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:grid;gap:14px;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;box-shadow:0 -14px 40px rgba(0,0,0,.55);animation:paup .28s cubic-bezier(.2,.8,.2,1)}' +
-    '.pa-sheet::before{content:"";position:absolute;top:8px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:4px;background:rgba(255,228,186,.2)}' +
-    '@media(min-width:640px){.pa-back{align-items:center;padding:24px}.pa-sheet{border-radius:22px;border-bottom:1px solid rgba(255,228,186,.13);padding:26px 24px 22px}.pa-sheet::before{display:none}}' +
-    '.pa-x{position:absolute;top:12px;right:12px;width:36px;height:36px;display:grid;place-items:center;appearance:none;border:0;border-radius:50%;background:rgba(255,240,215,.08);color:#cbbca3;font:400 22px/1 system-ui,sans-serif;cursor:pointer;z-index:1}.pa-x:hover{background:rgba(255,240,215,.16);color:#fff}' +
-    '.pa-sheet h2{margin:0;padding-right:44px;font:600 23px/1.2 Fraunces,Georgia,serif;letter-spacing:-.01em}.pa-sheet p{margin:0}.pa-note{font-size:13.5px;color:#ab9b83}' +
-    '.pa-sheet h3{margin:0;font:700 12px/1.2 system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#e8ab4c}' +
-    '.pa-tabs{display:flex;gap:4px;background:rgba(0,0,0,.28);padding:4px;border-radius:14px;border:1px solid rgba(255,228,186,.08)}.pa-tabs button{flex:1;appearance:none;border:0;background:none;color:#cbbca3;font:600 15px system-ui,sans-serif;padding:10px;border-radius:10px;cursor:pointer}.pa-tabs button.on{background:#e8ab4c;color:#1b1209;box-shadow:0 2px 8px rgba(0,0,0,.3)}' +
-    '.pa-sheet form{display:grid;gap:12px}.pa-sheet form.pa-bar{display:flex;flex-wrap:nowrap}.pa-sheet form.pa-bar input{min-width:0!important}.pa-sheet label{display:grid;gap:6px;font-size:13.5px;font-weight:600;color:#cbbca3}' +
-    '.pa-sheet input[type=text],.pa-sheet input[type=password]{font:16px system-ui,sans-serif;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,228,186,.16);background:rgba(0,0,0,.3);color:#f6ecdc;min-height:48px;transition:border-color .15s,box-shadow .15s}' +
-    '.pa-sheet input::placeholder{color:#7d705d}.pa-sheet input[type=text]:focus,.pa-sheet input[type=password]:focus{outline:none;border-color:#e8ab4c;box-shadow:0 0 0 3px rgba(232,171,76,.18)}' +
-    '.pa-btn{appearance:none;border:0;border-radius:12px;min-height:48px;padding:11px 18px;font:700 15.5px system-ui,sans-serif;background:#e8ab4c;color:#1b1209;cursor:pointer;transition:background .15s,transform .1s;box-shadow:0 4px 14px rgba(232,171,76,.18)}.pa-btn:hover{background:#f6cd7d}.pa-btn:active{transform:scale(.98)}.pa-btn:disabled{opacity:.5}' +
-    '.pa-btn.g{background:rgba(255,240,215,.06);color:inherit;box-shadow:inset 0 0 0 1px rgba(255,228,186,.16)}.pa-btn.g:hover{background:rgba(255,240,215,.12)}.pa-btn.s{min-height:36px;padding:7px 13px;font-size:14px;border-radius:10px;box-shadow:none}.pa-btn.s.g{box-shadow:inset 0 0 0 1px rgba(255,228,186,.16)}.pa-btn.r{background:#c2412d;color:#fff}' +
-    '.pa-err{color:#ff9b86;font-size:14.5px;padding:10px 12px;border-radius:12px;background:rgba(255,110,90,.09)}.pa-ok{color:#9fe0a0;font-size:14.5px;padding:10px 12px;border-radius:12px;background:rgba(80,200,120,.09)}' +
-    '.pa-list{display:grid;gap:6px}.pa-row{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:13px;background:rgba(0,0,0,.22);border:1px solid rgba(255,228,186,.07)}.pa-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
-    '.pa-dot{width:9px;height:9px;border-radius:50%;background:#6f675c;flex:none}.pa-dot.on{background:#43d17c;box-shadow:0 0 0 3px rgba(67,209,124,.18)}' +
-    '.pa-row a.pa-btn{text-decoration:none;display:inline-flex;align-items:center}.pa-num{font-size:13.5px;color:#cbbca3;white-space:nowrap}.pa-pct{min-width:44px;text-align:right;font-weight:800;color:#e8ab4c}' +
-    '.pa-tot{background:rgba(232,171,76,.1);border-color:rgba(232,171,76,.25)}.pa-me{box-shadow:inset 0 0 0 1px rgba(232,171,76,.6)}.pa-pos{width:24px;text-align:center;font-weight:800;color:#e8ab4c}.pa-res{width:24px;text-align:center}' +
-    '.pa-filter{gap:6px;flex-wrap:nowrap!important;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}.pa-filter .pa-btn{flex:none;white-space:nowrap}' +
-    '.pa-chip{appearance:none;display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,228,186,.18);background:rgba(255,240,215,.07);color:inherit;border-radius:999px;padding:4px 13px 4px 4px;min-height:38px;font:600 14.5px system-ui,-apple-system,sans-serif;cursor:pointer;position:relative;white-space:nowrap;transition:border-color .15s,background .15s}.pa-chip:hover{border-color:#e8ab4c;background:rgba(255,240,215,.11)}' +
-    '.pa-chip.in{background:#e8ab4c;border-color:#e8ab4c;color:#1b1209;padding:4px 15px 4px 6px}.pa-chip.in:hover{background:#f6cd7d}.pa-chip.in svg{width:26px;height:26px;padding:4px;border-radius:50%;background:rgba(0,0,0,.12)}' +
-    '.pa-chip .n{background:#d8402a;color:#fff;border-radius:999px;font-size:11px;line-height:18px;min-width:18px;text-align:center;padding:0 5px;font-weight:800}.pa-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
-    '.pa-av{display:inline-grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;color:#fff;font:700 14px/1 system-ui,sans-serif;text-transform:uppercase;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}.pa-av.l{width:58px;height:58px;font-size:25px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.2),0 6px 18px rgba(0,0,0,.35)}' +
-    '.pa-prof{display:flex;align-items:center;gap:14px;padding-right:40px}.pa-prof h2{padding:0}.pa-prof>div{display:grid;gap:2px;min-width:0}' +
-    '.pa-sec{display:grid;gap:10px;padding:16px;border-radius:18px;background:rgba(255,240,215,.035);border:1px solid rgba(255,228,186,.09)}' +
-    '.pa-sh{display:flex;align-items:center;gap:10px}.pa-sh h3{flex:1}.pa-si{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;color:#e8ab4c;background:rgba(232,171,76,.12)}.pa-cnt{font-size:12.5px;font-weight:700;color:#cbbca3;background:rgba(255,240,215,.07);padding:2px 9px;border-radius:999px}' +
-    '.pa-nav{appearance:none;width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:12px;border-radius:14px;border:1px solid rgba(255,228,186,.08);background:rgba(0,0,0,.22);color:inherit;font:inherit;cursor:pointer}.pa-nav:hover{border-color:rgba(232,171,76,.5)}.pa-nav span{flex:1;min-width:0;display:grid}.pa-nav small{font-size:13px;color:#ab9b83}.pa-nav i{font-style:normal;font-size:22px;color:#ab9b83}' +
-    '.pa-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pa-acts .pa-btn{width:100%}.pa-btn.dz{color:#ff9b86}' +
-    '.pa-check{display:flex!important;flex-direction:row!important;gap:12px!important;align-items:center;font-size:15px!important;font-weight:400!important;color:inherit!important;padding:4px 0;cursor:pointer}' +
-    '.pa-check input{-webkit-appearance:none;appearance:none;margin:0;flex:none;position:relative;cursor:pointer;width:44px;height:26px;border-radius:999px;background:rgba(255,240,215,.16);transition:background .2s}' +
-    '.pa-check input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .2s cubic-bezier(.2,.8,.2,1)}.pa-check input:checked{background:#e8ab4c}.pa-check input:checked::after{transform:translateX(18px)}' +
-    '.pa-check input:focus-visible{outline:2px solid #f6cd7d;outline-offset:2px}' +
-    '.pa-sec>.pa-check{flex-direction:row-reverse!important;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,228,186,.07)}.pa-sec>.pa-check:last-of-type{border-bottom:0}' +
-    '.pa-games{display:flex;flex-wrap:wrap;gap:6px}.pa-games .pa-check{gap:7px!important;font-size:13.5px!important;padding:6px 11px 6px 7px;border-radius:999px;border:1px solid rgba(255,228,186,.13);background:rgba(0,0,0,.18)}' +
-    '.pa-games .pa-check:has(input:checked){border-color:rgba(232,171,76,.55);background:rgba(232,171,76,.12)}' +
-    '.pa-games .pa-check input{width:18px;height:18px;border-radius:6px}.pa-games .pa-check input::after{top:3px;left:6px;width:5px;height:9px;border-radius:0;background:none;box-shadow:none;border:solid #1b1209;border-width:0 2px 2px 0;transform:rotate(45deg) scale(0)}.pa-games .pa-check input:checked::after{transform:rotate(45deg) scale(1)}' +
-    '.pa-sep{border:0;border-top:1px solid rgba(255,228,186,.09);margin:2px 0}' +
-    '.pa-pw{position:relative;display:block}.pa-pw input{width:100%;box-sizing:border-box;padding-right:84px!important}.pa-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);appearance:none;border:0;background:rgba(255,240,215,.07);color:#cbbca3;font:600 13px system-ui,sans-serif;min-width:72px;min-height:38px;cursor:pointer;border-radius:9px}' +
-    '.pa-code{font:700 24px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-align:center;padding:16px 10px;border-radius:14px;background:rgba(0,0,0,.35);border:1px dashed rgba(232,171,76,.7);color:#f6cd7d;user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}' +
-    '.pa-warn{padding:12px 14px;border-radius:14px;background:rgba(232,140,60,.12);border:1px solid rgba(232,140,60,.45);font-size:14.5px;display:grid;gap:10px}.pa-warn .pa-btn{justify-self:start}' +
-    '.pa-link{appearance:none;border:0;background:none;color:#e8ab4c;font:600 14.5px system-ui,sans-serif;text-decoration:underline;text-underline-offset:3px;padding:6px 0;cursor:pointer;justify-self:start}' +
-    '.pa-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:99;background:#241b14;color:#f6ecdc;border:1px solid rgba(232,171,76,.5);padding:11px 16px;border-radius:14px;font:15px system-ui,sans-serif;box-shadow:0 12px 30px rgba(0,0,0,.5);max-width:min(92vw,460px)}';
-  var ICO = {
-    friends: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.3c1.9.7 3 2.6 3 5.7"/>',
-    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
-    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
-    shield: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/>',
-    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'
-  };
-  function ico(k, w) { return '<svg viewBox="0 0 24 24" width="' + (w || 18) + '" height="' + (w || 18) + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICO[k] + '</svg>'; }
-  function avatar(name, cls) { var h = 0; String(name).split('').forEach(function (c) { h = (h * 31 + c.charCodeAt(0)) % 360; }); return '<span class="pa-av' + (cls ? ' ' + cls : '') + '" style="background:linear-gradient(135deg,hsl(' + h + ',62%,52%),hsl(' + ((h + 40) % 360) + ',58%,38%))" aria-hidden="true">' + esc(String(name).charAt(0)) + '</span>'; }
-  function secHead(k, title, n) { return '<div class="pa-sh"><span class="pa-si">' + ico(k) + '</span><h3>' + title + '</h3>' + (n != null ? '<span class="pa-cnt">' + n + '</span>' : '') + '</div>'; }
-  function css() { if (!document.getElementById('pa-css')) { var s = document.createElement('style'); s.id = 'pa-css'; s.textContent = CSS; document.head.appendChild(s); } }
-  function toastMsg(t) { css(); var d = document.createElement('div'); d.className = 'pa-toast'; d.textContent = t; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3200); }
+  /* ---------- grafica: pannello «Impostazioni» (profilo, amici, statistiche, notifiche, audio, app, account) ---------- */
+  var TITLES = { settings: 'Impostazioni', friends: 'Amici', stats: 'Statistiche', security: 'Password e account', games: 'Nuovi tavoli', login: 'Accedi', register: 'Crea account', recover: 'Password dimenticata', code: 'Codice di recupero', invite: 'Invita un amico' };
+  // stili propri del pannello (il resto viene dal kit): password con «Mostra», codice di recupero, avvisi
+  var CSS = '.pa-pw{position:relative;display:block}.pa-pw .k-input{padding-right:92px}' +
+    '.pa-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);appearance:none;border:0;background:var(--k-surface-3);color:var(--k-text);border-radius:9px;padding:7px 11px;font:600 13px var(--k-font);cursor:pointer}' +
+    '.pa-code{font:700 24px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-align:center;padding:18px 10px;border-radius:16px;background:var(--k-surface);border:1.5px dashed var(--k-accent-ink);color:var(--k-text);user-select:all;-webkit-user-select:all}' +
+    '.k-warn{display:grid;gap:10px;padding:13px 14px;border-radius:16px;background:color-mix(in srgb,#e8a33c 13%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,#e8a33c 45%,transparent);font-size:14px;line-height:1.45}.k-warn .k-btn{justify-self:start}' +
+    '.k-link{appearance:none;border:0;background:none;color:var(--k-accent-ink);font:600 14.5px var(--k-font);text-decoration:underline;text-underline-offset:3px;padding:4px 0;cursor:pointer;justify-self:start}';
+  function css() { Kit.css(); if (!document.getElementById('pa-css')) { var s = document.createElement('style'); s.id = 'pa-css'; s.textContent = CSS; document.head.appendChild(s); } }
+  function toastMsg(t) { Kit.toast(t); }
   function close() {
-    var m = document.querySelector('.pa-back'); if (m) m.remove(); view = null; msg = null; showPw = false;
+    var m = document.querySelector('.k-back[data-pa-sheet]'); if (m) m.remove(); view = null; msg = null; showPw = false;
     if (reloadOnClose) { reloadOnClose = false; reloadSoon(); }   // appena entrati: ora che il codice di recupero è stato visto, si riparte con l'account
   }
   function open(v, extra) {
-    css(); view = { v: v || (user() ? 'account' : 'login'), x: extra || {} }; msg = null;
-    if (view.v !== 'login' && view.v !== 'register' && view.v !== 'recover' && !user()) view = { v: 'login', x: { why: extra && extra.why } };
+    css(); v = v === 'account' || !v ? 'settings' : v;
+    view = { v: v, x: extra || {} }; msg = null;
+    if ((NEED_USER[v] || v === 'login' || v === 'register' || v === 'recover') && !configured()) view = { v: 'settings', x: {} };
+    else if (NEED_USER[v] && !user()) view = { v: 'login', x: { why: extra && extra.why, intent: extra && extra.intent } };
     render();
-    if (user() && (view.v === 'account' || view.v === 'invite')) refreshFriends().catch(function () {});
-    if (user() && view.v === 'account') { devices = null; loadDevices(); }
+    if (user() && (view.v === 'settings' || view.v === 'friends' || view.v === 'invite')) refreshFriends(true).then(render, function () {});
+    if (user() && view.v === 'security') { devices = null; loadDevices(); }
     if (user() && view.v === 'stats') { statsData = null; loadStats(); }
+  }
+  function go(v) {
+    // passando tra accesso, registrazione e recupero si tiene il motivo e quello che si stava facendo
+    var keep = view && view.x && (view.x.why || view.x.intent) && /^(login|register|recover)$/.test(v) ? { why: view.x.why, intent: view.x.intent } : {};
+    view = { v: v, x: keep }; msg = null; render(); var s = document.querySelector('.k-back[data-pa-sheet] .k-sheet'); if (s) s.scrollTop = 0;
+    if (view.v === 'friends') refreshFriends(true).then(render, function () {});
+    if (view.v === 'security') { devices = null; loadDevices(); }
+    if (view.v === 'stats') { statsData = null; loadStats(); }
   }
   function render() {
     if (!view) return;
-    var html = body(), back = document.querySelector('.pa-back');
-    if (!back) { back = document.createElement('div'); back.className = 'pa-back'; back.addEventListener('click', function (e) { if (e.target === back) close(); }); document.body.appendChild(back); }
-    var focused = document.activeElement && document.activeElement.name, vals = {};
+    var back = document.querySelector('.k-back[data-pa-sheet]');
+    if (!back) {
+      back = document.createElement('div'); back.className = 'k-back'; back.setAttribute('data-pa-sheet', '');
+      back.addEventListener('click', function (e) { if (e.target === back) close(); });
+      document.body.appendChild(back);
+    }
+    var focused = document.activeElement && back.contains(document.activeElement) ? document.activeElement.name : null, vals = {};
     back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (i.name) vals[i.name] = i.value; });
-    back.innerHTML = '<div class="pa-sheet" role="dialog" aria-modal="true"><button type="button" class="pa-x" data-pa="close" aria-label="Chiudi">×</button>' + html + '</div>';
-    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (i.name && vals[i.name] != null) i.value = vals[i.name]; });
+    var sheet = back.querySelector('.k-sheet'), top = sheet ? sheet.scrollTop : 0, sub = view.v !== 'settings' && !((view.v === 'login' || view.v === 'register') && view.x.why) && view.v !== 'invite' && view.v !== 'code';
+    var auth = view.v === 'login' || view.v === 'register';
+    var backTo = view.v === 'recover' ? 'login' : 'settings';
+    back.innerHTML = '<div class="k-sheet" role="dialog" aria-modal="true" aria-labelledby="pa-title"><div class="k-head">' +
+      (sub ? '<button type="button" class="k-icbtn" data-pa="go" data-v="' + backTo + '" aria-label="Indietro">' + Kit.icon('back') + '</button>' : '<span class="k-icbtn ghost"></span>') +
+      '<h2 id="pa-title">' + (auth ? (view.v === 'register' ? 'Crea il tuo account' : 'Entra in Board Games') : TITLES[view.v] || '') + '</h2>' +
+      '<button type="button" class="k-icbtn" data-pa="close" aria-label="Chiudi">' + Kit.icon('x') + '</button></div><div class="k-body">' + body() + '</div></div>';
+    sheet = back.querySelector('.k-sheet'); sheet.scrollTop = top;
+    back.querySelectorAll('input[type=text],input[type=password]').forEach(function (i) { if (vals[i.name] != null) i.value = vals[i.name]; });
     var f = focused && back.querySelector('[name="' + focused + '"]'); if (f) f.focus();
   }
-  function msgHTML() { return msg ? '<p class="' + (msg.ok ? 'pa-ok' : 'pa-err') + '" role="status">' + esc(msg.t) + '</p>' : ''; }
+  function msgHTML() { return msg ? '<p class="k-msg ' + (msg.ok ? 'ok' : 'err') + '" role="status">' + esc(msg.t) + '</p>' : ''; }
+  function myNick() { return (get('pp-nick') || '').trim().slice(0, 18); }
+
   function body() {
     var v = view.v, u = user();
-    if (!configured()) return '<h2>Account</h2><p>Il server dei giocatori non è ancora attivo: puoi continuare a giocare come sempre.</p><button class="pa-btn g" data-pa="close">Chiudi</button>';
-    if (v === 'login' || v === 'register') {
-      var reg = v === 'register';
-      return '<h2>' + (reg ? 'Crea il tuo account' : 'Entra in Board Games') + '</h2>' + (view.x.why ? '<p>' + esc(view.x.why) + '</p>' : '') +
-        '<div class="pa-tabs" role="tablist"><button type="button" class="' + (!reg ? 'on' : '') + '" data-pa="tab" data-v="login">Accedi</button><button type="button" class="' + (reg ? 'on' : '') + '" data-pa="tab" data-v="register">Registrati</button></div>' +
-        '<form data-pa-form="' + v + '" autocomplete="on"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></label>' +
-        pwField('Password', 'p', reg ? 'new-password' : 'current-password', reg ? 'next' : 'go') +
-        (reg ? pwField('Ripeti la password', 'p2', 'new-password', 'go') : '') + msgHTML() +
-        '<button class="pa-btn" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : reg ? 'Crea account' : 'Accedi') + '</button></form>' +
-        (reg ? '' : '<button type="button" class="pa-link" data-pa="go" data-v="recover">Password dimenticata?</button>') +
-        '<p class="pa-note">' + (reg ? 'Nome da 3 a 18 caratteri tra lettere, numeri, punto e trattini; password di almeno 6. Niente email: subito dopo ricevi un <b>codice di recupero</b>, che serve se dimentichi la password.' : 'Con l’account ritrovi amici, inviti e notifiche su tutti i tuoi dispositivi, e resti collegato finché non esci tu.') + '</p>' +
-        '<button class="pa-btn g" data-pa="close" type="button">' + (view.x.why ? 'Non ora' : 'Chiudi') + '</button>';
-    }
-    if (v === 'recover') {
-      return '<h2>Password dimenticata</h2><p class="pa-note">Scrivi il tuo nome utente, il <b>codice di recupero</b> che hai ricevuto quando hai creato l’account (12 caratteri, tipo ABCD-EFGH-JKLM) e la nuova password.</p>' +
-        '<form data-pa-form="recover" autocomplete="off"><label>Nome utente<input type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>' +
-        '<label>Codice di recupero<input type="text" name="c" maxlength="20" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH-JKLM" required></label>' +
-        pwField('Nuova password', 'p', 'new-password', 'go') + msgHTML() +
-        '<button class="pa-btn" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : 'Cambia password ed entra') + '</button></form>' +
-        '<p class="pa-note">Non hai il codice? Se sei ancora collegato su un altro dispositivo, da lì puoi crearne uno nuovo (👤 → Codice di recupero) o cambiare la password. Altrimenti l’account non si può recuperare: creane uno nuovo.</p>' +
-        '<button class="pa-btn g" data-pa="go" data-v="login" type="button">Torna all’accesso</button>';
-    }
-    if (v === 'code') {
-      return '<h2>Il tuo codice di recupero</h2><p>Se un giorno dimentichi la password, con questo codice ne scegli una nuova. <b>Lo vedi solo adesso</b>: scrivilo, copialo nelle note o fai uno screenshot.</p>' +
-        '<div class="pa-code" data-code>' + esc(view.x.code) + '</div>' + msgHTML() +
-        '<button class="pa-btn g" type="button" data-pa="copycode">Copia il codice</button>' +
-        '<p class="pa-note">Vale una volta sola: quando lo usi ne ricevi uno nuovo.' + (view.x.fresh ? '' : ' Il codice di prima non vale più.') + '</p>' +
-        '<button class="pa-btn" type="button" data-pa="close">L’ho salvato</button>';
-    }
-    if (!u) return '';
+    if (v === 'login' || v === 'register') return authHTML(v === 'register');
+    if (v === 'recover') return recoverHTML();
+    if (v === 'code') return codeHTML();
     if (v === 'stats') return statsHTML();
-    if (v === 'invite') {
-      var x = view.x, fr = friendsData ? friendsData.friends : null;
-      return '<h2>Invita un amico</h2><p class="pa-note">Gli arriva una notifica: toccandola si siede al tavolo <b>' + esc(x.code) + '</b>.</p>' + msgHTML() +
-        (fr == null ? '<p class="pa-note">Carico i tuoi amici…</p>' : fr.length ? '<div class="pa-list">' + fr.map(function (f) {
-          var k = x.code + ':' + f.username, sent = inviteSent[k];
-          return '<div class="pa-row"><span class="pa-dot' + (f.online ? ' on' : '') + '" title="' + (f.online ? 'Collegato' : 'Non in linea') + '"></span><span style="flex:1;min-width:0"><b>' + esc(f.username) + '</b><br><span class="pa-note">' + esc(friendLine(f)) + '</span></span><button class="pa-btn s' + (sent ? ' g' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato ✓' : 'Invita') + '</button></div>';
-        }).join('') + '</div>' : '<p>Non hai ancora amici nella lista.</p>') +
-        '<button class="pa-btn g" data-pa="go" data-v="account">Aggiungi amici</button><button class="pa-btn g" data-pa="close">Chiudi</button>';
-    }
-    // account
-    var d = friendsData, fr2 = d ? d.friends : [], inc = d ? d.incoming : [], out = d ? d.outgoing : [];
-    var on = fr2.filter(function (f) { return f.online; }).length;
-    var h = '<div class="pa-prof">' + avatar(u.username, 'l') + '<div><h2>Ciao, ' + esc(u.username) + '</h2><p class="pa-note">' + (d ? fr2.length + (fr2.length === 1 ? ' amico' : ' amici') + (on ? ' · ' + on + ' collegat' + (on === 1 ? 'o' : 'i') + ' ora' : '') : 'Il tuo profilo') + '</p></div></div>' + msgHTML();
-    if (hasRecovery === false && !view.x.rec) h += '<div class="pa-warn"><span><b>Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso (amici e statistiche compresi).</span><button class="pa-btn s" type="button" data-pa="rec">Crea il codice di recupero</button></div>';
-    // amici
-    h += '<section class="pa-sec">' + secHead('friends', 'Amici', d ? fr2.length : null);
-    if (inc.length) h += '<div class="pa-list">' + inc.map(function (n) { return '<div class="pa-row pa-tot">' + avatar(n) + '<b>' + esc(n) + ' vuole essere tuo amico</b><button class="pa-btn s" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button class="pa-btn s g" data-pa="decline" data-u="' + esc(n) + '">No</button></div>'; }).join('') + '</div>';
-    h += d == null ? '<p class="pa-note">Carico…</p>' : fr2.length ? '<div class="pa-list">' + fr2.map(function (f) { var j = joinHref(f); return '<div class="pa-row">' + avatar(f.username) + '<span style="flex:1;min-width:0"><b style="display:flex;align-items:center;gap:7px">' + esc(f.username) + '<span class="pa-dot' + (f.online ? ' on' : '') + '" title="' + (f.online ? 'Collegato' : 'Non in linea') + '"></span></b><span class="pa-note">' + esc(friendLine(f)) + '</span></span>' + (j ? '<a class="pa-btn s" href="' + esc(j) + '">' + (f.phase === 'lobby' ? 'Raggiungi' : 'Guarda') + '</a>' : '') + '<button class="pa-btn s g" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici">×</button></div>'; }).join('') + '</div>' : '<p class="pa-note">Nessun amico per ora. Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica.</p>';
-    if (out.length) h += '<p class="pa-note">In attesa di risposta: ' + out.map(esc).join(', ') + '</p>';
-    h += '<form data-pa-form="friend" class="pa-bar"><input type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" style="flex:1;min-width:170px" required><button class="pa-btn s" type="submit" style="min-height:48px">Aggiungi</button></form></section>';
-    // partite
-    h += '<section class="pa-sec">' + secHead('chart', 'Partite') + '<button type="button" class="pa-nav" data-pa="go" data-v="stats"><span><b>Statistiche e classifica tra amici</b><small>Vittorie per gioco, ultime partite e chi è il più forte</small></span><i aria-hidden="true">›</i></button></section>';
-    // notifiche
-    h += '<section class="pa-sec">' + secHead('bell', 'Notifiche') + (window.Alerts && Alerts.settingsHTML ? Alerts.settingsHTML() : '') + '</section>';
-    // account e sicurezza
-    h += '<section class="pa-sec">' + secHead('shield', 'Account e sicurezza');
-    if (devices && devices.length) {
-      h += '<div class="pa-list">' + devices.map(function (dv) { return '<div class="pa-row"><span class="pa-dot' + (dv.here ? ' on' : '') + '"></span><span style="flex:1;min-width:0"><b>' + esc(dv.device) + '</b><br><span class="pa-note">' + (dv.here ? 'questo dispositivo' : 'ultimo uso ' + ago(dv.used)) + '</span></span></div>'; }).join('') + '</div>';
-      h += devices.length > 1 ? '<div class="pa-bar"><button class="pa-btn s g" data-pa="others">Esci dagli altri dispositivi</button></div>' : '<p class="pa-note">Sei collegato solo da qui. L’accesso resta attivo finché non esci tu (o per 6 mesi senza usarlo).</p>';
-    }
-    if (view.x.pw) h += '<form data-pa-form="password">' + pwField('Password attuale', 'o', 'current-password') + pwField('Nuova password', 'n', 'new-password') + '<button class="pa-btn s" type="submit">Cambia password</button></form>';
-    if (view.x.rec) h += '<form data-pa-form="recovery"><p>Per creare un nuovo codice di recupero scrivi la tua password. Il codice di prima, se c’era, non varrà più.</p>' + pwField('Password', 'r', 'current-password') + '<button class="pa-btn s" type="submit">Crea il codice</button></form>';
-    if (view.x.del) h += '<form data-pa-form="delete"><p>Cancelli account, amici e notifiche. Non si può annullare.</p>' + pwField('Password', 'd', 'current-password') + '<button class="pa-btn s r" type="submit">Cancella per sempre</button></form>';
-    h += '<div class="pa-acts">' + (view.x.pw ? '' : '<button class="pa-btn s g" data-pa="pw">Cambia password</button>') + (view.x.rec ? '' : '<button class="pa-btn s g" data-pa="rec">Codice di recupero</button>') + '<button class="pa-btn s g" data-pa="logout">Esci</button>' + (view.x.del ? '' : '<button class="pa-btn s g dz" data-pa="del">Cancella account</button>') + '</div></section>';
-    return h + '<button class="pa-btn g" data-pa="close">Chiudi</button>';
+    if (v === 'friends') return friendsHTML();
+    if (v === 'invite') return inviteListHTML();
+    if (v === 'security') return securityHTML();
+    if (v === 'games') return window.Alerts && Alerts.gamesHTML ? Alerts.gamesHTML() : '';
+    return settingsHTML(u);
+  }
+  function settingsHTML(u) {
+    var h = msgHTML(), nick = myNick(), d = friendsData, n = incoming();
+    var online = d && d.friends ? d.friends.filter(function (f) { return f.online; }).length : 0;
+    // profilo
+    var who = u ? u.username : nick || 'Ospite';
+    var sub = u ? 'Account Board Games' + (d && d.friends ? ' · ' + d.friends.length + (d.friends.length === 1 ? ' amico' : ' amici') + (online ? ', ' + online + ' in linea' : '') : '')
+      : configured() ? 'Accedi per ritrovare amici, inviti e notifiche su tutti i tuoi dispositivi.' : 'Giochi senza account: il nome resta su questo dispositivo.';
+    h += '<div class="k-list"><div class="k-row" style="min-height:76px">' + Kit.avatar(who === 'Ospite' ? '' : who, 'lg') + '<span class="k-rt"><b style="font-size:17px">' + esc(who) + '</b><small>' + esc(sub) + '</small></span>' +
+      (configured() && !u ? '<button type="button" class="k-btn sm" data-pa="go" data-v="login">Accedi</button>' : '') + '</div></div>';
+    if (u && hasRecovery === false) h += '<div class="k-warn"><span><b>Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso (amici e statistiche compresi).</span><button class="k-btn sm" type="button" data-pa="rec">Crea il codice di recupero</button></div>';
+    // al tavolo
+    h += Kit.group('Al tavolo', [Kit.row({ ic: 'user', title: 'Il tuo nome', sub: 'Lo vedono gli altri al tavolo', right: '<input class="k-input" type="text" name="nick" data-pa-nick maxlength="18" autocomplete="nickname" placeholder="Es. Ale" value="' + esc(nick) + '" aria-label="Il tuo nome al tavolo">', tag: 'label' })]);
+    if (u) h += Kit.group('Amici e partite', [
+      Kit.row({ ic: 'users', title: 'Amici', sub: n ? n + (n === 1 ? ' richiesta di amicizia' : ' richieste di amicizia') : 'Invitali ai tavoli con una notifica', right: n ? '<span class="k-badge">' + n + '</span>' : '', attrs: 'data-pa="go" data-v="friends"', chev: true }),
+      Kit.row({ ic: 'chart', title: 'Statistiche', sub: 'Le tue partite e la classifica tra amici', attrs: 'data-pa="go" data-v="stats"', chev: true })
+    ]);
+    if (window.Alerts && Alerts.notifyHTML) h += Alerts.notifyHTML();
+    if (window.Sound && Sound.setMusic) h += Kit.group('Audio', [
+      Kit.row({ ic: 'music', title: 'Musica di sottofondo', right: Kit.sw('data-pa-snd="m" aria-label="Musica di sottofondo"', Sound.musicOn), tag: 'label' }),
+      Kit.row({ ic: 'sound', title: 'Effetti sonori', right: Kit.sw('data-pa-snd="s" aria-label="Effetti sonori"', Sound.sfxOn), tag: 'label' })
+    ]);
+    var app = [];
+    app.push('<div class="k-row" style="flex-wrap:wrap;row-gap:10px"><span class="k-ri">' + Kit.icon('sun', 18) + '</span><span class="k-rt"><b>Aspetto</b><small>Automatico segue il tema del telefono</small></span>' +
+      '<div style="flex:1 1 100%">' + Kit.seg('k-theme-pick', [['auto', 'Automatico'], ['dark', 'Scuro'], ['light', 'Chiaro']], Kit.themePref()) + '</div></div>');
+    if (window.PWA && PWA.available && PWA.available()) app.push(Kit.row({ ic: 'download', title: PWA.apk && PWA.apk() ? 'Scarica l’app' : 'Installa l’app', sub: 'Si apre a tutto schermo, come un’app vera', attrs: 'data-pa="install"', chev: true }));
+    if (A.here) app.push(Kit.row({ ic: 'grid', title: 'Tutti i giochi', sub: 'Torna alla home di Board Games', href: ROOT, chev: true }));
+    if (app.length) h += Kit.group('App', app);
+    if (u) h += Kit.group('Account', [
+      Kit.row({ ic: 'key', title: 'Password e account', sub: 'Dispositivi collegati, codice di recupero, password', attrs: 'data-pa="go" data-v="security"', chev: true }),
+      Kit.row({ ic: 'out', icCls: 'r', title: 'Esci', sub: 'Su questo dispositivo', attrs: 'data-pa="logout"', cls: 'danger' })
+    ]);
+    return h;
+  }
+  function authHTML(reg) {
+    return (view.x.why ? '<p class="k-note" style="font-size:15px;color:var(--k-text)">' + esc(view.x.why) + '</p>' : '') +
+      '<div class="k-tabs" role="tablist"><button type="button" role="tab" class="' + (!reg ? 'on' : '') + '" data-pa="tab" data-v="login">Accedi</button><button type="button" role="tab" class="' + (reg ? 'on' : '') + '" data-pa="tab" data-v="register">Registrati</button></div>' +
+      '<form class="k-form" data-pa-form="' + (reg ? 'register' : 'login') + '" autocomplete="on"><label class="k-field">Nome utente<input class="k-input" type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required></label>' +
+      pwField('Password', 'p', reg ? 'new-password' : 'current-password', reg ? 'next' : 'go') +
+      (reg ? pwField('Ripeti la password', 'p2', 'new-password', 'go') : '') + msgHTML() +
+      '<button class="k-btn block" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : reg ? 'Crea account' : 'Accedi') + '</button></form>' +
+      (reg ? '' : '<button type="button" class="k-link" data-pa="go" data-v="recover">Password dimenticata?</button>') +
+      '<p class="k-note">' + (reg ? 'Nome da 3 a 18 caratteri tra lettere, numeri, punto e trattini; password di almeno 6. Niente email: subito dopo ricevi un <b>codice di recupero</b>, che serve se dimentichi la password.' : 'Con l’account ritrovi amici, inviti, statistiche e notifiche su tutti i tuoi dispositivi, e resti collegato finché non esci tu.') + '</p>' +
+      (view.x.why ? '<button class="k-btn sec block" data-pa="close" type="button">Non ora</button>' : '');
+  }
+  function recoverHTML() {
+    return '<p class="k-note">Scrivi il tuo nome utente, il <b>codice di recupero</b> che hai ricevuto quando hai creato l’account (12 caratteri, tipo ABCD-EFGH-JKLM) e la nuova password.</p>' +
+      '<form class="k-form" data-pa-form="recover" autocomplete="off"><label class="k-field">Nome utente<input class="k-input" type="text" name="u" maxlength="18" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>' +
+      '<label class="k-field">Codice di recupero<input class="k-input" type="text" name="c" maxlength="20" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH-JKLM" required></label>' +
+      pwField('Nuova password', 'p', 'new-password', 'go') + msgHTML() +
+      '<button class="k-btn block" type="submit"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Un attimo…' : 'Cambia password ed entra') + '</button></form>' +
+      '<p class="k-note">Non hai il codice? Se sei ancora collegato su un altro dispositivo, da lì puoi crearne uno nuovo (Impostazioni → Password e account) o cambiare la password. Altrimenti l’account non si può recuperare: creane uno nuovo.</p>';
+  }
+  function codeHTML() {
+    return '<p>Se un giorno dimentichi la password, con questo codice ne scegli una nuova. <b>Lo vedi solo adesso</b>: scrivilo, copialo nelle note o fai uno screenshot.</p>' +
+      '<div class="pa-code" data-code>' + esc(view.x.code) + '</div>' + msgHTML() +
+      '<button class="k-btn sec block" type="button" data-pa="copycode">Copia il codice</button>' +
+      '<p class="k-note">Vale una volta sola: quando lo usi ne ricevi uno nuovo.' + (view.x.fresh ? '' : ' Il codice di prima non vale più.') + '</p>' +
+      '<button class="k-btn block" type="button" data-pa="close">L’ho salvato</button>';
   }
   // Campo password con «Mostra»: sul telefono si sbaglia facilmente a scrivere alla cieca.
   function pwField(lab, name, auto, hint) {
-    return '<label>' + lab + '<span class="pa-pw"><input type="' + (showPw ? 'text' : 'password') + '" name="' + name + '" maxlength="72" autocomplete="' + auto + '" autocapitalize="none" autocorrect="off" spellcheck="false"' + (hint ? ' enterkeyhint="' + hint + '"' : '') + ' required>' +
+    return '<label class="k-field">' + lab + '<span class="pa-pw"><input class="k-input" type="' + (showPw ? 'text' : 'password') + '" name="' + name + '" maxlength="72" autocomplete="' + auto + '" autocapitalize="none" autocorrect="off" spellcheck="false"' + (hint ? ' enterkeyhint="' + hint + '"' : '') + ' required>' +
       '<button type="button" class="pa-eye" data-pa="eye" aria-pressed="' + showPw + '" aria-label="' + (showPw ? 'Nascondi la password' : 'Mostra la password') + '">' + (showPw ? 'Nascondi' : 'Mostra') + '</button></span></label>';
+  }
+  function friendsHTML() {
+    var d = friendsData, fr = d ? d.friends : null, inc = d ? d.incoming : [], out = d ? d.outgoing : [];
+    var h = msgHTML() + '<form class="k-inline" data-pa-form="friend"><input class="k-input" type="text" name="f" maxlength="18" placeholder="Nome utente dell’amico" autocapitalize="none" spellcheck="false" aria-label="Nome utente dell’amico" required><button class="k-btn" type="submit">Aggiungi</button></form>';
+    if (inc.length) h += Kit.group('Richieste di amicizia', inc.map(function (n) {
+      return Kit.row({ title: esc(n), sub: 'vuole essere tuo amico', right: '<button type="button" class="k-btn sm" data-pa="accept" data-u="' + esc(n) + '">Accetta</button><button type="button" class="k-btn sm sec" data-pa="decline" data-u="' + esc(n) + '">Rifiuta</button>' });
+    }));
+    if (fr == null) h += '<div class="k-empty">Carico i tuoi amici…</div>';
+    else if (!fr.length) h += '<div class="k-empty">' + Kit.icon('users', 28) + '<b style="color:var(--k-text)">Nessun amico per ora</b>Aggiungili con il loro nome utente: potrete invitarvi ai tavoli con una notifica e confrontare le statistiche.</div>';
+    else h += Kit.group('I tuoi amici', fr.map(function (f) {
+      var j = joinHref(f);
+      return '<div class="k-row">' + Kit.avatar(f.username, 'sm') + '<span class="k-rt"><b>' + esc(f.username) + '</b><small><span class="k-dot' + (f.online ? ' on' : '') + '" style="display:inline-block;margin-right:6px;vertical-align:1px"></span>' + esc(friendLine(f)) + '</small></span>' +
+        (j ? '<a class="k-btn sm" href="' + esc(j) + '">' + (f.phase === 'lobby' ? 'Raggiungi' : 'Guarda') + '</a>' : '') +
+        (view.x.unf === f.username ? '<button type="button" class="k-btn sm danger" data-pa="unfriend" data-u="' + esc(f.username) + '">Togli</button>'
+          : '<button type="button" class="k-icbtn" data-pa="unfriend" data-u="' + esc(f.username) + '" aria-label="Togli ' + esc(f.username) + ' dagli amici" title="Togli dagli amici">' + Kit.icon('x', 16) + '</button>') + '</div>';
+    }));
+    if (out.length) h += '<p class="k-note">In attesa di risposta: ' + out.map(esc).join(', ') + '</p>';
+    return h;
+  }
+  function inviteListHTML() {
+    var x = view.x, fr = friendsData ? friendsData.friends : null;
+    var h = '<p class="k-note">Gli arriva una notifica: toccandola si siede al tavolo <b style="color:var(--k-text)">' + esc(x.code) + '</b>.</p>' + msgHTML();
+    if (fr == null) return h + '<div class="k-empty">Carico i tuoi amici…</div>';
+    if (!fr.length) return h + '<div class="k-empty">' + Kit.icon('users', 28) + 'Non hai ancora amici nella lista.</div><button type="button" class="k-btn sec block" data-pa="go" data-v="friends">Aggiungi amici</button>';
+    return h + Kit.group('', fr.map(function (f) {
+      var sent = inviteSent[x.code + ':' + f.username];
+      return '<div class="k-row">' + Kit.avatar(f.username, 'sm') + '<span class="k-rt"><b>' + esc(f.username) + '</b><small><span class="k-dot' + (f.online ? ' on' : '') + '" style="display:inline-block;margin-right:6px;vertical-align:1px"></span>' + esc(friendLine(f)) + '</small></span>' +
+        '<button type="button" class="k-btn sm' + (sent ? ' sec' : '') + '" data-pa="invite" data-u="' + esc(f.username) + '"' + (sent ? ' disabled' : '') + '>' + (sent ? 'Invitato' : 'Invita') + '</button></div>';
+    })) + '<button type="button" class="k-btn sec block" data-pa="go" data-v="friends">Aggiungi amici</button>';
+  }
+  function securityHTML() {
+    var h = msgHTML();
+    h += '<section class="k-group"><h3 class="k-gtitle">Dispositivi collegati</h3>';
+    if (devices == null) h += '<div class="k-empty">Carico…</div>';
+    else if (devices.length) {
+      h += '<div class="k-list">' + devices.map(function (dv) { return Kit.row({ ic: 'phone', title: esc(dv.device), sub: dv.here ? 'Questo dispositivo' : 'Ultimo uso ' + ago(dv.used), right: dv.here ? '<span class="k-pill ok">Qui</span>' : '' }); }).join('') + '</div>';
+      h += devices.length > 1 ? '<button type="button" class="k-btn sec" data-pa="others">Esci dagli altri dispositivi</button>' : '<p class="k-note" style="padding:0 4px">Sei collegato solo da qui. L’accesso resta attivo finché non esci tu (o per 6 mesi senza usarlo).</p>';
+    }
+    h += '</section>';
+    h += '<section class="k-group" id="pa-rec"><h3 class="k-gtitle">Codice di recupero</h3><form class="k-form" data-pa-form="recovery"><p class="k-note">' +
+      (hasRecovery === false ? '<b style="color:var(--k-text)">Non hai ancora un codice di recupero.</b> Senza, se dimentichi la password l’account è perso. ' : 'Serve se dimentichi la password. ') +
+      'Per crearne uno nuovo scrivi la tua password: il codice di prima, se c’era, non varrà più.</p>' + pwField('Password', 'r', 'current-password') + '<button class="k-btn" type="submit">Crea il codice</button></form></section>';
+    h += '<section class="k-group"><h3 class="k-gtitle">Cambia password</h3><form class="k-form" data-pa-form="password">' + pwField('Password attuale', 'o', 'current-password') + pwField('Nuova password', 'n', 'new-password') +
+      '<button class="k-btn" type="submit">Cambia password</button><p class="k-note">Gli altri dispositivi dovranno accedere di nuovo.</p></form></section>';
+    h += '<section class="k-group"><h3 class="k-gtitle" style="color:var(--k-danger)">Cancella account</h3><form class="k-form" data-pa-form="delete"><p class="k-note">Cancelli account, amici, statistiche e notifiche. Non si può annullare.</p>' +
+      pwField('Password', 'd', 'current-password') + '<button class="k-btn danger" type="submit">Cancella per sempre</button></form></section>';
+    return h;
   }
   function repaint() {
     document.querySelectorAll('[data-pa-chip]').forEach(function (e) { e.outerHTML = chipHTML(); });
-    if (window.Alerts && Alerts.controlHTML) document.querySelectorAll('.ppa-ctl').forEach(function (e) { e.outerHTML = Alerts.controlHTML(); });
+    if (window.Alerts && Alerts.controlHTML) document.querySelectorAll('[data-k-alerts]').forEach(function (e) { e.outerHTML = Alerts.controlHTML(); });
   }
+  // Pulsante con il profilo: apre le Impostazioni (compare nella home e nella lobby di ogni gioco).
   function chipHTML() {
-    css(); if (!configured()) return '<span data-pa-chip hidden></span>';
-    var u = user();
-    if (!u) return '<span data-pa-chip class="pa-bar"><button type="button" class="pa-chip in" data-pa="open" data-v="login">' + ico('user', 26) + 'Accedi o registrati</button></span>';
-    var n = incoming();
-    return '<span data-pa-chip class="pa-bar"><button type="button" class="pa-chip" data-pa="open" data-v="account" aria-label="Profilo e impostazioni di ' + esc(u.username) + '">' + avatar(u.username) + esc(u.username) + (n ? ' <span class="n" title="Richieste di amicizia">' + n + '</span>' : '') + '</button></span>';
+    css();
+    var u = user(), n = incoming(), name = u ? u.username : myNick();
+    var label = u ? esc(u.username) : configured() ? 'Accedi' : name ? esc(name) : 'Impostazioni';
+    return '<span data-pa-chip style="display:inline-flex;max-width:100%"><button type="button" class="k-me" data-pa="open" data-v="' + (u || !configured() ? 'settings' : 'login') + '" aria-label="Profilo e impostazioni">' +
+      Kit.avatar(u ? u.username : name, 'sm') + '<span>' + label + '</span>' + (n ? '<span class="k-badge" title="Richieste di amicizia">' + n + '</span>' : '') + Kit.icon('gear', 17) + '</button></span>';
   }
   function inviteHTML() {
     if (!user()) return '';
-    return '<button type="button" class="pa-chip" data-pa="openinvite">✉ Invita un amico</button>';
+    return '<button type="button" class="k-me" style="padding-left:12px" data-pa="openinvite">' + Kit.icon('mail', 17) + '<span>Invita un amico</span></button>';
   }
   // Prima di sedersi a un tavolo: con il server attivo serve l'account.
   function allow() {
@@ -392,14 +419,15 @@ var Account = (function () {
     var k = b.getAttribute('data-pa'), uname = b.getAttribute('data-u');
     if (k === 'open') { e.preventDefault(); open(b.getAttribute('data-v')); }
     else if (k === 'close') close();
+    else if (k === 'tab' || k === 'go') go(b.getAttribute('data-v'));
+    else if (k === 'install') { close(); if (window.PWA && PWA.install) PWA.install(); }
     else if (k === 'eye') { e.preventDefault(); showPw = !showPw; render(); }
     else if (k === 'copycode') { var cc = view && view.x.code; try { navigator.clipboard.writeText(cc).then(function () { msg = { ok: true, t: 'Codice copiato: incollalo in un posto sicuro (le note del telefono vanno bene).' }; render(); }, function () { msg = { t: 'Tieni premuto sul codice per copiarlo.' }; render(); }); } catch (er) { msg = { t: 'Tieni premuto sul codice per copiarlo.' }; render(); } }
-    else if (k === 'rec') { view.x.rec = true; render(); }
+    else if (k === 'rec') { go('security'); setTimeout(function () { var r = document.getElementById('pa-rec'); if (r) r.scrollIntoView({ block: 'start' }); }, 50); }
     else if (k === 'others') {
       b.disabled = true;
       rpc('logout_others', { p_token: session.token, p_keep_endpoint: (window.Alerts && Alerts.endpoint && Alerts.endpoint()) || null }).then(function (n) { msg = { ok: true, t: n ? 'Fatto: gli altri dispositivi dovranno accedere di nuovo.' : 'Non c’erano altri dispositivi collegati.' }; loadDevices(); render(); }, function (er) { msg = { t: String(er) }; render(); });
     }
-    else if (k === 'tab' || k === 'go') { var keepX = view && view.x && (view.x.why || view.x.intent) && /^(login|register|recover)$/.test(b.getAttribute('data-v')) ? { why: view.x.why, intent: view.x.intent } : {}; view = { v: b.getAttribute('data-v'), x: keepX }; msg = null; render(); if (view.v === 'account') refreshFriends().catch(function () {}); if (view.v === 'stats') { statsData = null; loadStats(); } }
     else if (k === 'board') { boardGame = b.getAttribute('data-g') || ''; rpc('friends_board', { p_token: session.token, p_game: boardGame || null }).then(function (r) { boardData = r; render(); }, function (er) { msg = { t: String(er) }; render(); }); render(); }
     else if (k === 'openinvite') { var code = window.Net && Net.tableCode; if (!code) return; open('invite', { code: code, game: gameId() }); }
     else if (k === 'invite') {
@@ -413,11 +441,22 @@ var Account = (function () {
     }
     else if (k === 'accept') addFriend(uname).catch(function (er) { msg = { t: String(er) }; render(); });
     else if (k === 'decline') rpc('friend_respond', { p_token: session.token, p_username: uname, p_accept: false }).then(function () { return refreshFriends(); }).catch(function (er) { msg = { t: String(er) }; render(); });
-    else if (k === 'unfriend') rpc('friend_remove', { p_token: session.token, p_username: uname }).then(function () { msg = { ok: true, t: uname + ' non è più nei tuoi amici.' }; return refreshFriends(); }).catch(function (er) { msg = { t: String(er) }; render(); });
-    else if (k === 'pw') { view.x.pw = true; render(); }
-    else if (k === 'del') { view.x.del = true; render(); }
+    else if (k === 'unfriend') {   // doppio tocco: il primo chiede conferma nella riga stessa
+      if (view.x.unf !== uname) { view.x.unf = uname; render(); return; }
+      view.x.unf = null; rpc('friend_remove', { p_token: session.token, p_username: uname }).then(function () { msg = { ok: true, t: uname + ' non è più nei tuoi amici.' }; return refreshFriends(); }).catch(function (er) { msg = { t: String(er) }; render(); }); }
     else if (k === 'logout') logout();
   });
+  document.addEventListener('change', function (e) {
+    var t = e.target; if (!t.getAttribute) return;
+    if (t.hasAttribute('data-pa-nick')) {   // nome al tavolo: vale per tutti i giochi
+      var n = t.value.trim().slice(0, 18); if (!n) { t.value = myNick(); return; }
+      set('pp-nick', n); document.querySelectorAll('input#nick').forEach(function (i) { i.value = n; }); repaint(); toastMsg('Nome salvato: ' + n);
+    }
+    if (t.id === 'k-theme-pick') { Kit.setTheme(t.value); return; }
+    var s = t.getAttribute('data-pa-snd');
+    if (s && window.Sound) { if (s === 'm') Sound.setMusic(t.checked); else Sound.setSfx(t.checked); }
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.hasAttribute && e.target.hasAttribute('data-pa-nick')) e.target.blur(); });
   document.addEventListener('submit', function (e) {
     var f = e.target.closest('[data-pa-form]'); if (!f) return;
     e.preventDefault(); var k = f.getAttribute('data-pa-form'), v = function (n) { var i = f.querySelector('[name="' + n + '"]'); return i ? i.value : ''; };
@@ -431,9 +470,9 @@ var Account = (function () {
     } else if (k === 'recovery') {
       rpc('new_recovery', { p_token: session.token, p_password: v('r') }).then(function (r) { hasRecovery = true; view = { v: 'code', x: { code: r.recovery } }; msg = null; render(); }, function (er) { msg = { t: String(er) }; render(); });
     } else if (k === 'friend') {
-      addFriend(v('f').trim()).then(function () { var i = document.querySelector('[name="f"]'); if (i) i.value = ''; }, function (er) { msg = { t: String(er) }; render(); });
+      addFriend(v('f').trim()).then(function () { var i = document.querySelector('[data-pa-form="friend"] [name="f"]'); if (i) i.value = ''; }, function (er) { msg = { t: String(er) }; render(); });
     } else if (k === 'password') {
-      rpc('change_password', { p_token: session.token, p_old: v('o'), p_new: v('n') }).then(function () { view.x.pw = false; msg = { ok: true, t: 'Password cambiata. Gli altri dispositivi dovranno accedere di nuovo.' }; render(); }, function (er) { msg = { t: String(er) }; render(); });
+      rpc('change_password', { p_token: session.token, p_old: v('o'), p_new: v('n') }).then(function () { f.reset(); msg = { ok: true, t: 'Password cambiata. Gli altri dispositivi dovranno accedere di nuovo.' }; render(); }, function (er) { msg = { t: String(er) }; render(); });
     } else if (k === 'delete') {
       var s = session;
       (window.Alerts && Alerts.forget ? Alerts.forget() : Promise.resolve()).catch(function () {}).then(function () { return rpc('delete_account', { p_token: s.token, p_password: v('d') }); })
@@ -442,7 +481,7 @@ var Account = (function () {
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && view) close(); });
   // link dalle notifiche: ?amici=1 apre la lista degli amici
-  if (/[?&]amici=1/.test(location.search)) ready.then(function () { if (user()) open('account'); });
+  if (/[?&]amici=1/.test(location.search)) ready.then(function () { if (user()) open('friends'); });
   ready.then(resume);
 
   load();

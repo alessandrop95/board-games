@@ -7,11 +7,11 @@ var Coach = (function () {
   var cfg = null, hidden = false, lastHTML = '';
   function setup(c) { cfg = c; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  var CSS = '.cx-start{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border:1px dashed rgba(255,255,255,.22);border-radius:12px;font-size:14.5px;line-height:1.35}.cx-start span{flex:1;min-width:180px;opacity:.9}' +
-    '.cx-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(58px + env(safe-area-inset-top,0px));z-index:9980;width:min(540px,calc(100vw - 16px));display:flex;gap:10px;align-items:flex-start;padding:10px 10px 10px 12px;border-radius:14px;background:rgba(18,30,44,.94);color:#eef4fb;border:1px solid rgba(140,200,255,.45);box-shadow:0 10px 26px rgba(0,0,0,.45);font:14.5px/1.4 system-ui,-apple-system,sans-serif}' +
-    '.cx-bar .cx-t{flex:1;min-width:0}.cx-bar b{color:#9fd3ff}.cx-bar .cx-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}' +
-    '.cx-bar button{appearance:none;font:600 13.5px system-ui,sans-serif;border-radius:999px;padding:7px 12px;border:1px solid #9fd3ff;background:transparent;color:inherit;cursor:pointer}.cx-bar button.main{background:#9fd3ff;color:#0e1a26;border-color:#9fd3ff}' +
-    '.cx-bar .cx-x{border:0;padding:2px 6px;font-size:20px;line-height:1;opacity:.7}.cx-pill{position:fixed;right:max(10px,env(safe-area-inset-right,0px));top:calc(60px + env(safe-area-inset-top,0px));z-index:9980;appearance:none;border:1px solid rgba(140,200,255,.6);background:rgba(18,30,44,.94);color:#eef4fb;border-radius:999px;padding:7px 12px;font:600 13.5px system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4)}';
+  var CSS = '.cx-start{display:flex;gap:10px 12px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);font:14px/1.4 var(--k-font)}.cx-start span{flex:1;min-width:180px;opacity:.88}' +
+    '.cx-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(58px + env(safe-area-inset-top,0px));z-index:9980;width:min(540px,calc(100vw - 16px));display:flex;gap:10px;align-items:flex-start;padding:12px 12px 12px 14px;border-radius:16px;background:rgba(20,22,29,.96);color:var(--k-text);box-shadow:0 14px 34px rgba(0,0,0,.5),inset 0 0 0 1px var(--k-line-2),inset 3px 0 0 var(--k-accent);font:14.5px/1.45 var(--k-font);-webkit-font-smoothing:antialiased}' +
+    '.cx-bar .cx-t{flex:1;min-width:0}.cx-bar b{color:var(--k-accent)}.cx-bar .cx-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}' +
+    '.cx-bar button{appearance:none;font:600 13.5px var(--k-font);border-radius:10px;padding:8px 12px;border:0;background:var(--k-surface-2);box-shadow:inset 0 0 0 1px var(--k-line-2);color:inherit;cursor:pointer}.cx-bar button.main{background:var(--k-accent);color:var(--k-on-accent);box-shadow:none}' +
+    '.cx-bar .cx-x{background:none;box-shadow:none;padding:2px 6px;font-size:20px;line-height:1;opacity:.6}.cx-pill{position:fixed;right:max(10px,env(safe-area-inset-right,0px));top:calc(60px + env(safe-area-inset-top,0px));z-index:9980;appearance:none;border:0;background:rgba(20,22,29,.96);box-shadow:0 8px 22px rgba(0,0,0,.45),inset 0 0 0 1px var(--k-accent);color:var(--k-text);border-radius:999px;padding:8px 14px;font:600 13.5px var(--k-font);cursor:pointer}';
   function css() { if (!document.getElementById('cx-css')) { var s = document.createElement('style'); s.id = 'cx-css'; s.textContent = CSS; document.head.appendChild(s); } }
   function buttonHTML() {
     if (!cfg || (window.App && App.code)) return '';
@@ -48,7 +48,7 @@ var Coach = (function () {
   function flash(t) { flashTxt = t; clearTimeout(flashT); flashT = setTimeout(function () { flashTxt = null; paint(); }, 5000); paint(); }
   function paint() {
     // nascosta mentre è aperta una finestra del gioco (benvenuto, scelte, regole): quella spiega già cosa fare
-    var d = window.App && App.doc, on = d && d.practice && App.screen === 'table' && d.game && cfg && !App.sheet && !document.querySelector('.pa-back,.px-back');
+    var d = window.App && App.doc, on = d && d.practice && App.screen === 'table' && d.game && cfg && !App.sheet && !document.querySelector('.pa-back,.px-back,.k-back');
     var bar = document.querySelector('.cx-bar'), pill = document.querySelector('.cx-pill');
     if (!on) { if (bar) bar.remove(); if (pill) pill.remove(); lastHTML = ''; return; }
     css();

@@ -4,10 +4,10 @@
 var Reactions = (function () {
   var EMO = ['😂', '👏', '😱', '😡', '😎', '🤞', '🙏', '💀'];
   var last = 0, seen = {}, open = false;
-  var CSS = '.rx-btn{min-width:40px}.rx-pick{position:fixed;z-index:9990;top:calc(54px + env(safe-area-inset-top,0px));right:max(8px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:8px;border-radius:16px;background:#1d1b22;border:1px solid rgba(255,255,255,.18);box-shadow:0 12px 30px rgba(0,0,0,.5);animation:rxin .15s ease-out}' +
-    '.rx-pick button{appearance:none;border:0;background:rgba(255,255,255,.06);border-radius:12px;font-size:28px;line-height:1;width:52px;height:52px;cursor:pointer}.rx-pick button:active{transform:scale(.9)}' +
+  var CSS = '.rx-btn{min-width:40px}.rx-pick{position:fixed;z-index:9990;top:calc(54px + env(safe-area-inset-top,0px));right:max(8px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px;border-radius:20px;background:var(--k-bg);box-shadow:0 18px 44px var(--k-shadow),inset 0 0 0 1px var(--k-line-2);animation:rxin .15s ease-out}' +
+    '.rx-pick button{appearance:none;border:0;background:var(--k-surface-2);border-radius:14px;font-size:28px;line-height:1;width:52px;height:52px;cursor:pointer;transition:transform .1s,background .15s}.rx-pick button:hover{background:var(--k-surface-3)}.rx-pick button:active{transform:scale(.9)}' +
     '.rx-lay{position:fixed;left:0;right:0;top:calc(64px + env(safe-area-inset-top,0px));z-index:9989;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px}' +
-    '.rx-b{display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border-radius:999px;background:rgba(20,18,26,.88);color:#fff;font:600 15px system-ui,sans-serif;box-shadow:0 8px 20px rgba(0,0,0,.4);animation:rxpop 3.2s ease-out forwards}' +
+    '.rx-b{display:inline-flex;align-items:center;gap:8px;padding:6px 16px 6px 8px;border-radius:999px;background:rgba(20,22,29,.92);color:#f2f0eb;font:600 14.5px var(--k-font);box-shadow:0 10px 26px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.1);animation:rxpop 3.2s ease-out forwards}' +
     '.rx-b i{font-style:normal;font-size:34px;line-height:1;animation:rxbig .6s ease-out}' +
     '@keyframes rxin{from{opacity:0;transform:translateY(-6px)}}@keyframes rxbig{0%{transform:scale(.3)}60%{transform:scale(1.35)}100%{transform:scale(1)}}' +
     '@keyframes rxpop{0%{opacity:0;transform:translateY(-10px)}10%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}' +

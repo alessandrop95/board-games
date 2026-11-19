@@ -39,55 +39,55 @@ def page(title, desc, theme, fonts, css, js, short):
 </html>
 '''
 
-net = r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'calm.js') + '\n' + r('src', 'shared', 'awake.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'exit.js') + '\n' + r('src', 'shared', 'score.js') + '\n' + r('src', 'shared', 'coach.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js') + '\n' + r('src', 'shared', 'react.js') + '\n' + r('src', 'shared', 'audio.js') + '\n' + r('src', 'shared', 'alerts.js') + '\n' + r('src', 'shared', 'account.js')
+net = r('src', 'shared', 'kit.js') + '\n' + r('src', 'shared', 'net.js') + '\n' + r('src', 'shared', 'calm.js') + '\n' + r('src', 'shared', 'awake.js') + '\n' + r('src', 'shared', 'turns.js') + '\n' + r('src', 'shared', 'exit.js') + '\n' + r('src', 'shared', 'score.js') + '\n' + r('src', 'shared', 'coach.js') + '\n' + r('src', 'shared', 'install.js') + '\n' + r('src', 'shared', 'lobby.js') + '\n' + r('src', 'shared', 'nav.js') + '\n' + r('src', 'shared', 'chat.js') + '\n' + r('src', 'shared', 'react.js') + '\n' + r('src', 'shared', 'audio.js') + '\n' + r('src', 'shared', 'alerts.js') + '\n' + r('src', 'shared', 'account.js')
 
 def build_pp():
     pp = 'src/polvere-e-piombo/'
     pp_css = 'html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}\n' + r(pp, 'style.css')
     pp_js = "window.GAME_PREFIX = 'polvere-piombo/v1/';\n" + '\n'.join(r(pp, f) for f in ['data.js', 'engine.js', 'bot.js', 'cards.js', 'fx.js']) + '\n' + net + '\n' + r(pp, 'sound.js') + '\n' + r(pp, 'table.js') + '\n' + r(pp, 'ui.js')
-    open(os.path.join(ROOT, 'polvere-e-piombo', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'polvere-e-piombo', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Bang!', 'Gioco di carte western a ruoli segreti, da 4 a 8 giocatori con le espansioni, ognuno dal proprio telefono.', '#1d140e',
         'family=Courier+Prime:wght@400;700&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Rye', pp_css, pp_js, 'Polvere&amp;Piombo'))
 
 def build_pr():
     pr = 'src/presagio/'
     pr_js = "window.GAME_PREFIX = 'presagio/v1/';\n" + net + '\n' + '\n'.join(r(pr, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
-    open(os.path.join(ROOT, 'presagio', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'presagio', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Wizard', 'Gioco di carte a prese con previsione, da 3 a 6 giocatori, ognuno dal proprio telefono.', '#06050d',
         'family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=Cormorant+Garamond:wght@500;600;700', r(pr, 'style.css'), pr_js, 'Presagio'))
 
 def build_gm():
     gm = 'src/gattomina/'
     gm_js = "window.GAME_PREFIX = 'gattomina/v1/';\n" + net + '\n' + '\n'.join(r(gm, f) for f in ['engine.js', 'bot.js', 'cards.js', 'table.js', 'sound.js', 'ui.js'])
-    open(os.path.join(ROOT, 'gattomina', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'gattomina', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Exploding Kittens', 'Gioco di carte esplosivo con i gatti, da 2 a 5 giocatori, ognuno dal proprio telefono.', '#2a1446',
         'family=Fredoka:wght@400;500;600;700&family=Luckiest+Guy', r(gm, 'style.css'), gm_js, 'Gattomina'))
 
 def build_ca():
     ca = 'src/campi-acciaio/'
     ca_js = "window.GAME_PREFIX = 'campi-acciaio/v1/';\n" + '\n'.join(r(ca, f) for f in ['data.js', 'engine.js', 'bot.js', 'terrain.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ca, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
-    open(os.path.join(ROOT, 'campi-acciaio', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'campi-acciaio', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Scythe', 'Strategia dieselpunk: cinque fazioni si contendono le campagne intorno a una Fabbrica di mech. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#1c1915',
         'family=Big+Shoulders+Display:wght@600;700;800&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400', r(ca, 'style.css'), ca_js, 'Campi d’Acciaio'))
 
 def build_bi():
     bi = 'src/binari-italia/'
     bi_js = "window.GAME_PREFIX = 'binari-italia/v1/';\n" + '\n'.join(r(bi, f) for f in ['data.js', 'engine.js', 'bot.js', 'painter.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(bi, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
-    open(os.path.join(ROOT, 'binari-italia', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'binari-italia', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Ticket to Ride Italy', 'Gioco di treni sulla mappa d’Italia: tratte, traghetti, Paesi confinanti e bonus delle regioni. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#102027',
         'family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;0,6..96,800;1,6..96,500&family=Barlow:wght@400;500;600;700;800', r(bi, 'style.css'), bi_js, 'TtR Italy'))
 
 def build_ct():
     ct = 'src/catan/'
     ct_js = "window.GAME_PREFIX = 'catan/v1/';\n" + '\n'.join(r(ct, f) for f in ['data.js', 'engine.js', 'bot.js', 'painter.js', 'art.js', 'board.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ct, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
-    open(os.path.join(ROOT, 'catan', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'catan', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Catan', 'Coloni su un’isola da scoprire: raccogli risorse, commercia, costruisci strade, colonie e città. Da 3 a 4 giocatori, ognuno dal proprio telefono.', '#1d1610',
         'family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito+Sans:wght@400;600;700;800;900', r(ct, 'style.css'), ct_js, 'Catan'))
 
 def build_mc():
     mc = 'src/machiavelli/'
     mc_js = "window.GAME_PREFIX = 'machiavelli/v1/';\n" + '\n'.join(r(mc, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(mc, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
-    open(os.path.join(ROOT, 'machiavelli', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'machiavelli', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Machiavelli', 'Il gioco di carte italiano in cui il tavolo è di tutti: tris, poker e scale da smontare e rimontare. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#0f2a1f',
         'family=Marcellus&family=Mulish:wght@400;600;700;800;900', r(mc, 'style.css'), mc_js, 'Machiavelli'))
 
@@ -95,7 +95,7 @@ def build_ul():
     ul = 'src/unlock/'
     ul_js = "window.GAME_PREFIX = 'unlock/v1/';\n" + '\n'.join(r(ul, f) for f in ['scen.js', 'engine.js', 'bot.js', 'art.js', 'art2.js', 'art3.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ul, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'unlock'), exist_ok=True)
-    open(os.path.join(ROOT, 'unlock', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'unlock', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Unlock!', 'Escape room cooperativa in carte: scoprite le carte, unite gli oggetti, decifrate i codici e uscite prima che scada il tempo. Da 1 a 6 giocatori, ognuno dal proprio telefono.', '#070d14',
         'family=Bungee&family=Nunito:wght@400;600;700;800;900&family=Share+Tech+Mono&family=Caveat:wght@600', r(ul, 'cards.css') + '\n' + r(ul, 'style.css'), ul_js, 'Unlock!'))
 
@@ -103,7 +103,7 @@ def build_sk():
     sk = 'src/skyjo/'
     sk_js = "window.GAME_PREFIX = 'skyjo/v1/';\n" + '\n'.join(r(sk, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(sk, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'skyjo'), exist_ok=True)
-    open(os.path.join(ROOT, 'skyjo', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'skyjo', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Skyjo', 'Il gioco di carte delle griglie: scambia, scopri, fai sparire le colonne uguali e chiudi la manche con meno punti di tutti. Da 2 a 8 giocatori, ognuno dal proprio telefono.', '#1c4ea8',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(sk, 'style.css'), sk_js, 'Skyjo'))
 
@@ -111,7 +111,7 @@ def build_f7():
     f7 = 'src/flip7/'
     f7_js = "window.GAME_PREFIX = 'flip7/v1/';\n" + '\n'.join(r(f7, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(f7, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'flip7'), exist_ok=True)
-    open(os.path.join(ROOT, 'flip7', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'flip7', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Flip 7', 'Il gioco di carte dove si tenta la fortuna: pesca, fermati prima del doppione e prova a mettere in fila sette numeri diversi. Da 2 a 8 giocatori, ognuno dal proprio telefono.', '#24104f',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(f7, 'style.css'), f7_js, 'Flip 7'))
 
@@ -119,7 +119,7 @@ def build_cd():
     cd = 'src/citadels/'
     cd_js = "window.GAME_PREFIX = 'citadels/v1/';\n" + '\n'.join(r(cd, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(cd, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'citadels'), exist_ok=True)
-    open(os.path.join(ROOT, 'citadels', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'citadels', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Citadels', 'Il gioco dei personaggi segreti: ogni round scegli chi essere (Assassino, Ladro, Re, Mercante…), raccogli oro e costruisci la città più ricca. Da 4 a 7 giocatori, ognuno dal proprio telefono.', '#1a1232',
         'family=Cinzel:wght@700;800;900&family=Nunito:wght@400;600;700;800;900', r(cd, 'style.css'), cd_js, 'Citadels'))
 
@@ -127,7 +127,7 @@ def build_cb():
     cb = 'src/cabo/'
     cb_js = "window.GAME_PREFIX = 'cabo/v1/';\n" + '\n'.join(r(cb, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(cb, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'cabo'), exist_ok=True)
-    open(os.path.join(ROOT, 'cabo', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'cabo', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Cabo', 'Il gioco di carte della memoria: quattro carte coperte, ne conosci due. Sbircia, spia gli altri, scambia le carte e chiama Cabo quando pensi di avere meno punti di tutti. Da 2 a 6 giocatori, ognuno dal proprio telefono.', '#0c2350',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(cb, 'style.css'), cb_js, 'Cabo'))
 
@@ -135,7 +135,7 @@ def build_ng():
     ng = 'src/nograzie/'
     ng_js = "window.GAME_PREFIX = 'nograzie/v1/';\n" + '\n'.join(r(ng, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(ng, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'nograzie'), exist_ok=True)
-    open(os.path.join(ROOT, 'nograzie', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'nograzie', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'No Grazie!', 'Il gioco dei regali che nessuno vuole: prendi la carta o paga un gettone e di\' «No grazie!». Le carte in scala contano solo per la più bassa. Da 3 a 7 giocatori, ognuno dal proprio telefono.', '#4a0b1f',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(ng, 'style.css'), ng_js, 'No Grazie!'))
 
@@ -143,7 +143,7 @@ def build_sg():
     sg = 'src/sushigo/'
     sg_js = "window.GAME_PREFIX = 'sushigo/v1/';\n" + '\n'.join(r(sg, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(sg, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'sushigo'), exist_ok=True)
-    open(os.path.join(ROOT, 'sushigo', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'sushigo', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Sushi Go!', 'Il gioco del sushi: tutti insieme scegliete una carta e passate la mano. Tris di sashimi, tempura, gyoza, maki, nigiri sul wasabi e budini. Da 2 a 5 giocatori, ognuno dal proprio telefono.', '#2a1f4a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(sg, 'style.css'), sg_js, 'Sushi Go!'))
 
@@ -151,7 +151,7 @@ def build_p6():
     p6 = 'src/prendi6/'
     p6_js = "window.GAME_PREFIX = 'prendi6/v1/';\n" + '\n'.join(r(p6, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(p6, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'prendi6'), exist_ok=True)
-    open(os.path.join(ROOT, 'prendi6', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'prendi6', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         'Prendi 6!', 'Il gioco delle teste di toro: tutti insieme giocate una carta e chi mette la sesta in una fila se la prende. Vince chi prende meno teste. Da 2 a 10 giocatori, ognuno dal proprio telefono.', '#4f7a2a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(p6, 'style.css'), p6_js, 'Prendi 6!'))
 
@@ -159,7 +159,7 @@ def build_nc():
     d = 'src/nomicose/'
     js = "window.GAME_PREFIX = 'nomicose/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'nomicose'), exist_ok=True)
-    open(os.path.join(ROOT, 'nomicose', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'nomicose', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Nomi, cose, città", "Il gioco di carta e penna a squadre: esce una lettera e con i compagni riempite il foglio prima degli altri, ognuno dal proprio telefono, anche a distanza. Da 2 a 12 giocatori.", '#1b3f63',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Nomi cose città"))
 
@@ -167,7 +167,7 @@ def build_dg():
     d = 'src/disegna/'
     js = "window.GAME_PREFIX = 'disegna/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'disegna'), exist_ok=True)
-    open(os.path.join(ROOT, 'disegna', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'disegna', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Disegna e indovina", "A squadre: uno disegna col dito sul telefono e i compagni indovinano la parola, mentre gli avversari guardano pronti a rubarla. Anche a distanza. Da 4 a 12 giocatori.", '#c2364a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Disegna"))
 
@@ -175,7 +175,7 @@ def build_br():
     d = 'src/briscola/'
     js = "window.GAME_PREFIX = 'briscola/v1/';\n" + '\n'.join(r(d, f) for f in ['../carte/art.js', 'engine.js', 'bot.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'briscola'), exist_ok=True)
-    open(os.path.join(ROOT, 'briscola', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'briscola', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Briscola", "La briscola con le carte italiane, uno contro uno o due contro due con i segni al compagno, ognuno dal proprio telefono anche a distanza.", '#1b5e36',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Briscola"))
 
@@ -183,7 +183,7 @@ def build_sc():
     d = 'src/scopa/'
     js = "window.GAME_PREFIX = 'scopa/v1/';\n" + '\n'.join(r(d, f) for f in ['../carte/art.js', 'engine.js', 'bot.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'scopa'), exist_ok=True)
-    open(os.path.join(ROOT, 'scopa', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'scopa', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Scopa", "La scopa con le carte italiane, uno contro uno o due contro due, anche a Scopone scientifico, ognuno dal proprio telefono anche a distanza.", '#1b4f86',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Scopa"))
 
@@ -191,7 +191,7 @@ def build_bu():
     d = 'src/burraco/'
     js = "window.GAME_PREFIX = 'burraco/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'burraco'), exist_ok=True)
-    open(os.path.join(ROOT, 'burraco', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'burraco', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Burraco", "Il burraco a coppie con due mazzi e i jolly: scale, tris, pinelle, pozzetto e chiusura, uno contro uno o due contro due, ognuno dal proprio telefono anche a distanza.", '#6a1f2a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Burraco"))
 
@@ -199,7 +199,7 @@ def build_st():
     d = 'src/sintonia/'
     js = "window.GAME_PREFIX = 'sintonia/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'sintonia'), exist_ok=True)
-    open(os.path.join(ROOT, 'sintonia', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'sintonia', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Sintonia", "Esce un tema e ognuno scrive di nascosto la prima cosa che gli viene in mente: la squadra fa punti quando i compagni scrivono la stessa parola. Da 3 a 12 giocatori, anche a distanza.", '#5a2fa0',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Sintonia"))
 
@@ -207,7 +207,7 @@ def build_fn():
     d = 'src/fune/'
     js = "window.GAME_PREFIX = 'fune/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'fune'), exist_ok=True)
-    open(os.path.join(ROOT, 'fune', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'fune', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Tiro alla fune", "Una griglia di lettere uguale per tutti: trova parole con lettere vicine e tira la corda verso la tua squadra, in diretta, ognuno dal proprio telefono anche a distanza. Da 2 a 12 giocatori.", '#7a4a1a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Tiro alla fune"))
 
@@ -215,7 +215,7 @@ def build_cq():
     d = 'src/conquista/'
     js = "window.GAME_PREFIX = 'conquista/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'conquista'), exist_ok=True)
-    open(os.path.join(ROOT, 'conquista', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'conquista', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Conquista l’Italia", "Il quiz a squadre sulla mappa: chi risponde giusto per primo conquista una regione, finite quelle libere si strappano agli avversari. Da 2 a 12 giocatori, anche a distanza.", '#1f6fa8',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Conquista"))
 
@@ -223,7 +223,7 @@ def build_fz():
     d = 'src/forziere/'
     js = "window.GAME_PREFIX = 'forziere/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'forziere'), exist_ok=True)
-    open(os.path.join(ROOT, 'forziere', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'forziere', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Il Forziere Maledetto", "Pirati a ruoli segreti: Levante contro Ponente, con un Pirata o due Corsari nascosti. Prendi una nave, spara bordate e porta il Forziere alla tua bandiera. Da 4 a 8 giocatori.", '#0f2a38',
         'family=Pirata+One&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Forziere"))
 
@@ -231,7 +231,7 @@ def build_mn():
     d = 'src/miniera/'
     js = "window.GAME_PREFIX = 'miniera/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'miniera'), exist_ok=True)
-    open(os.path.join(ROOT, 'miniera', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'miniera', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "La Miniera", "Rischia o fermati: tutti insieme in una miniera piena di pepite e pericoli. A ogni galleria scegli in segreto se andare avanti o tornare al campo. Da 3 a 10 giocatori.", '#24150a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Miniera"))
 
@@ -239,7 +239,7 @@ def build_lb():
     d = 'src/bugiardo/'
     js = "window.GAME_PREFIX = 'bugiardo/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
     os.makedirs(os.path.join(ROOT, 'bugiardo'), exist_ok=True)
-    open(os.path.join(ROOT, 'bugiardo', 'index.html'), 'w', encoding='utf-8').write(page(
+    open(os.path.join(ROOT, 'bugiardo', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
         "Dadi del bugiardo", "Il classico gioco di bluff con i dadi: ognuno vede solo i suoi sotto il bicchiere e si dichiara quanti ce ne sono in tutto il tavolo. Alzi o dici «Dubito!»? Da 2 a 8 giocatori.", '#3a0f14',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Bugiardo"))
 
@@ -257,7 +257,7 @@ for name in (sys.argv[1:] or list(GAMES)):
     f = os.path.join(ROOT, name, 'index.html')
     html = open(f, encoding='utf-8').read()
     v = hashlib.sha1(html.encode('utf-8')).hexdigest()[:12]
-    open(f, 'w', encoding='utf-8').write(html.replace('content="@@BUILD@@"', 'content="%s" data-game="%s"' % (v, name), 1))
+    open(f, 'w', encoding='utf-8', newline='\n').write(html.replace('content="@@BUILD@@"', 'content="%s" data-game="%s"' % (v, name), 1))
     vers[name] = v
-open(VERS, 'w', encoding='utf-8').write(json.dumps(dict(sorted(vers.items())), indent=1) + '\n')
+open(VERS, 'w', encoding='utf-8', newline='\n').write(json.dumps(dict(sorted(vers.items())), indent=1) + '\n')
 print('ok')

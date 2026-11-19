@@ -155,9 +155,9 @@ var Sound = (function () {
 
   var css = '.snd-btn{appearance:none;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.07);color:inherit;border-radius:999px;min-height:36px;min-width:38px;padding:4px 9px;cursor:pointer;display:inline-grid;place-items:center;font-size:17px;line-height:1}' +
     '.snd-btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}' +
-    '.snd-pop{position:fixed;z-index:75;min-width:230px;padding:10px;border-radius:14px;background:#1d1a2a;color:#f4eefc;box-shadow:0 12px 30px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);display:grid;gap:6px;font:15px/1.3 system-ui,sans-serif}' +
-    '.snd-pop label{display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:10px;cursor:pointer}.snd-pop label:hover{background:rgba(255,255,255,.06)}' +
-    '.snd-pop input{width:20px;height:20px;accent-color:#e6c278}.snd-pop small{opacity:.65;font-size:12px;padding:0 6px}';
+    '.snd-pop{position:fixed;z-index:9995;min-width:250px;padding:6px;border-radius:18px;background:var(--k-bg);color:var(--k-text);box-shadow:0 18px 44px var(--k-shadow),inset 0 0 0 1px var(--k-line-2);display:grid;gap:2px;font:15px/1.3 var(--k-font)}' +
+    '.snd-pop label{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 10px 10px 12px;border-radius:12px;cursor:pointer;font-weight:550}.snd-pop label:hover{background:var(--k-surface)}' +
+    '.snd-pop small{color:var(--k-muted);font-size:11.5px;padding:4px 12px 6px}';
   function ensureCss() { if (!document.getElementById('snd-css')) { var s = document.createElement('style'); s.id = 'snd-css'; s.textContent = css; document.head.appendChild(s); } }
   var ICON_ON = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
   var ICON_OFF = '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
@@ -170,7 +170,7 @@ var Sound = (function () {
     var old = document.querySelector('.snd-pop'); if (old) { old.remove(); return; }
     unlock();
     var r = btn.getBoundingClientRect(), p = document.createElement('div'); p.className = 'snd-pop';
-    p.innerHTML = '<label><input type="checkbox" id="snd-m"' + (musicOn ? ' checked' : '') + '> Musica di sottofondo</label><label><input type="checkbox" id="snd-s"' + (sfxOn ? ' checked' : '') + '> Effetti sonori</label><small>' + (cfg.credit || '') + '</small>';
+    p.innerHTML = '<label><span>Musica di sottofondo</span><span class="k-sw"><input type="checkbox" role="switch" id="snd-m"' + (musicOn ? ' checked' : '') + '><i></i></span></label><label><span>Effetti sonori</span><span class="k-sw"><input type="checkbox" role="switch" id="snd-s"' + (sfxOn ? ' checked' : '') + '><i></i></span></label><small>' + (cfg.credit || '') + '</small>';
     document.body.appendChild(p);
     var w = p.offsetWidth; p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px'; p.style.top = (r.bottom + 6) + 'px';
     p.addEventListener('change', function (e) { if (e.target.id === 'snd-m') setMusic(e.target.checked); if (e.target.id === 'snd-s') setSfx(e.target.checked); });

@@ -57,7 +57,7 @@ with sync_playwright() as p:
 
     # 2) interruttore degli avvisi nella pagina
     A.evaluate("localStorage.setItem('pp-alerts','off')"); A.reload(); A.wait_for_timeout(900)
-    A.click('[data-pa="open"][data-v="account"]'); A.wait_for_timeout(500)
+    A.click('[data-pa="open"][data-v="settings"]'); A.wait_for_timeout(500)
     box = A.locator('[data-pp="inapp"]')
     t('interruttore «anche dentro l’app» presente e spento', box.count() == 1 and not box.is_checked())
     box.check(); A.wait_for_timeout(200)
