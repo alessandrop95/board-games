@@ -243,9 +243,17 @@ def build_lb():
         "Dadi del bugiardo", "Il classico gioco di bluff con i dadi: ognuno vede solo i suoi sotto il bicchiere e si dichiara quanti ce ne sono in tutto il tavolo. Alzi o dici «Dubito!»? Da 2 a 8 giocatori.", '#3a0f14',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Bugiardo"))
 
+def build_ts():
+    d = 'src/tressette/'
+    js = "window.GAME_PREFIX = 'tressette/v1/';\n" + '\n'.join(r(d, f) for f in ['../carte/art.js', 'engine.js', 'bot.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'tressette'), exist_ok=True)
+    open(os.path.join(ROOT, 'tressette', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
+        "Tressette", "Il tressette con le carte italiane, a vincere in coppia con busso, striscio e volo o a perdere fino a 6 giocatori, ognuno dal proprio telefono anche a distanza.", '#1f4d3a',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Tressette"))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere, miniera, bugiardo
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz, 'miniera': build_mn, 'bugiardo': build_lb}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere, miniera, bugiardo, tressette
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz, 'miniera': build_mn, 'bugiardo': build_lb, 'tressette': build_ts}
 import sys, hashlib, json, re
 # Versione di ogni pagina: impronta del suo contenuto, scritta nella pagina e in version.json. Le app aperte da
 # tempo confrontano la loro con quella pubblicata e si aggiornano da sole (vedi Fresh in src/shared/net.js).
