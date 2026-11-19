@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Miniera">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="pwa-sw" content="../sw.js" data-scope="../">
-<meta name="pp-build" content="22d97d659e8f" data-game="miniera">
+<meta name="pp-build" content="b14b29865fc6" data-game="miniera">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap">
 <style>
@@ -3144,6 +3144,7 @@ var Alerts = (function () {
     { p: 'nograzie/v1/', path: 'nograzie/', n: 'No Grazie!' },
     { p: 'sushigo/v1/', path: 'sushigo/', n: 'Sushi Go!' },
     { p: 'prendi6/v1/', path: 'prendi6/', n: 'Prendi 6!' },
+    { p: 'tressette/v1/', path: 'tressette/', n: 'Tressette' },
     { p: 'bugiardo/v1/', path: 'bugiardo/', n: 'Dadi del bugiardo' },
     { p: 'miniera/v1/', path: 'miniera/', n: 'La Miniera' },
     { p: 'forziere/v1/', path: 'forziere/', n: 'Il Forziere Maledetto' },
@@ -3475,7 +3476,7 @@ var Alerts = (function () {
   }
 
   /* --- home: «Continua la partita», i tavoli dove sei seduto in qualsiasi gioco --- */
-  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table', 'unlock/': 'ul-table', 'skyjo/': 'sk-table', 'flip7/': 'f7-table', 'citadels/': 'cd-table', 'cabo/': 'cb-table', 'nograzie/': 'ng-table', 'sushigo/': 'sg-table', 'prendi6/': 'p6-table', 'nomicose/': 'nc-table', 'disegna/': 'dg-table', 'sintonia/': 'st-table', 'fune/': 'fn-table', 'conquista/': 'cq-table', 'briscola/': 'br-table', 'scopa/': 'sc-table', 'burraco/': 'bu-table', 'forziere/': 'fz-table' };
+  var SEAT = { 'polvere-e-piombo/': 'pp-table', 'presagio/': 'pr-table', 'gattomina/': 'gm-table', 'campi-acciaio/': 'ca-table', 'binari-italia/': 'bi-table', 'catan/': 'ct-table', 'machiavelli/': 'mc-table', 'unlock/': 'ul-table', 'skyjo/': 'sk-table', 'flip7/': 'f7-table', 'citadels/': 'cd-table', 'cabo/': 'cb-table', 'nograzie/': 'ng-table', 'sushigo/': 'sg-table', 'prendi6/': 'p6-table', 'nomicose/': 'nc-table', 'disegna/': 'dg-table', 'sintonia/': 'st-table', 'fune/': 'fn-table', 'conquista/': 'cq-table', 'briscola/': 'br-table', 'tressette/': 'ts-table', 'scopa/': 'sc-table', 'burraco/': 'bu-table', 'forziere/': 'fz-table' };
   function mountContinue(el) {
     if (!el || typeof Net === 'undefined' || !Net.peekAt) return;
     var box = el.closest('section') || el, cards = {};
