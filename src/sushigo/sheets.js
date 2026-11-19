@@ -129,7 +129,7 @@ document.addEventListener('click', function (ev) {
     case 'lobbycode': { var jc = $('#joincode'); if (jc) { jc.focus(); jc.scrollIntoView({ block: 'center' }); } toast('Tavolo solo su invito: chiedi il codice a ' + esc(el.getAttribute('data-host') || 'chi l’ha aperto') + ' e scrivilo qui.'); break; }
     case 'closetable': App.sheet = { kind: 'closeconfirm' }; renderSheet(); break;
     case 'closeyes': App.sheet = null; renderSheet(); App.closing = true; if (!Net.closeTable()) { App.closing = false; toast('Sei offline: il tavolo non è stato chiuso. Riprova.'); } break;
-    case 'takehost': App.sheet = null; renderSheet(); Net.takeHost(); toast('Ora sei tu a reggere il tavolo e a muovere i giocatori automatici.'); break;
+    case 'takehost': App.sheet = null; renderSheet(); if (!Net.takeHost()) { toast('Solo chi è seduto al tavolo può prendere il comando.'); break; } toast('Ora sei tu a reggere il tavolo e a muovere i giocatori automatici.'); break;
     case 'auto': App.sheet = null; renderSheet(); send({ t: 'auto', p: +el.getAttribute('data-p'), on: !g.players[+el.getAttribute('data-p')].bot }); break;
     case 'resume': send({ t: 'back' }); break;
     case 'player': App.sheet = { kind: 'player', p: +el.getAttribute('data-p') }; renderSheet(); break;

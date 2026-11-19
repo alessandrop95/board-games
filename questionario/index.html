@@ -603,8 +603,14 @@ const Store = {
       s.onload = res; s.onerror = () => rej(new Error("Impossibile caricare Supabase"));
       document.head.appendChild(s);
     });
+    // Mentre la pagina viene lasciata usa keepalive, così la richiesta non viene annullata;
+    // se il browser la rifiuta (corpo oltre 64 KB) riprova con una fetch normale.
+    const keepaliveFetch = async (u, opts) => {
+      if (!leaving) return fetch(u, opts);
+      try { return await fetch(u, { ...opts, keepalive: true }); } catch (e) { return fetch(u, opts); }
+    };
     const url = CONFIG.SUPABASE_URL.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
-    this.sb = window.supabase.createClient(url, CONFIG.SUPABASE_ANON_KEY.trim());
+    this.sb = window.supabase.createClient(url, CONFIG.SUPABASE_ANON_KEY.trim(), { global: { fetch: keepaliveFetch } });
   },
   async save(row) {
     if (!REMOTE) { const all = ls.get("qg_local_rows") || {}; all[row.id] = Object.assign({}, all[row.id] || { created_at: row.updated_at }, row); ls.set("qg_local_rows", all); return; }
@@ -639,21 +645,24 @@ function setStatus(kind, txt) {
   const el = $("#status"); el.className = "status " + kind;
   $("#statusTxt").textContent = txt;
 }
-let saveT = null, saving = false, again = false;
+// I salvataggi sono messi in coda uno dopo l'altro; flush() restituisce true se il salvataggio è andato a buon fine.
+let saveT = null, saveQueue = Promise.resolve(true), leaving = false;
 function scheduleSave() { setStatus("saving", "Salvataggio…"); clearTimeout(saveT); saveT = setTimeout(flush, 700); }
-async function flush() {
-  clearTimeout(saveT);
-  if (!st) return;
-  if (saving) { again = true; return; }
-  saving = true;
+function flush() {
+  clearTimeout(saveT); saveT = null;
+  if (!st) return Promise.resolve(true);
+  saveQueue = saveQueue.then(saveNow);
+  return saveQueue;
+}
+async function saveNow() {
   const row = { id: st.id, nome: st.nome, modalita: st.modalita, risposte: st.risposte, completato: st.completato,
     risposte_date: countAnswered(st.risposte, ALLQ), updated_at: new Date().toISOString() };
-  try { await Store.save(row); setStatus("saved", "Salvato"); ls.set(SESSION_KEY, { id: st.id, sezione: st.sezione }); }
-  catch (e) { console.error(e); setStatus("error", "Non salvato");  toast("Salvataggio non riuscito: controlla la connessione"); }
-  saving = false;
-  if (again) { again = false; flush(); }
+  try { await Store.save(row); setStatus("saved", "Salvato"); ls.set(SESSION_KEY, { id: st.id, sezione: st.sezione }); return true; }
+  catch (e) { console.error(e); setStatus("error", "Non salvato"); toast("Salvataggio non riuscito: controlla la connessione"); return false; }
 }
-window.addEventListener("beforeunload", () => { if (saveT) flush(); });
+// Quando la pagina viene nascosta o chiusa, salva subito le modifiche in attesa (con fetch keepalive, vedi Store.init).
+document.addEventListener("visibilitychange", () => { leaving = document.visibilityState === "hidden"; if (leaving && saveT) flush(); });
+window.addEventListener("pagehide", () => { leaving = true; if (saveT) flush(); });
 
 /* ---------------- Viste: compilazione ---------------- */
 function previewBanner() {
@@ -735,16 +744,21 @@ function qHtml(q) {
     <div class="ctl">${ctl}</div></div>`;
 }
 
+// La barra si ridisegna solo se è cambiata davvero, e torna sulla sezione attiva solo quando la sezione cambia:
+// mentre si scrive, chi ha fatto scorrere la barra a mano non se la vede rimettere a posto a ogni tasto.
+let navHtml = "", navOn = null;
 function renderNav() {
   const secs = visibleSections();
-  $("#secnav").innerHTML = secs.map(si => {
+  const html = secs.map(si => {
     const qs = visibleQs(si), done = countAnswered(st.risposte, qs);
     return `<button data-sec="${si}" class="${si === st.sezione && view === "form" ? "on" : ""} ${done === qs.length ? "done" : ""}">${esc(SECTIONS[si].title)}<span class="c">${done}/${qs.length}</span></button>`;
   }).join("") + `<button data-sec="end" class="${view === "summary" ? "on" : ""}">Riepilogo</button>`;
+  if (html !== navHtml) { $("#secnav").innerHTML = html; navHtml = html; }
   const all = visibleAll();
   $("#pfill").style.width = (countAnswered(st.risposte, all) / all.length * 100) + "%";
   $("#brandSub").textContent = `${st.nome} · ${IS_APP ? "approfondimento" : st.modalita === "rapida" ? "versione rapida" : "versione completa"}`;
-  const on = $("#secnav .on"); if (on) on.scrollIntoView({ block: "nearest", inline: "center" });
+  const onKey = view + ":" + st.sezione;
+  if (onKey !== navOn) { navOn = onKey; const on = $("#secnav .on"); if (on) on.scrollIntoView({ block: "nearest", inline: "center" }); }
 }
 $("#secnav").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
@@ -865,7 +879,13 @@ function renderSummary() {
     ${missR.length ? `<footer>Per inviare devi rispondere a tutte le domande obbligatorie.</footer>` : ""}
     ${!IS_APP && st.modalita === "rapida" ? `<footer>Hai tempo per approfondire? <button class="linkbtn" id="toFull2">Passa alla versione completa</button></footer>` : ""}`;
   $("#backBtn").onclick = () => renderSection(st.sezione);
-  $("#sendBtn").onclick = async () => { st.completato = true; await flush(); renderThanks(); };
+  $("#sendBtn").onclick = async e => {
+    const btn = e.currentTarget, wasDone = st.completato;
+    btn.disabled = true; st.completato = true;
+    if (await flush()) return renderThanks();
+    st.completato = wasDone; btn.disabled = false;
+    toast("Invio non riuscito: controlla la connessione e riprova");
+  };
   document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
     const q = QMAP[b.dataset.go]; renderSection(q.sec);
     setTimeout(() => { const el = $("#q-" + q.id); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); } }, 60);
@@ -890,8 +910,12 @@ function renderThanks() {
 /* ---------------- Vista: risposte (per chi crea il gioco) ---------------- */
 let rows = [], dashSel = null, showEmpty = false, liveOn = false;
 async function loadRows() {
-  try { rows = (await Store.list()).filter(r => IS_APP ? r.modalita === "approfondimento" : r.modalita !== "approfondimento"); renderDash(); }
-  catch (e) { console.error(e); $("#app").innerHTML = `<div class="empty-state">Non riesco a leggere le risposte. Controlla la configurazione di Supabase.<br><small>${esc(e.message || e)}</small></div>`; }
+  try { rows = (await Store.list()).filter(r => IS_APP ? r.modalita === "approfondimento" : r.modalita !== "approfondimento"); loadRows.ok = true; renderDash(); }
+  catch (e) {
+    console.error(e);
+    // Se le risposte erano già caricate, un errore temporaneo non deve cancellare la vista.
+    if (loadRows.ok) { setStatus("error", "Aggiornamento non riuscito"); return; }
+    $("#app").innerHTML = `<div class="empty-state">Non riesco a leggere le risposte. Controlla la configurazione di Supabase.<br><small>${esc(e.message || e)}</small></div>`; }
 }
 function respondentAll(r) { return !IS_APP && r.modalita === "rapida" ? ESSENTIAL : ALLQ; }
 function renderDash() {
@@ -960,13 +984,22 @@ async function start() {
     let t = null;
     const refresh = () => { clearTimeout(t); t = setTimeout(loadRows, 300); };
     Store.subscribe(refresh, ok => { liveOn = ok; renderDash(); });
-    setInterval(loadRows, 15000);
+    setInterval(() => { if (!liveOn) loadRows(); }, 15000);
     return;
   }
   setStatus("", "");
   const sess = ls.get(SESSION_KEY);
   let resume = null;
-  if (sess && sess.id) { try { resume = await Store.get(sess.id); } catch (e) { console.error(e); } }
+  if (sess && sess.id) {
+    try { resume = await Store.get(sess.id); }
+    catch (e) {
+      // Non mostrare il modulo vuoto: ricominciare creerebbe un nuovo id e perderebbe il collegamento alle risposte già date.
+      console.error(e);
+      $("#app").innerHTML = `<div class="empty-state card" style="margin-top:24px">Non riesco a recuperare le tue risposte salvate.<br>Controlla la connessione e riprova.<div style="margin-top:16px"><button class="btn" id="retryBtn">Riprova</button></div></div>`;
+      $("#retryBtn").onclick = () => location.reload();
+      return;
+    }
+  }
   renderWelcome(resume);
 }
 window.addEventListener("hashchange", () => location.reload());

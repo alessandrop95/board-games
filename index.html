@@ -49,8 +49,8 @@ p { margin: 0; }
 #account-slot:empty { display: none; }
 
 /* presentazione */
-main { display: grid; gap: 28px; padding-top: 28px; padding-bottom: 40px; }
-.hero { display: grid; gap: 16px; padding: 18px 0 6px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 28px; padding-bottom: 40px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 18px 0 6px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; justify-self: start; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--eyebrow); background: rgba(232,171,76,.1); border: 1px solid rgba(232,171,76,.28); padding: 5px 11px; border-radius: 999px; }
 .hero h1 { font-size: clamp(34px, 7.4vw, 60px); line-height: 1.04; letter-spacing: -.025em; }
 .hero h1 em { font-style: italic; font-weight: 500; background: linear-gradient(100deg, var(--em1), var(--em2) 60%, #e2725b); -webkit-background-clip: text; background-clip: text; color: transparent; }
