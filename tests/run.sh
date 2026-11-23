@@ -57,6 +57,10 @@ gstep forziere "Regole e partite tra bot di Il Forziere Maledetto" node tests/ru
 gstep miniera "Regole e partite tra bot di La Miniera" node tests/rules/miniera.js 10
 gstep bugiardo "Regole e partite tra bot di Dadi del bugiardo" node tests/rules/bugiardo.js 10
 gstep tressette "Regole e partite tra bot di Tressette" node tests/rules/tressette.js 10
+gstep rischio "Regole e partite tra bot di Dadi e rischio" node tests/rules/rischio.js 10
+gstep asta "Regole e partite tra bot di Asta lampo" node tests/rules/asta.js 10
+gstep vocabolario "Regole e partite tra bot di Vocabolario bugiardo" node tests/rules/vocabolario.js 10
+gstep emoji "Regole e partite tra bot di Emoji in scena" node tests/rules/emoji.js 10
 gstep polvere-e-piombo "Regole di Bang! con le espansioni" node tests/rules/pp_rules.js
 gstep polvere-e-piombo "Partite intere tra bot (Bang!, tutte le combinazioni di espansioni)" node tests/rules/pp_bots.js
 gstep comuni "Notifiche: cifratura e firma (RFC 8291/8292)" node tests/push/webpush.mjs
