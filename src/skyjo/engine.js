@@ -90,7 +90,7 @@ var SKEngine = (function () {
     var g = {
       v: 2, phase: 'reveal', seq: 0, turnN: 0, round: 0,
       opts: { target: target, action: !!opts.action, elim: !!opts.elim },
-      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, grid: [], total: 0, hist: [], ready: false, out: false, outRound: null, acts: [], bonus: 0, rb: 0, seen: [] }; }),
+      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: s.col != null ? s.col : i, grid: [], total: 0, hist: [], ready: false, out: false, outRound: null, acts: [], bonus: 0, rb: 0, seen: [] }; }),
       deck: [], disc: [], turn: 0, drawn: null, ender: null, starter: null, lastEnder: null,
       adeck: [], arow: [], adisc: [], extra: 0, chain: null, pick: null, hold: false,
       log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null, roundRes: null

@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Skyjo">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="pwa-sw" content="../sw.js" data-scope="../">
-<meta name="pp-build" content="4f83ebbab521" data-game="skyjo">
+<meta name="pp-build" content="82b021764b4e" data-game="skyjo">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap">
 <style>
@@ -535,7 +535,7 @@ var SKEngine = (function () {
     var g = {
       v: 2, phase: 'reveal', seq: 0, turnN: 0, round: 0,
       opts: { target: target, action: !!opts.action, elim: !!opts.elim },
-      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, grid: [], total: 0, hist: [], ready: false, out: false, outRound: null, acts: [], bonus: 0, rb: 0, seen: [] }; }),
+      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: s.col != null ? s.col : i, grid: [], total: 0, hist: [], ready: false, out: false, outRound: null, acts: [], bonus: 0, rb: 0, seen: [] }; }),
       deck: [], disc: [], turn: 0, drawn: null, ender: null, starter: null, lastEnder: null,
       adeck: [], arow: [], adisc: [], extra: 0, chain: null, pick: null, hold: false,
       log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null, roundRes: null
@@ -4914,7 +4914,10 @@ function tableReducer(doc, from, op) {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
       if (doc.seats.length < 2) return { err: 'Servono almeno 2 giocatori: aggiungi un giocatore automatico.' };
-      doc.game = E.newGame(doc.seats.slice(), doc.opts || {}); doc.phase = 'play'; return {};
+      // ordine di gioco sempre nuovo: si mescolano i posti a ogni partita (anche nella rivincita); il colore resta quello della sala d'attesa
+      var order = doc.seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: s.bot, col: i }; });
+      for (var i = order.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = order[i]; order[i] = order[j]; order[j] = t; }
+      doc.game = E.newGame(order, doc.opts || {}); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
     case 'auto': if (!isHost) return hostOnly; if (!doc.game || !doc.game.players[op.p]) return { changed: false }; doc.game.players[op.p].bot = !!op.on; if (!op.on) doc.game.players[op.p].away = false; else if (doc.game.phase === 'scores') doc.game.players[op.p].ready = true; return {};
@@ -5200,6 +5203,7 @@ var Game = (function () {
     el('gv').classList.toggle('action', !!(g.opts && g.opts.action));
     setHTML('gv-info', '<b>Skyjo' + (g.opts.action ? ' Action' : '') + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : 'Manche ' + g.round) + (g.opts.elim ? ' · eliminazione a ' : ' · fino a ') + g.opts.target + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
     setHTML('gv-opp', opponents(g, mi));
+    followTurn(g, mi);
     setHTML('gv-mid', middle(g, me));
     setHTML('gv-prompt', prompt(g, me));
     setHTML('gv-me', mainBoard(g, mi, me));
@@ -5244,9 +5248,29 @@ var Game = (function () {
     if (g.phase === 'scores' && P.ready && !P.bot) o += '<span class="tag ok">pronto</span>';
     return o;
   }
+  // gli avversari in ordine di turno: per primo chi gioca subito dopo di me, in fondo chi gioca subito prima
+  function oppOrder(g, mi) {
+    var n = g.players.length, o = [];
+    for (var k = 1; k < n; k++) o.push((mi + k) % n);
+    return o;
+  }
+  // con tanti avversari la fila scorre da sola: segue chi sta giocando e torna all'inizio quando tocca a chi viene dopo di me
+  function followTurn(g, mi) {
+    var box = el('gv-opp'); if (!box) return;
+    var key = g.phase === 'play' ? g.round + ':' + g.turnN : g.phase;
+    if (box._turn === key) return;
+    box._turn = key;
+    if (g.phase !== 'play' || g.turn === mi || box.scrollWidth <= box.clientWidth + 2) return;
+    var first = oppOrder(g, mi).filter(function (p) { return !g.players[p].out; })[0];
+    if (g.turn === first) { box.scrollTo({ left: 0, behavior: reduce ? 'auto' : 'smooth' }); return; }
+    var on = box.querySelector('.opp.on'); if (!on) return;
+    var b = box.getBoundingClientRect(), r = on.getBoundingClientRect(), pad = 10;
+    if (r.right > b.right - pad) box.scrollBy({ left: r.right - b.right + pad, behavior: reduce ? 'auto' : 'smooth' });
+    else if (r.left < b.left + pad) box.scrollBy({ left: r.left - b.left - pad, behavior: reduce ? 'auto' : 'smooth' });
+  }
   function opponents(g, mi) {
-    return g.players.map(function (P, p) {
-      if (p === mi) return '';
+    return oppOrder(g, mi).map(function (p) {
+      var P = g.players[p];
       var on = g.phase === 'play' && g.turn === p;
       return '<button class="opp' + (on ? ' on' : '') + (P.out ? ' out' : '') + '" style="--pc:' + pcol(g, p) + '" data-act="player" data-p="' + p + '" aria-label="' + esc(P.nick) + '">' +
         '<span class="opp-h"><span class="pv">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><b>' + Net.dot(P.uid) + esc(P.nick) + '</b></span>' +

@@ -34,6 +34,7 @@ var Game = (function () {
     el('gv').classList.toggle('action', !!(g.opts && g.opts.action));
     setHTML('gv-info', '<b>Skyjo' + (g.opts.action ? ' Action' : '') + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : 'Manche ' + g.round) + (g.opts.elim ? ' · eliminazione a ' : ' · fino a ') + g.opts.target + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
     setHTML('gv-opp', opponents(g, mi));
+    followTurn(g, mi);
     setHTML('gv-mid', middle(g, me));
     setHTML('gv-prompt', prompt(g, me));
     setHTML('gv-me', mainBoard(g, mi, me));
@@ -78,9 +79,29 @@ var Game = (function () {
     if (g.phase === 'scores' && P.ready && !P.bot) o += '<span class="tag ok">pronto</span>';
     return o;
   }
+  // gli avversari in ordine di turno: per primo chi gioca subito dopo di me, in fondo chi gioca subito prima
+  function oppOrder(g, mi) {
+    var n = g.players.length, o = [];
+    for (var k = 1; k < n; k++) o.push((mi + k) % n);
+    return o;
+  }
+  // con tanti avversari la fila scorre da sola: segue chi sta giocando e torna all'inizio quando tocca a chi viene dopo di me
+  function followTurn(g, mi) {
+    var box = el('gv-opp'); if (!box) return;
+    var key = g.phase === 'play' ? g.round + ':' + g.turnN : g.phase;
+    if (box._turn === key) return;
+    box._turn = key;
+    if (g.phase !== 'play' || g.turn === mi || box.scrollWidth <= box.clientWidth + 2) return;
+    var first = oppOrder(g, mi).filter(function (p) { return !g.players[p].out; })[0];
+    if (g.turn === first) { box.scrollTo({ left: 0, behavior: reduce ? 'auto' : 'smooth' }); return; }
+    var on = box.querySelector('.opp.on'); if (!on) return;
+    var b = box.getBoundingClientRect(), r = on.getBoundingClientRect(), pad = 10;
+    if (r.right > b.right - pad) box.scrollBy({ left: r.right - b.right + pad, behavior: reduce ? 'auto' : 'smooth' });
+    else if (r.left < b.left + pad) box.scrollBy({ left: r.left - b.left - pad, behavior: reduce ? 'auto' : 'smooth' });
+  }
   function opponents(g, mi) {
-    return g.players.map(function (P, p) {
-      if (p === mi) return '';
+    return oppOrder(g, mi).map(function (p) {
+      var P = g.players[p];
       var on = g.phase === 'play' && g.turn === p;
       return '<button class="opp' + (on ? ' on' : '') + (P.out ? ' out' : '') + '" style="--pc:' + pcol(g, p) + '" data-act="player" data-p="' + p + '" aria-label="' + esc(P.nick) + '">' +
         '<span class="opp-h"><span class="pv">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><b>' + Net.dot(P.uid) + esc(P.nick) + '</b></span>' +
