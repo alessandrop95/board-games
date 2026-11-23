@@ -11,12 +11,13 @@ var NCRules = (function () {
       '<li>Quando la vostra squadra ha riempito <b>tutte</b> le caselle potete dire <b>Stop!</b>: alle altre squadre restano 10 secondi.</li></ul>'],
     check: ['Il controllo',
       '<p>Finito il tempo si vedono le risposte di tutti. Quelle vuote o che non cominciano con la lettera non valgono.</p>' +
-      '<p>Se una risposta di un’altra squadra non ti convince («Zagarolo è davvero una città?») tocca <b>Contesta</b>: chi non è di quella squadra vota sì o no. Se i <b>no</b> sono più dei sì, la risposta vale 0.</p>' +
+      '<p>Se una risposta di un’altra squadra non ti convince («Zagarolo è davvero una città?») tocca <b>Contesta</b>: chi non è di quella squadra vota: <b>vale</b>, <b>vale solo 5 punti</b> (non è sbagliata, ma è un po’ tirata) oppure <b>non vale</b>. Chi contesta parte da «non vale» e può cambiare voto come tutti. Accanto alla risposta si vede chi l’ha contestata e come ha votato ognuno.</p>' +
+      '<p>Decide il voto di mezzo: se i <b>no</b> sono più della metà la risposta vale 0, se lo sono i «no» e i «5» insieme vale 5, altrimenti vale normalmente. A parità tra due scelte vince la più generosa.</p>' +
       '<p>Quando hai finito tocca <b>Pronto</b>.</p>'],
     points: ['I punti',
       '<div class="rbands"><span class="rband"><b class="pt p20">20</b><small><b>unica</b>solo la tua squadra ha una risposta valida</small></span>' +
       '<span class="rband"><b class="pt p10">10</b><small><b>originale</b>diversa da quelle degli altri</small></span>' +
-      '<span class="rband"><b class="pt p5">5</b><small><b>doppione</b>un’altra squadra ha scritto la stessa parola</small></span>' +
+      '<span class="rband"><b class="pt p5">5</b><small><b>doppione</b>un’altra squadra ha scritto la stessa parola, oppure il voto l’ha ridotta a 5</small></span>' +
       '<span class="rband"><b class="pt p0">0</b><small><b>non vale</b>vuota, lettera sbagliata o bocciata</small></span></div>' +
       '<p>Le parole uguali si riconoscono anche con un errore di battitura. Dopo le manche stabilite dall’host vince la squadra con più punti.</p>'],
     tips: ['Consigli',

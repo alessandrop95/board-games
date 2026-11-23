@@ -83,9 +83,10 @@ function tableReducer(doc, from, op) {
   return { err: 'Azione sconosciuta.' };
 }
 Net.setReducer(tableReducer);
-Coach.setup({ bots: 2, tip: function (g, me, mine) {
+Coach.setup({ bots: 2, myTurn: function (g, me) { return E.needs(g, me); }, tip: function (g, me, mine) {
   var P = g.players[me]; if (!P) return null;
   var where = ' In questa mano: previste <b>' + (P.bid == null ? '?' : P.bid) + '</b>, fatte <b>' + (P.tricks || 0) + '</b>.';
+  if (!mine && E.together(g)) return 'Previsione fatta: aspetta che scelgano anche gli altri.' + where;
   if (!mine) return g.phase === 'play' && P.bid != null ? 'Tocca a un bot.' + where + ' Ricorda: fai esattamente le prese previste.' : null;
   if (g.phase === 'trump') return 'È uscito un <b>Arcimago</b>: scegli tu il colore di <b>briscola</b>, quello di cui hai più carte alte.';
   if (g.phase === 'bid') return '<b>Prevedi quante prese farai</b> in questa mano. Contano le carte alte, le briscole e gli Arcimaghi; i Giullari non prendono mai. Se indovini esattamente guadagni 20 punti + 10 per presa, se sbagli li perdi.';
@@ -192,11 +193,16 @@ function invite() {
 }
 
 /* ---------- giocatori automatici (li muove l'host) ---------- */
+// il bot che deve muovere adesso: con le previsioni coperte scelgono tutti insieme, quindi uno qualsiasi tra chi manca
+function botToMove(g) {
+  if (E.together(g)) { var w = E.pending(g).filter(function (p) { return g.players[p].bot; }); return w.length ? w[0] : null; }
+  var d = E.decider(g); return d != null && g.players[d].bot ? d : null;
+}
 function driveBots() {
   var doc = App.doc;
   if (!doc || !Net.isHost || doc.phase !== 'play' || !doc.game) return;
-  var g = doc.game, d = E.decider(g);
-  if (d == null || !g.players[d].bot) return;
+  var g = doc.game, d = botToMove(g);
+  if (d == null) return;
   var key = App.code + ':' + g.seq;
   if (App.botKey === key) return;
   App.botKey = key; clearTimeout(App.botTimer);
@@ -204,8 +210,8 @@ function driveBots() {
   App.botTimer = setTimeout(function () {
     Net.hostApply(function (cur) {
       if (!cur || !cur.game || cur.phase !== 'play') return false;
-      var gg = cur.game, dd = E.decider(gg);
-      if (gg.seq !== g.seq || dd !== d || !gg.players[dd].bot) return false;
+      var gg = cur.game, dd = botToMove(gg);
+      if (gg.seq !== g.seq || dd !== d) return false;
       var a = BOT.decide(gg, dd); if (!a || E.act(gg, dd, a)) return false;
       if (gg.phase === 'over') cur.phase = 'over';
       return true;
@@ -300,7 +306,7 @@ function roomHTML() {
     '<p class="lead">Chi apre il link si siede dal suo telefono, senza registrarsi. Servono da 3 a 6 giocatori; i posti mancanti si riempiono con giocatori automatici.</p></section>' +
     '<section class="panel"><h2>Al tavolo (' + n + '/6)</h2><div class="seats">' + seats + '</div>' +
     '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-noeven"' + (noEven ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Somma delle previsioni diversa dalle prese</b><br><span class="muted" style="font-size:15px">Il mazziere, che dichiara per ultimo, non può dire il numero che renderebbe la somma uguale alle prese della mano.</span></span></label>' +
-    '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-hidden"' + (hidden ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Previsioni coperte</b><br><span class="muted" style="font-size:15px">Ognuno dichiara senza far vedere il numero: le previsioni di tutti si scoprono solo a fine mano. Non si combina con la somma diversa.</span></span></label>' +
+    '<label class="switch' + (isHost ? '' : ' ro') + '"><input type="checkbox" id="opt-hidden"' + (hidden ? ' checked' : '') + (isHost ? '' : ' disabled') + '><span><b>Previsioni coperte</b><br><span class="muted" style="font-size:15px">Tutti dichiarano nello stesso momento, senza far vedere il numero: si gioca quando hanno scelto tutti e le previsioni si scoprono solo a fine mano. Non si combina con la somma diversa.</span></span></label>' +
     Lobby.roomHTML(d, isHost) + Turns.optionHTML(d, isHost) +
     (isHost ? '<div class="row"><button class="btn ghost" data-act="addbot"' + (n >= 6 ? ' disabled' : '') + '>Aggiungi giocatore automatico</button><button class="btn" data-act="start"' + (n < 3 ? ' disabled' : '') + '>Inizia la partita</button></div>' + (n < 3 ? '<p class="lead">Mancano ' + (3 - n) + ' giocatori per iniziare.</p>' : '<p class="lead">In ' + n + ' si giocano ' + rounds + ' mani.</p>')
       : seated ? '<p class="lead">In attesa che l’host inizi la partita.</p>' : '<button class="btn" data-act="jointable" data-code="' + esc(d.code) + '">Siediti</button>') +
@@ -317,6 +323,11 @@ function statusLine(g, me, sum, allBid, short) {
   if (g.phase === 'over') return 'Partita finita.';
   if (g.phase === 'roundEnd') return 'Fine della mano ' + g.round + '. ' + pr;
   if (g.phase === 'trump') return 'Il mazziere (' + who(g.dealer) + ') sceglie la briscola.';
+  if (g.phase === 'bid' && E.together(g)) {
+    var wait = E.pending(g), mine = me >= 0 && wait.indexOf(me) >= 0, others = wait.filter(function (i) { return i !== me; });
+    if (mine) return '<b>Fai la tua previsione.</b> Si sceglie tutti insieme: gli altri non vedranno il tuo numero fino a fine mano.' + (others.length && !short ? ' Mancano anche ' + others.map(who).join(', ') + '.' : '');
+    return (me >= 0 ? 'Previsione fatta. ' : 'Previsioni coperte, tutti insieme. ') + 'Aspetto ' + wait.map(who).join(', ') + '…';
+  }
   if (g.phase === 'bid') return (g.turn === me ? '<b>Tocca a te prevedere.</b> ' : 'Prevede <b>' + who(g.turn) + '</b>. ') + pr + (g.opts.noEven ? ' · regola somma diversa' : '') + (g.opts.hidden ? (g.turn === me ? ' Gli altri non vedranno il tuo numero fino a fine mano.' : ' Previsioni coperte.') : '');
   return (g.turn === me ? '<b>Tocca a te.</b>' : 'Gioca <b>' + who(g.turn) + '</b>.') + ' ' + followNote(g, me) + ' ' + pr;
 }
@@ -392,7 +403,7 @@ var RULES = '<p>Si gioca con 60 carte: quattro casate (Fiamme, Maree, Foreste, S
   '<h3>Le mani</h3><p>Nella prima mano ognuno riceve 1 carta, nella seconda 2 e così via, finché il mazzo basta: 20 mani in 3, 15 in 4, 12 in 5, 10 in 6. Il mazziere cambia ogni mano.</p>' +
   '<h3>La briscola</h3><ul><li>Dopo la distribuzione si scopre la prima carta del mazzo: il suo colore è la briscola.</li><li>Se è un Giullare non c’è briscola.</li><li>Se è un Arcimago, il mazziere sceglie il colore.</li><li>Nell’ultima mano non resta niente da scoprire: si gioca senza briscola.</li></ul>' +
   '<h3>La previsione</h3><p>A turno, partendo da chi siede dopo il mazziere, ognuno dichiara quante prese farà. Con la regola <b>somma diversa</b>, il mazziere non può dichiarare il numero che renderebbe la somma uguale alle prese della mano.</p>' +
-  '<h3>Previsioni coperte (opzione del tavolo)</h3><p>Ognuno dichiara a turno ma il numero resta nascosto agli altri: si vede solo chi ha già previsto e quante prese ha fatto. A fine mano si scoprono tutte le previsioni e si contano i punti.</p>' +
+  '<h3>Previsioni coperte (opzione del tavolo)</h3><p>Tutti dichiarano <b>nello stesso momento</b>, ognuno dal proprio telefono, e il numero resta nascosto agli altri: si vede solo chi ha già previsto e, durante la mano, quante prese ha fatto. Si comincia a giocare quando hanno scelto tutti. A fine mano si scoprono tutte le previsioni e si contano i punti.</p>' +
   '<h3>Le prese</h3><ul><li>Apre chi siede dopo il mazziere; poi apre chi ha vinto l’ultima presa.</li><li>Bisogna rispondere al colore di chi apre, se lo si ha. Arcimaghi e Giullari si possono giocare sempre.</li><li>Se si apre con un Arcimago, gli altri giocano quello che vogliono. Se si apre con un Giullare, il colore lo decide la prima carta numerata.</li><li>Vince il primo Arcimago; altrimenti la briscola più alta; altrimenti la carta più alta del colore di uscita. Se tutti giocano Giullari, vince il primo.</li></ul>' +
   '<h3>Punti</h3><ul><li>Previsione esatta: 20 punti più 10 per ogni presa.</li><li>Previsione sbagliata: −10 per ogni presa di differenza.</li></ul>' +
   '<h3>Illustrazioni</h3><p>Incisioni di Gustave Doré (Inferno, La ballata del vecchio marinaio, la Bibbia, gli Idilli del re), il giullare Will Sommers, l’atlante celeste di Andreas Cellarius (1660) e l’incisione di Flammarion (1888): tutte di pubblico dominio, da Wikimedia Commons, rielaborate a luce.</p><h3>Musica</h3><p>«Fireflies and Stardust» ed «Enchanted Valley» di Kevin MacLeod (incompetech.com), licenza CC BY 3.0. Gli effetti sonori sono sintetizzati.</p>' +

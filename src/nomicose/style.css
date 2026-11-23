@@ -285,7 +285,7 @@ select.field { color: #13284f; }
 /* il controllo */
 .rev { gap: 10px; }
 .rcat h4 { font: 800 15px var(--f-disp); color: #2a5ca8; margin: 2px 0 4px; }
-.rr2 { display: grid; grid-template-columns: minmax(58px, auto) 1fr auto; grid-template-areas: 'rt rw rb' 'ra ra ra'; gap: 2px 8px; align-items: center; padding: 5px 8px; border-radius: 10px; border-left: 5px solid var(--tc); background: rgba(28, 44, 76, .05); margin-bottom: 4px; }
+.rr2 { display: grid; grid-template-columns: minmax(58px, auto) 1fr auto; grid-template-areas: 'rt rw rb' 'ra ra ra' 'fb fb fb'; gap: 2px 8px; align-items: center; padding: 5px 8px; border-radius: 10px; border-left: 5px solid var(--tc); background: rgba(28, 44, 76, .05); margin-bottom: 4px; }
 .rr2.mine { background: rgba(255, 215, 94, .2); } .rr2.flagged { background: rgba(239, 106, 90, .12); }
 .rt { grid-area: rt; font: 800 12.5px var(--f-body); color: color-mix(in srgb, var(--tc) 70%, #1c2c4c); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
 .rw { grid-area: rw; font: 700 17px var(--f-body); color: #183a7a; overflow-wrap: anywhere; } .rw.none { color: #a0aec4; }
@@ -301,6 +301,10 @@ select.field { color: #13284f; }
 .vb { appearance: none; display: inline-flex; align-items: center; gap: 3px; border-radius: 999px; padding: 4px 10px; font: 800 13px var(--f-body); cursor: pointer; border: 2px solid; background: #fff; min-height: 34px; }
 .vb .ic { width: 15px; height: 15px; } .vb.yes { color: #2f9a58; border-color: #6cc48a; } .vb.no { color: #c8402c; border-color: #ef8a7a; }
 .vb.yes.on { background: #2f9a58; color: #fff; } .vb.no.on { background: #c8402c; color: #fff; }
+.vb.half { color: #2f6fd8; border-color: #8db6fb; } .vb.half b { font: 800 14px var(--f-disp); } .vb.half.on { background: #3d8bfd; color: #fff; } .vc b { font: 800 13px var(--f-disp); }
+.fby { grid-area: fb; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; font: 600 11.5px var(--f-body); color: #7a5a5a; }
+.fby .ic { width: 12px; height: 12px; color: #c8402c; } .fby > b { color: #4a2a2a; }
+.vn { display: inline-flex; align-items: center; gap: 3px; color: #4a5a7a; } .vn .ic { color: inherit; } .vn b { font: 800 12px var(--f-disp); }
 .rsum { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding-top: 4px; } .rsum .gc { color: #1c2c4c; border-color: var(--tc); background: color-mix(in srgb, var(--tc) 18%, #fff); }
 /* punti della manche */
 .rr-row { grid-template-columns: minmax(0, 1fr) auto; }

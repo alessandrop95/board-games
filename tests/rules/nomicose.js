@@ -44,13 +44,23 @@ t('punti: uguale all’altra squadra 5, diversa 10, unica 20, sbagliata 0', P.pt
 // contestazioni
 t('non si contesta la propria squadra', E.act(g, 0, { a: 'flag', t: 0, c: 'cosa' }, T0 + 16000) !== null);
 t('non si contesta una risposta che non vale già', E.act(g, 1, { a: 'flag', t: 0, c: 'frutta' }, T0 + 16000) !== null);
-t('si contesta quella di un’altra squadra', E.act(g, 1, { a: 'flag', t: 0, c: 'animale' }, T0 + 16000) === null && g.flags['0:animale'].v[1] === false);
+t('si contesta quella di un’altra squadra', E.act(g, 1, { a: 'flag', t: 0, c: 'animale' }, T0 + 16000) === null && g.flags['0:animale'].v[1] === 0);
 t('la squadra contestata non vota', E.act(g, 0, { a: 'vote', t: 0, c: 'animale', ok: true }, T0 + 16000) !== null);
 E.act(g, 3, { a: 'vote', t: 0, c: 'animale', ok: false }, T0 + 16100);
 P = E.points(g);
 t('con più no che sì vale 0 (e l’altra diventa unica)', P.pts[0].animale === 0 && P.why[0].animale === 'voted' && P.pts[1].animale === 20);
 E.act(g, 3, { a: 'vote', t: 0, c: 'animale', ok: true }, T0 + 16200);
 t('si può cambiare voto: pari → vale', E.points(g).pts[0].animale === 10);
+E.act(g, 3, { a: 'vote', t: 0, c: 'animale', v: 1 }, T0 + 16250);
+P = E.points(g);
+t('un no e un «5»: vale 5 punti (e per gli altri resta una risposta)', P.pts[0].animale === 5 && P.why[0].animale === 'half' && P.pts[1].animale === 10 && g.flags['0:animale'].v[3] === 1);
+t('voti contati per tipo', (function () { var o = E.flagOut(g.flags['0:animale']); return o.yes === 0 && o.half === 1 && o.no === 1 && o.lvl === 1; })());
+t('voto non valido no', E.act(g, 3, { a: 'vote', t: 0, c: 'bah', v: 2 }, T0 + 16260) !== null);
+t('decide il voto di mezzo', E.flagOut({ v: { a: 2, b: 1, c: 0 } }).lvl === 1 && E.flagOut({ v: { a: 2, b: 2, c: 1 } }).lvl === 2 && E.flagOut({ v: { a: 0, b: 0, c: 1 } }).lvl === 0 && E.flagOut({ v: { a: 0, b: 1, c: 1, d: 2 } }).lvl === 1 && E.flagOut({ v: { a: 1 } }).lvl === 1);
+t('i voti vecchi (sì/no) valgono ancora', E.flagOut({ v: { a: true, b: false } }).lvl === 2 && E.flagOut({ v: { a: false, b: false, c: true } }).out);
+var gh = E.newGame(seats(4, [0, 1, 0, 1]), { teams: 2 }, T0); gh.letter = 'R';
+E.act(gh, 0, { a: 'w', c: 'citta', w: 'Roccasecca' }, T0); E.act(gh, 1, { a: 'w', c: 'citta', w: 'Roma' }, T0); E.tick(gh, gh.until);
+t('chi contesta può proporre subito 5 punti', E.act(gh, 1, { a: 'flag', t: 0, c: 'citta', v: 1 }, gh.until + 1) === null && gh.flags['0:citta'].by === 1 && gh.flags['0:citta'].v[1] === 1 && E.points(gh).pts[0].citta === 5 && E.points(gh).pts[1].citta === 10);
 E.act(g, 3, { a: 'vote', t: 0, c: 'animale', ok: false }, T0 + 16300);
 ['ready'].forEach(function () { [0, 1, 2].forEach(function (p) { E.act(g, p, { a: 'ready' }, T0 + 17000); }); });
 t('si aspetta che tutti siano pronti', g.phase === 'review' && E.pending(g).join() === '3');

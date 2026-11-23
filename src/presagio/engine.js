@@ -56,7 +56,33 @@ var PREngine = (function () {
       else if (c.k === 'j') { log(s, 'Si scopre un Giullare: niente briscola in questa mano.', 'sys'); }
       else { s.phase = 'trump'; s.turn = s.dealer; log(s, 'Si scopre un Arcimago: ' + nm(s, s.dealer) + ' sceglie la briscola.', 'sys'); return; }
     } else log(s, 'Ultima mano: tutte le carte sono distribuite, niente briscola.', 'sys');
+    startBids(s);
+  }
+  // Si aprono le previsioni: a turno dal giocatore dopo il mazziere oppure, se coperte, tutti insieme
+  function startBids(s) {
     s.phase = 'bid'; s.turn = next(s, s.dealer);
+    if (s.opts.hidden) { s.turn = firstPending(s); log(s, 'Previsioni coperte: tutti scelgono insieme.', 'sys'); }
+  }
+  // Previsioni coperte: tutti dichiarano nello stesso momento, ognuno dal proprio telefono
+  function together(s) { return !!s.opts.hidden && s.phase === 'bid'; }
+  // Chi deve ancora prevedere (in ordine di gioco, dal giocatore dopo il mazziere)
+  function pending(s) {
+    var out = [];
+    if (s.phase !== 'bid') return out;
+    if (!together(s)) return s.turn != null ? [s.turn] : out;
+    for (var k = 1; k <= n(s); k++) { var p = (s.dealer + k) % n(s); if (s.players[p].bid == null) out.push(p); }
+    return out;
+  }
+  // Il «turno» durante le previsioni coperte: chi deve ancora scegliere, prima le persone (per il timer) poi i bot
+  function firstPending(s) {
+    var w = pending(s), h = w.filter(function (p) { return !s.players[p].bot; });
+    return h.length ? h[0] : w.length ? w[0] : next(s, s.dealer);
+  }
+  // Deve fare una mossa adesso? (durante le previsioni coperte possono essere in tanti)
+  function needs(s, p) {
+    if (s.phase === 'over' || !s.players[p]) return false;
+    if (together(s)) return s.players[p].bid == null;
+    return s.turn === p;
   }
   function handOrder(a, b) {
     var A = C[a], B = C[b];
@@ -121,28 +147,30 @@ var PREngine = (function () {
     } else { s.phase = 'roundEnd'; s.turn = next(s, s.dealer); }
   }
 
-  function decider(s) { return s.phase === 'over' ? null : s.turn; }
+  function decider(s) { return s.phase === 'over' ? null : together(s) ? firstPending(s) : s.turn; }
 
   function act(s, p, a) {
     if (s.phase === 'over') return 'La partita è finita.';
-    if (p !== s.turn) return 'Non tocca a te.';
     var P = s.players[p];
+    if (!P) return 'Non sei al tavolo.';
+    if (together(s)) { if (P.bid != null) return 'Hai già fatto la tua previsione: aspetta gli altri.'; }
+    else if (p !== s.turn) return 'Non tocca a te.';
     if (s.phase === 'trump') {
       if (a.a !== 'trump' || !(a.s >= 0 && a.s <= 3)) return 'Scegli il colore di briscola.';
       s.trump = a.s; log(s, nm(s, p) + ' sceglie come briscola ' + PRData.SUITS[a.s].n + '.', 'sys');
-      s.phase = 'bid'; s.turn = next(s, s.dealer);
+      startBids(s);
     } else if (s.phase === 'bid') {
       var b = a.b;
       if (a.a !== 'bid' || typeof b !== 'number' || b !== Math.floor(b) || b < 0 || b > s.round) return 'Previsione non valida.';
       if (forbiddenBid(s, p) === b) return 'Con la regola della somma diversa non puoi dichiarare ' + b + '.';
       P.bid = b; log(s, s.opts.hidden ? nm(s, p) + ' ha fatto la sua previsione.' : nm(s, p) + ' prevede ' + b + (b === 1 ? ' presa.' : ' prese.'), 'bid');
       s.flash = { kind: 'bid', p: p, n: s.logN };
-      if (p === s.dealer) {
+      if (together(s) ? !pending(s).length : p === s.dealer) {
         var sum = bidSum(s);
         if (s.opts.hidden) log(s, 'Previsioni fatte: restano coperte fino alla fine della mano.', 'sys');
         else log(s, 'Previsioni: ' + sum + ' su ' + s.round + (sum > s.round ? ' (più delle prese: qualcuno resterà deluso)' : sum < s.round ? ' (meno delle prese: qualcuno ne farà di troppo)' : '') + '.', 'sys');
         s.phase = 'play'; s.leader = next(s, s.dealer); s.turn = s.leader;
-      } else s.turn = next(s, p);
+      } else s.turn = together(s) ? firstPending(s) : next(s, p);
     } else if (s.phase === 'play') {
       if (a.a !== 'play') return 'Gioca una carta.';
       if (P.hand.indexOf(a.c) < 0) return 'Non hai questa carta.';
@@ -168,6 +196,6 @@ var PREngine = (function () {
     return null;
   }
 
-  return { newGame: newGame, act: act, decider: decider, playable: playable, leadSuit: leadSuit, trickWinner: trickWinner, forbiddenBid: forbiddenBid, bidSum: bidSum, cardName: cardName, handOrder: handOrder };
+  return { newGame: newGame, act: act, decider: decider, pending: pending, needs: needs, together: together, playable: playable, leadSuit: leadSuit, trickWinner: trickWinner, forbiddenBid: forbiddenBid, bidSum: bidSum, cardName: cardName, handOrder: handOrder };
 })();
 if (typeof module !== 'undefined') module.exports = { PRData: PRData, PREngine: PREngine };

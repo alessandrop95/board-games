@@ -90,8 +90,17 @@ var Game = (function () {
 
   /* ---------- il controllo ---------- */
   function badge(g, why, pts) {
-    var txt = { only: 'unica', uniq: '', dup: 'doppione', empty: 'vuota', short: 'troppo corta', letter: 'non è ' + g.letter, voted: 'bocciata' }[why] || '';
+    var txt = { only: 'unica', uniq: '', dup: 'doppione', empty: 'vuota', short: 'troppo corta', letter: 'non è ' + g.letter, voted: 'bocciata', half: 'ridotta a 5' }[why] || '';
     return '<span class="pt p' + pts + '">' + (pts ? '+' + pts : '0') + '</span>' + (txt ? '<small class="why">' + txt + '</small>' : '');
+  }
+  // chi ha contestato la risposta e come ha votato ognuno
+  function flagWho(g, f, me) {
+    var nm = function (i) { return g.players[i] ? esc(g.players[i].nick) + (i === me ? ' (tu)' : '') : '?'; };
+    var groups = [[2, IC('check')], [1, '<b>5pt</b>'], [0, IC('x')]].map(function (o) {
+      var ids = Object.keys(f.v).filter(function (k) { return E.voteVal(f.v[k]) === o[0]; }).map(Number);
+      return ids.length ? '<span class="vn">' + o[1] + ' ' + ids.map(nm).join(', ') + '</span>' : '';
+    }).join('');
+    return '<small class="fby">' + IC('flag') + ' Contestata da <b>' + nm(f.by) + '</b>' + groups + '</small>';
   }
   function review(g, me) {
     if (!g.rev) return '';
@@ -99,13 +108,16 @@ var Game = (function () {
     return '<div class="paper rev">' + g.cats.map(function (c) {
       return '<div class="rcat"><h4>' + esc(catName(c)) + '</h4>' + g.teams.map(function (T, t) {
         var cell = g.rev.cells[t][c], f = g.flags[t + ':' + c], why = P.why[t][c], pts = P.pts[t][c], acts = '';
+        var who = '';
         if (f) {
-          var fo = E.flagOut(f), my = me >= 0 ? f.v[me] : null, can = open && me >= 0 && mt !== t;
-          acts = '<span class="vote">' + (can ? '<button class="vb yes' + (my === true ? ' on' : '') + '" data-act="vote" data-t="' + t + '" data-c="' + c + '" data-ok="1" aria-label="Vale">' + IC('check') + ' ' + fo.yes + '</button><button class="vb no' + (my === false ? ' on' : '') + '" data-act="vote" data-t="' + t + '" data-c="' + c + '" data-ok="0" aria-label="Non vale">' + IC('x') + ' ' + fo.no + '</button>'
-            : '<span class="vc">' + IC('check') + fo.yes + ' ' + IC('x') + fo.no + '</span>') + '</span>';
+          var fo = E.flagOut(f), my = me >= 0 && f.v[me] != null ? E.voteVal(f.v[me]) : null, can = open && me >= 0 && mt !== t;
+          var vb = function (v, cls, lbl, inner, n) { return '<button class="vb ' + cls + (my === v ? ' on' : '') + '" data-act="vote" data-t="' + t + '" data-c="' + c + '" data-v="' + v + '" aria-label="' + lbl + '" title="' + lbl + '">' + inner + ' ' + n + '</button>'; };
+          acts = '<span class="vote">' + (can ? vb(2, 'yes', 'Vale', IC('check'), fo.yes) + vb(1, 'half', 'Vale solo 5 punti', '<b>5pt</b>', fo.half) + vb(0, 'no', 'Non vale', IC('x'), fo.no)
+            : '<span class="vc">' + IC('check') + fo.yes + ' <b>5pt</b>' + fo.half + ' ' + IC('x') + fo.no + '</span>') + '</span>';
+          who = flagWho(g, f, me);
         } else if (open && me >= 0 && mt !== t && cell.st === 'ok') acts = '<button class="chip flagb" data-act="flag" data-t="' + t + '" data-c="' + c + '">' + IC('flag') + ' Contesta</button>';
         var by = cell.by != null && g.players[cell.by] && g.opts.teams ? '<small class="wby">' + esc(g.players[cell.by].nick) + '</small>' : '';
-        return '<div class="rr2' + (t === mt ? ' mine' : '') + (f ? ' flagged' : '') + '" style="--tc:' + tcol(g, t) + '"><span class="rt">' + esc(T.name) + '</span><span class="rw' + (cell.w ? '' : ' none') + '">' + (cell.w ? esc(cell.w) : '—') + by + '</span><span class="rb">' + badge(g, why, pts) + '</span>' + (acts ? '<span class="ra">' + acts + '</span>' : '') + '</div>';
+        return '<div class="rr2' + (t === mt ? ' mine' : '') + (f ? ' flagged' : '') + '" style="--tc:' + tcol(g, t) + '"><span class="rt">' + esc(T.name) + '</span><span class="rw' + (cell.w ? '' : ' none') + '">' + (cell.w ? esc(cell.w) : '—') + by + '</span><span class="rb">' + badge(g, why, pts) + '</span>' + (acts ? '<span class="ra">' + acts + '</span>' : '') + who + '</div>';
       }).join('') + '</div>';
     }).join('') + '<div class="rsum">' + g.teams.map(function (T, t) { return '<span class="gc" style="--tc:' + tcol(g, t) + '"><b>' + esc(T.name) + '</b> +' + P.tot[t] + '</span>'; }).join('') + '</div></div>';
   }
@@ -119,7 +131,7 @@ var Game = (function () {
       var wait = E.pending(g);
       if (!P) h = 'Si controllano le risposte…';
       else if (P.ready) { h = 'Pronto. Aspetto ' + wait.map(function (i) { return pname(g, i); }).join(', ') + '…'; btn = '<button class="btn small ghost" data-act="unready">Ancora un attimo</button>'; }
-      else { h = 'Controlla le risposte: <b>Contesta</b> quelle che non valgono, vota quelle contestate.'; btn = '<button class="btn small" data-act="ready">' + IC('check') + ' Pronto</button>'; }
+      else { h = 'Controlla le risposte: <b>Contesta</b> quelle che non ti convincono, poi vota: vale, <b>5</b> punti o non vale.'; btn = '<button class="btn small" data-act="ready">' + IC('check') + ' Pronto</button>'; }
       if (isHost && wait.length && !(wait.length === 1 && wait[0] === me)) btn += '<button class="btn small ghost" data-act="nextround">Avanti</button>';
     } else if (!P) h = 'Le squadre scrivono parole con la <b>' + g.letter + '</b>…';
     else {

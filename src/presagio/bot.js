@@ -63,7 +63,7 @@ var PRBot = (function () {
     return byVal[0];
   }
   function decide(s, p) {
-    if (s.turn !== p) return null;
+    if (E.needs ? !E.needs(s, p) : s.turn !== p) return null;
     if (s.phase === 'trump') return { a: 'trump', s: chooseTrump(s, p) };
     if (s.phase === 'bid') return { a: 'bid', b: chooseBid(s, p) };
     if (s.phase === 'play') return { a: 'play', c: choosePlay(s, p) };

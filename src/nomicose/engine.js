@@ -3,8 +3,9 @@
    ogni squadra ha un foglio comune che tutti i compagni riempiono insieme, dal proprio telefono, entro il tempo.
    La squadra che ha riempito tutte le caselle può dire «Stop!»: agli altri restano 10 secondi.
    Poi si controllano le risposte: ognuno può contestare quelle delle altre squadre e chi non è della squadra
-   contestata vota. Punti per categoria: 20 se la risposta valida è l'unica, 10 se è diversa da quelle degli
-   altri, 5 se un'altra squadra ha scritto la stessa parola, 0 se è vuota, sbagliata o bocciata dal voto.
+   contestata vota: vale, vale solo 5 punti, non vale. Punti per categoria: 20 se la risposta valida è l'unica,
+   10 se è diversa da quelle degli altri, 5 se un'altra squadra ha scritto la stessa parola o se il voto l'ha
+   ridotta a 5, 0 se è vuota, sbagliata o bocciata dal voto.
    Dopo le manche stabilite vince la squadra con più punti.
    Le funzioni che dipendono dall'ora ricevono «now» (millisecondi dell'host), così le prove le controllano. */
 var NCEngine = (function () {
@@ -100,8 +101,16 @@ var NCEngine = (function () {
     log(g, 'Tempo scaduto! Si controllano le risposte.', 'sys');
     fx(g, { k: 'reveal', round: g.round });
   }
-  // una risposta contestata è bocciata se i «no» sono più dei «sì»
-  function flagOut(f) { var y = 0, n = 0; Object.keys(f.v).forEach(function (k) { if (f.v[k]) y++; else n++; }); return { yes: y, no: n, out: n > y }; }
+  /* Voti su una risposta contestata: 2 = vale, 1 = vale solo 5 punti, 0 = non vale (true/false delle partite
+     cominciate prima valgono 2 e 0). Decide il voto «di mezzo» (la mediana): con due voti diversi vince il più
+     generoso, quindi a parità tra sì e no la risposta vale, come prima. lvl è il risultato: 2, 1 o 0. */
+  function voteVal(v) { return v === true ? 2 : v === false ? 0 : v === 1 || v === 2 ? v : 0; }
+  function flagOut(f) {
+    var vs = Object.keys(f.v).map(function (k) { return voteVal(f.v[k]); }).sort();
+    var y = vs.filter(function (x) { return x === 2; }).length, h = vs.filter(function (x) { return x === 1; }).length, n = vs.length - y - h;
+    var lvl = vs.length ? vs[Math.floor(vs.length / 2)] : 2;
+    return { yes: y, half: h, no: n, lvl: lvl, out: lvl === 0 };
+  }
   // punti di ogni casella (provvisori durante il controllo, definitivi alla fine)
   function points(g) {
     if (!g.rev) return null;
@@ -115,6 +124,8 @@ var NCEngine = (function () {
         valid.push(t);
       }
       valid.forEach(function (t) {
+        // ridotta a 5 dal voto: vale 5 (e conta comunque come risposta per le altre squadre)
+        var f = g.flags[t + ':' + c]; if (f && flagOut(f).lvl === 1) { pts[t][c] = 5; why[t][c] = 'half'; return; }
         var dup = valid.some(function (u) { return u !== t && same(g.rev.cells[t][c].w, g.rev.cells[u][c].w); });
         pts[t][c] = valid.length === 1 ? 20 : dup ? 5 : 10; why[t][c] = valid.length === 1 ? 'only' : dup ? 'dup' : 'uniq';
       });
@@ -191,17 +202,18 @@ var NCEngine = (function () {
         if (ft === t) return 'Non puoi contestare la tua squadra.';
         if (cell.st !== 'ok') return 'Questa risposta non vale già.';
         var key = ft + ':' + fc; if (g.flags[key]) return 'È già contestata: vota.';
-        g.flags[key] = { by: p, v: {} }; g.flags[key].v[p] = false;
+        // chi contesta vota «non vale» oppure «solo 5 punti»; poi può cambiare voto come tutti
+        g.flags[key] = { by: p, v: {} }; g.flags[key].v[p] = a.v === 1 ? 1 : 0;
         g.until = Math.max(g.until, now + VOTE_MS);
         g.players.forEach(function (Q, q) { if (!Q.bot && Q.team !== ft && q !== p) Q.ready = false; });
-        log(g, nick(g, p) + ' contesta «' + cell.w + '» dei ' + tname(g, ft) + ' (' + D.CATS[fc][0] + ').', 'flag', p);
+        log(g, nick(g, p) + ' contesta «' + cell.w + '» ' + (g.opts.teams ? 'dei ' : 'di ') + tname(g, ft) + ' (' + D.CATS[fc][0] + ')' + (a.v === 1 ? ' e propone 5 punti.' : '.'), 'flag', p);
         fx(g, { k: 'flag', p: p, t: ft, c: fc });
         return null;
       }
       if (a.a === 'vote') {
         var f = g.flags[(+a.t) + ':' + String(a.c || '')]; if (!f) return 'Questa risposta non è contestata.';
         if (+a.t === t) return 'Sulla tua squadra non voti.';
-        f.v[p] = !!a.ok;
+        f.v[p] = a.v === 0 || a.v === 1 || a.v === 2 ? a.v : a.ok ? 2 : 0;
         return null;
       }
       if (a.a === 'ready') {
@@ -229,6 +241,6 @@ var NCEngine = (function () {
   }
 
   return { newGame: newGame, act: act, tick: tick, decider: decider, pending: pending, forceNext: forceNext, points: points, flagOut: flagOut, filled: filled, members: members,
-    norm: norm, same: same, check: check, known: known, lev: lev, setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, STOP_MS: STOP_MS, D: D };
+    voteVal: voteVal, norm: norm, same: same, check: check, known: known, lev: lev, setRandom: setRandom, shuffle: shuffle, TEAMS: TEAMS, OPT: OPT, STOP_MS: STOP_MS, D: D };
 })();
 if (typeof module !== 'undefined') module.exports = NCEngine;
