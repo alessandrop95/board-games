@@ -19,6 +19,7 @@ var g = E.newGame(seats(3), {});
 t('12 carte coperte a testa', g.players.every(function (P) { return P.grid.length === 12 && P.grid.every(function (x) { return !x.up; }); }));
 t('una carta scoperta sugli scarti', g.disc.length === 1);
 t('tutte le 150 carte ci sono', count(g) === 150);
+t('posti mescolati: ognuno tiene il colore della sala d’attesa', E.newGame([{ uid: 'a', nick: 'A', col: 2 }, { uid: 'b', nick: 'B', col: 0 }], {}).players.map(function (P) { return P.col; }).join() === '2,0' && g.players.map(function (P) { return P.col; }).join() === '0,1,2');
 t('soglia di 100 punti', g.opts.target === 100 && E.newGame(seats(2), { target: 50 }).opts.target === 50 && E.newGame(seats(2), { target: 7 }).opts.target === 100);
 t('prima si scoprono due carte: niente pesca', E.act(g, 0, { a: 'draw' }) !== null);
 t('scoprire una carta', E.act(g, 0, { a: 'flip', i: 0 }) === null && g.players[0].grid[0].up);

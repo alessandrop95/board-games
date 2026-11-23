@@ -70,7 +70,10 @@ function tableReducer(doc, from, op) {
       if (!isHost) return hostOnly;
       if (doc.phase !== 'lobby') return { changed: false };
       if (doc.seats.length < 2) return { err: 'Servono almeno 2 giocatori: aggiungi un giocatore automatico.' };
-      doc.game = E.newGame(doc.seats.slice(), doc.opts || {}); doc.phase = 'play'; return {};
+      // ordine di gioco sempre nuovo: si mescolano i posti a ogni partita (anche nella rivincita); il colore resta quello della sala d'attesa
+      var order = doc.seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: s.bot, col: i }; });
+      for (var i = order.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = order[i]; order[i] = order[j]; order[j] = t; }
+      doc.game = E.newGame(order, doc.opts || {}); doc.phase = 'play'; return {};
     }
     case 'rematch': if (!isHost) return hostOnly; doc.phase = 'lobby'; doc.game = null; return {};
     case 'auto': if (!isHost) return hostOnly; if (!doc.game || !doc.game.players[op.p]) return { changed: false }; doc.game.players[op.p].bot = !!op.on; if (!op.on) doc.game.players[op.p].away = false; else if (doc.game.phase === 'scores') doc.game.players[op.p].ready = true; return {};
