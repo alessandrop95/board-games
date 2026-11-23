@@ -41,7 +41,7 @@ var TV = (function () {
       if (i === me) return;
       var th = seatAngle(g, i, me), p = seatXY(th);
       st.seatPos[i] = th;
-      var turn = g.turn === i && g.phase !== 'over';
+      var turn = E.needs(g, i);
       out += '<button class="tv-seat' + (turn ? ' turn' : '') + (P.bot ? ' bot' : '') + '" data-pl="' + i + '" style="left:' + p.x + '%;top:' + p.y + '%">' +
         '<span class="tv-ava">' + esc((P.nick || '?').charAt(0).toUpperCase()) + (g.dealer === i ? '<span class="dl" title="Mazziere">M</span>' : '') + '</span>' +
         '<span class="nm">' + Net.dot(P.uid) + esc(P.nick) + '</span>' + gemsHTML(P, bidHidden(g, i, me)) + '<span class="sc">' + P.score + ' pt' + (P.bot ? ' · auto' : '') + '</span></button>';
@@ -282,7 +282,8 @@ var TV = (function () {
   /* ---------- timer ad anello sul posto di chi deve giocare ---------- */
   function tickTimer() {
     if (!st || !App.doc || !App.doc.game) return;
-    var d = App.doc, s = Turns.secs(d), el = document.querySelector('.tv-seat.turn .tv-ava');
+    // l'anello del timer va sul posto di chi ha il tempo che scorre (con le previsioni coperte si illuminano tutti quelli che devono scegliere)
+    var d = App.doc, s = Turns.secs(d), el = document.querySelector('.tv-seat.turn[data-pl="' + E.decider(d.game) + '"] .tv-ava');
     if (!el) return;
     var p = s && d.turnSince ? Math.min(1, (Date.now() - d.turnSince) / (s * 1000)) : 0;
     el.style.setProperty('--p', (1 - p).toFixed(3));
@@ -306,15 +307,15 @@ var TV = (function () {
     var tc = g.trump != null ? ['var(--fiamme)', 'var(--maree)', 'var(--foreste)', 'var(--sabbie)'][g.trump] : null;
     $id('tv-trump').innerHTML = (g.trumpCard != null ? PRCards.html(g.trumpCard) : '<div class="none">ultima mano</div>') +
       '<span' + (tc ? ' style="--tc:' + tc + '"' : '') + '>Briscola<b>' + (g.trump != null ? suitName(g.trump) : g.phase === 'trump' ? 'da scegliere' : 'nessuna') + '</b></span>';
-    $id('tv-status').innerHTML = statusLine(g, me, sum, allBid, true) + (g.turn === me && g.phase !== 'over' ? '<span id="tt"></span>' : '');
+    $id('tv-status').innerHTML = statusLine(g, me, sum, allBid, true) + (E.decider(g) === me && g.phase !== 'over' ? '<span id="tt"></span>' : '');
     if (me >= 0) {
       var P = g.players[me];
-      $id('tv-me').className = 'tv-me' + (g.turn === me && g.phase !== 'over' ? ' turn' : '');
+      $id('tv-me').className = 'tv-me' + (E.needs(g, me) ? ' turn' : '');
       $id('tv-me').innerHTML = '<span class="nm">' + esc(P.nick) + (g.dealer === me ? ' · mazziere' : '') + '</span>' + gemsHTML(P) + '<span>' + P.score + ' punti</span>';
     } else $id('tv-me').innerHTML = '';
     renderHand(g, me, dealing && !first);
     if (dealing && !first) { Sound.play('shuffle'); setTimeout(function () { Sound.play('deal'); if (g.trumpCard != null) Sound.play('trump'); }, 500); }
-    if (!first && g.phase !== 'over' && g.turn === me && E.decider(g) === me && st.turnSeq !== g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0)) { st.turnSeq = g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0); setTimeout(function () { Sound.play('turn'); }, 600); }
+    if (!first && g.phase !== 'over' && E.needs(g, me) && st.turnSeq !== g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0)) { st.turnSeq = g.round + ':' + g.phase + ':' + g.trick.length + ':' + (g.lastTrick ? g.lastTrick.n : 0); setTimeout(function () { Sound.play('turn'); }, 600); }
     if (!first && g.phase === 'over' && !st.overSnd) { st.overSnd = true; setTimeout(function () { Sound.play(me >= 0 && g.winner && g.winner.indexOf(me) >= 0 ? 'win' : 'lose'); }, 1800); }
     $id('tv-actions').innerHTML = actionsHTML(g, me, sum);
     if (first) { staticTrick(g); st.flashN = g.flash ? g.flash.n : 0; st.scoredRound = g.phase === 'roundEnd' || g.phase === 'over' ? g.round : 0; }
@@ -330,7 +331,8 @@ var TV = (function () {
     if (me < 0) return '';
     var P = g.players[me], myTurn = g.turn === me && g.phase !== 'over';
     if (P.bot && g.phase !== 'over') return '<button class="btn block" data-act="resume">Riprendo io</button>';
-    if (g.phase === 'bid' && myTurn) {
+    if (g.phase === 'bid' && E.together(g) && P.bid != null) return '<p class="lead" style="text-align:center;margin:0">Hai previsto <b>' + P.bid + '</b>. Si gioca quando hanno scelto tutti.</p>';
+    if (g.phase === 'bid' && E.needs(g, me)) {
       var f = E.forbiddenBid(g, me), b = '';
       for (var i = 0; i <= g.round; i++) b += '<button data-act="bid" data-b="' + i + '"' + (i === f ? ' class="fb" disabled aria-label="' + i + ' non consentito"' : ' aria-label="Prevedo ' + i + '"') + '>' + i + '</button>';
       return '<div class="bids">' + b + '</div>';

@@ -36,7 +36,7 @@ Gioco di carte a prese con previsione, da 3 a 6 giocatori.
 - A ogni mano le carte aumentano di una. Prima si prevede quante prese si faranno, poi si gioca.
 - Previsione esatta: 20 punti + 10 per presa. Sbagliata: −10 per ogni presa di differenza.
 - Opzione del tavolo: la somma delle previsioni non può essere uguale al numero di prese.
-- Opzione del tavolo: previsioni coperte, che si scoprono tutte insieme a fine mano.
+- Opzione del tavolo: previsioni coperte, fatte da tutti nello stesso momento e scoperte solo a fine mano.
 - Con tante carte in mano il ventaglio passa su due file, così ogni carta resta leggibile.
 - Tavolo animato: le carte volano dalla mano al centro, la presa va al vincitore, la distribuzione parte dal mazzo.
 
@@ -174,7 +174,7 @@ Il gioco di carta e penna a squadre (o ognuno per sé), da 2 a 12 giocatori, anc
 **Gioca:** https://alessandrop95.github.io/board-games/nomicose/
 
 - Esce una lettera e ci sono 6 categorie (classiche o a sorpresa). Ogni squadra ha un foglio solo che i compagni riempiono insieme, in diretta; chi riempie tutto può dire «Stop!».
-- Controllo finale: le risposte vuote o con la lettera sbagliata non valgono, quelle dubbie si contestano e si votano. 20 punti alla risposta unica, 10 all’originale, 5 al doppione.
+- Controllo finale: le risposte vuote o con la lettera sbagliata non valgono, quelle dubbie si contestano e si votano (vale, solo 5 punti o non vale; si vede chi ha contestato e come ha votato ognuno). 20 punti alla risposta unica, 10 all’originale, 5 al doppione.
 
 ## Disegna e indovina
 

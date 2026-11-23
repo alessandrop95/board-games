@@ -152,7 +152,7 @@ document.addEventListener('click', function (ev) {
     // la partita
     case 'stop': if (g && g.phase === 'write') { var f = document.activeElement; if (f && f.classList && f.classList.contains('cin')) f.blur(); setTimeout(function () { act({ a: 'stop' }); }, 120); } break;
     case 'flag': act({ a: 'flag', t: +el.getAttribute('data-t'), c: el.getAttribute('data-c') }); break;
-    case 'vote': Sound.play('vote'); act({ a: 'vote', t: +el.getAttribute('data-t'), c: el.getAttribute('data-c'), ok: el.getAttribute('data-ok') === '1' }); break;
+    case 'vote': Sound.play('vote'); act({ a: 'vote', t: +el.getAttribute('data-t'), c: el.getAttribute('data-c'), v: +el.getAttribute('data-v') }); break;
     case 'ready': act({ a: 'ready' }); break;
     case 'unready': act({ a: 'unready' }); break;
     case 'next': act({ a: 'next' }); break;

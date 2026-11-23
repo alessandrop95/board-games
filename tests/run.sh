@@ -44,6 +44,7 @@ gstep nograzie "Regole di No Grazie!" node tests/rules/nograzie.js
 gstep nograzie "Partite intere tra bot (No Grazie!)" node tests/rules/nograzie_bots.js 20
 gstep sushigo "Regole e partite tra bot di Sushi Go!" node tests/rules/sushigo.js 20
 gstep prendi6 "Regole e partite tra bot di Prendi 6!" node tests/rules/prendi6.js 10
+gstep presagio "Previsioni e partite tra bot di Wizard" node tests/rules/presagio.js 10
 gstep nomicose "Regole e partite tra bot di Nomi, cose, città" node tests/rules/nomicose.js 10
 gstep disegna "Regole e partite tra bot di Disegna e indovina" node tests/rules/disegna.js 10
 gstep briscola "Regole e partite tra bot di Briscola" node tests/rules/briscola.js 10

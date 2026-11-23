@@ -1,8 +1,8 @@
 /* ===== Nomi, cose, città: giocatori automatici =====
    Scrivono una parola alla volta nelle caselle vuote della loro squadra, prese dalle liste che conoscono
    (non sempre: per ogni casella c'è una probabilità di «non farsi venire in mente niente»). Se la squadra ha
-   riempito tutto dicono stop. Nel controllo votano «sì» alle parole che conoscono e quasi sempre anche alle
-   altre, se cominciano con la lettera giusta; poi sono pronti. */
+   riempito tutto dicono stop. Nel controllo votano «vale» alle parole che conoscono; alle altre di solito
+   «vale», a volte «solo 5 punti» o «non vale»; poi sono pronti. */
 var NCBot = (function () {
   var E = (typeof NCEngine !== 'undefined') ? NCEngine : require('./engine.js'), D = E.D;
   var SKILL = .78;
@@ -23,7 +23,8 @@ var NCBot = (function () {
         var f = g.flags[keys[i]], ft = +keys[i].split(':')[0], fc = keys[i].split(':')[1];
         if (ft === P.team || f.v[p] != null) continue;
         var w = g.rev.cells[ft][fc].w;
-        return { a: 'vote', t: ft, c: fc, ok: E.known(w, fc) || (!E.known(w) && hash(w + p) < .75) };
+        var r = hash(w + p);
+        return { a: 'vote', t: ft, c: fc, v: E.known(w, fc) ? 2 : E.known(w) ? (r < .3 ? 1 : 0) : r < .6 ? 2 : r < .8 ? 1 : 0 };
       }
       return P.ready ? null : { a: 'ready' };
     }
