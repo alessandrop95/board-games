@@ -251,9 +251,41 @@ def build_ts():
         "Tressette", "Il tressette con le carte italiane, a vincere in coppia con busso, striscio e volo o a perdere fino a 6 giocatori, ognuno dal proprio telefono anche a distanza.", '#1f4d3a',
         'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Tressette"))
 
+def build_dr():
+    d = 'src/rischio/'
+    js = "window.GAME_PREFIX = 'rischio/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'rischio'), exist_ok=True)
+    open(os.path.join(ROOT, 'rischio', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
+        "Dadi e rischio", "Tira cinque dadi e metti da parte valori sempre diversi: ogni tiro in più vale punti, finché un tiro non ti offre niente di nuovo e perdi tutto. Tiri ancora o ti fermi? Da 2 a 8 giocatori.", '#1d1233',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Dadi e rischio"))
+
+def build_al():
+    d = 'src/asta/'
+    js = "window.GAME_PREFIX = 'asta/v1/';\n" + '\n'.join(r(d, f) for f in ['engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'asta'), exist_ok=True)
+    open(os.path.join(ROOT, 'asta', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
+        "Asta lampo", "Gemme da collezionare e maledizioni da evitare, all’asta una alla volta: tutti offrono in segreto nello stesso momento e se due pareggiano il lotto cresce. Strategia pura, senza bisogno di parlarsi. Da 2 a 6 giocatori.", '#0e1a3a',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Asta lampo"))
+
+def build_vb():
+    d = 'src/vocabolario/'
+    js = "window.GAME_PREFIX = 'vocabolario/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'vocabolario'), exist_ok=True)
+    open(os.path.join(ROOT, 'vocabolario', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
+        "Vocabolario bugiardo", "Esce una parola italiana vera e rarissima: ognuno inventa una definizione credibile e poi tutti cercano quella vera in mezzo alle bugie. Da 3 a 12 giocatori, anche a distanza.", '#3a1218',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Vocabolario"))
+
+def build_es():
+    d = 'src/emoji/'
+    js = "window.GAME_PREFIX = 'emoji/v1/';\n" + '\n'.join(r(d, f) for f in ['data.js', 'engine.js', 'bot.js', 'art.js', 'rules.js']) + '\n' + net + '\n' + '\n'.join(r(d, f) for f in ['sound.js', 'ui.js', 'view.js', 'sheets.js'])
+    os.makedirs(os.path.join(ROOT, 'emoji'), exist_ok=True)
+    open(os.path.join(ROOT, 'emoji', 'index.html'), 'w', encoding='utf-8', newline='\n').write(page(
+        "Emoji in scena", "A squadre: a turno uno fa il regista e racconta un film, un modo di dire o un personaggio usando solo emoji; i compagni indovinano, se no gli avversari rubano. Da 4 a 12 giocatori, anche a distanza.", '#4a1040',
+        'family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900', r(d, 'style.css'), js, "Emoji in scena"))
+
 # Uso: python3 build.py [giochi…]  (senza argomenti li ricostruisce tutti)
-# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere, miniera, bugiardo, tressette
-GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz, 'miniera': build_mn, 'bugiardo': build_lb, 'tressette': build_ts}
+# Nomi: polvere-e-piombo, presagio, gattomina, campi-acciaio, binari-italia, catan, machiavelli, unlock, skyjo, flip7, citadels, cabo, nograzie, sushigo, prendi6, nomicose, disegna, briscola, scopa, burraco, sintonia, fune, conquista, forziere, miniera, bugiardo, tressette, rischio, asta, vocabolario, emoji
+GAMES = {'polvere-e-piombo': build_pp, 'presagio': build_pr, 'gattomina': build_gm, 'campi-acciaio': build_ca, 'binari-italia': build_bi, 'catan': build_ct, 'machiavelli': build_mc, 'unlock': build_ul, 'skyjo': build_sk, 'flip7': build_f7, 'citadels': build_cd, 'cabo': build_cb, 'nograzie': build_ng, 'sushigo': build_sg, 'prendi6': build_p6, 'nomicose': build_nc, 'disegna': build_dg, 'briscola': build_br, 'scopa': build_sc, 'burraco': build_bu, 'sintonia': build_st, 'fune': build_fn, 'conquista': build_cq, 'forziere': build_fz, 'miniera': build_mn, 'bugiardo': build_lb, 'tressette': build_ts, 'rischio': build_dr, 'asta': build_al, 'vocabolario': build_vb, 'emoji': build_es}
 import sys, hashlib, json, re
 # Versione di ogni pagina: impronta del suo contenuto, scritta nella pagina e in version.json. Le app aperte da
 # tempo confrontano la loro con quella pubblicata e si aggiornano da sole (vedi Fresh in src/shared/net.js).

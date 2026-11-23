@@ -229,6 +229,44 @@ Quiz a squadre sulla mappa delle 20 regioni: chi risponde giusto per primo (o st
 
 **Gioca:** https://alessandrop95.github.io/board-games/conquista/
 
+## Vocabolario bugiardo
+
+Da 3 a 12 giocatori, ognuno per sé: esce una parola italiana vera e rarissima, ognuno inventa una definizione credibile e poi si vota quella che si crede vera.
+
+**Gioca:** https://alessandrop95.github.io/board-games/vocabolario/
+
+- 4, 6, 8 o 10 parole; 60, 90 o 120 secondi per inventare, 45 per votare.
+- +2 a chi vota la definizione vera, +1 all’autore di una bugia per ogni voto che riceve, +3 a chi scrive proprio la definizione vera. Definizioni uguali si uniscono e la bugia vale per tutti gli autori.
+- 133 parole rare (sostantivi, verbi e aggettivi) con la definizione vera; i giocatori automatici inventano definizioni dello stesso tipo della parola.
+
+## Emoji in scena
+
+Da 4 a 12 giocatori in 2, 3 o 4 squadre: a turno il regista racconta un titolo usando solo emoji e i compagni indovinano scrivendo dal telefono.
+
+**Gioca:** https://alessandrop95.github.io/board-games/emoji/
+
+- Titolo facile (1 punto) o difficile (2 punti): film, modi di dire, personaggi, cibi, luoghi, cose. +1 se indovinato nella prima metà del tempo.
+- Il regista usa una tastiera di sole emoji (niente lettere né numeri scritti), segna le risposte con 🔥 o ❄️ e può cambiare titolo una volta.
+- A tempo scaduto le altre squadre hanno 15 secondi per rubare il titolo. I giocatori automatici fanno anche da registi, con indizi già pronti.
+
+## Dadi e rischio
+
+Da 2 a 8 giocatori: tira cinque dadi e metti da parte valori sempre diversi; se un tiro non offre niente di nuovo, il piatto del turno è perso.
+
+**Gioca:** https://alessandrop95.github.io/board-games/rischio/
+
+- Una fila di 5 valori diversi vale +15 e restituisce tutti i dadi. Prima di tirare il telefono mostra il rischio esatto di sballare.
+- Traguardo a 100, 200 o 300 punti: chi lo raggiunge apre l’ultimo giro, così tutti giocano lo stesso numero di turni.
+
+## Asta lampo
+
+Da 2 a 6 giocatori: gemme e maledizioni all’asta una alla volta, con offerte segrete e simultanee. Strategia pura, senza bisogno di parlarsi.
+
+**Gioca:** https://alessandrop95.github.io/board-games/asta/
+
+- Gemme: vince l’offerta più alta; con un pareggio in testa nessuno paga e il lotto cresce. Maledizioni: le prende chi offre meno, che incassa le offerte degli altri.
+- Punti: valore delle gemme, +5 per la maggioranza in ogni colore, +4 per ogni collezione di 4 colori, maledizioni negative, 1 punto ogni 2 monete rimaste. 12 o 20 lotti.
+
 ## Musica e suoni
 
 - Ogni gioco ha la sua musica di sottofondo e i suoi effetti (spari e cavalli nel western, cristalli e arpe in Presagio, miagolii ed esplosioni in Gattomina).
