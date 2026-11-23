@@ -4,7 +4,8 @@
    del compagno e non la può più perdere gli danno punti, se è degli avversari la prendono quando conviene, se no
    lasciano la carta che vale meno. In 4 dicono «volo» quando aprono con l'ultima carta di un seme.
    A perdere: stanno sotto con la carta più alta che non prende; se devono prendere per forza, da ultimi prendono
-   con la carta più pesante; quando non hanno il seme scaricano assi e figure. */
+   con la carta più pesante; quando non hanno il seme scaricano assi e figure. Con l'asso di bastoni da 11 se ne
+   liberano appena possono: sotto a un 2 o a un 3 di bastoni, o su un altro seme quando non hanno quello d'uscita. */
 var TSBot = (function () {
   var E = (typeof TSEngine !== 'undefined') ? TSEngine : require('./engine.js');
   function out(g) { var o = []; g.taken.forEach(function (t) { o = o.concat(t); }); g.trick.forEach(function (x) { o.push(x.c); }); return o.concat(g.removed || []); }
@@ -15,8 +16,8 @@ var TSBot = (function () {
     return true;
   }
   function bySuitCount(hand) { var n = [0, 0, 0, 0]; hand.forEach(function (c) { n[E.suit(c)]++; }); return n; }
-  function cheapest(cs) { return cs.slice().sort(function (a, b) { return (E.thirds(a) * 20 + E.power(a)) - (E.thirds(b) * 20 + E.power(b)); })[0]; }
-  function richest(cs) { return cs.slice().sort(function (a, b) { return (E.thirds(b) * 20 + E.power(b)) - (E.thirds(a) * 20 + E.power(a)); })[0]; }
+  function cheapest(cs, g) { return cs.slice().sort(function (a, b) { return (E.thirds(a, g) * 20 + E.power(a)) - (E.thirds(b, g) * 20 + E.power(b)); })[0]; }
+  function richest(cs, g) { return cs.slice().sort(function (a, b) { return (E.thirds(b, g) * 20 + E.power(b)) - (E.thirds(a, g) * 20 + E.power(a)); })[0]; }
   function lowestPow(cs) { return cs.slice().sort(function (a, b) { return E.power(a) - E.power(b); })[0]; }
   function highestPow(cs) { return cs.slice().sort(function (a, b) { return E.power(b) - E.power(a); })[0]; }
 
@@ -68,16 +69,18 @@ var TSBot = (function () {
     var n = g.players.length;
     if (!g.trick.length) {
       // si apre con la carta più bassa, preferendo i semi di cui sono uscite poche carte (qualcuno starà sopra)
-      var gone = out(g), zero = L.filter(function (c) { return E.thirds(c) === 0; }), pool = zero.length ? zero : L;
+      var gone = out(g), zero = L.filter(function (c) { return E.thirds(c, g) === 0; }), pool = zero.length ? zero : L;
       return pool.slice().sort(function (a, b) { return (E.power(a) - E.power(b)) || (gone.filter(function (x) { return E.suit(x) === E.suit(a); }).length - gone.filter(function (x) { return E.suit(x) === E.suit(b); }).length); })[0];
     }
     var lead = E.suit(g.trick[0].c), follow = E.suit(L[0]) === lead, lastToPlay = g.trick.length === n - 1;
-    if (!follow) return richest(L);                    // non ho il seme: scarico assi e figure
+    if (!follow) return richest(L, g);                 // non ho il seme: scarico assi e figure (prima di tutto l'asso di bastoni da 11)
     var w = E.winner(g.trick), wc = g.trick.filter(function (x) { return x.p === w; })[0].c;
     var under = L.filter(function (c) { return E.power(c) < E.power(wc); });
+    if (g.opts.bastoni && under.indexOf(E.BASTONI) >= 0) return E.BASTONI;   // l'asso di bastoni sotto a un 2 o a un 3: se ne va senza prendere
     if (under.length) return highestPow(under);       // sto sotto con la più alta che non prende
-    if (lastToPlay) return richest(L);                 // prendo comunque: almeno mi libero della carta più pesante
-    return lowestPow(L);                               // spero che qualcuno dopo di me stia sopra
+    if (lastToPlay) return richest(L, g);              // prendo comunque: almeno mi libero della carta più pesante
+    var keep = g.opts.bastoni && L.length > 1 ? L.filter(function (c) { return c !== E.BASTONI; }) : L;   // l'asso di bastoni non si rischia: resta per scaricarlo dopo
+    return lowestPow(keep);                            // spero che qualcuno dopo di me stia sopra
   }
   return { decide: decide, master: master };
 })();

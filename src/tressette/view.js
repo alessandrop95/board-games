@@ -55,7 +55,7 @@ var Game = (function () {
     } else {
       for (var t = 0; t < S; t++) out += '<span class="sc-p' + (t === mt ? ' me' : '') + '" style="--tc:' + sideCol(g, t) + '">' + esc(t === mt ? 'Tu' : g.players[t].nick) + ' <b>' + g.totals[t] + '</b></span>';
     }
-    var my = mt >= 0 && g.phase === 'play' ? E.sumTh(g.taken[mt]) : null;
+    var my = mt >= 0 && g.phase === 'play' ? E.sumTh(g.taken[mt], g) : null;
     return '<div class="score">' + out + '<span>' + (perd(g) ? 'si chiude a ' : 'si vince a ') + g.opts.target + '</span>' + (my != null ? '<span>' + (E.pairs(g) ? 'Preso da voi' : 'Preso da te') + ': ' + E.fmtTh(my) + '</span>' : '') + '</div>';
   }
   function table(g, me) {

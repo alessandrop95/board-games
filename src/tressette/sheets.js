@@ -60,7 +60,7 @@ function roundRows(g, anim) {
   for (var t = 0; t < S; t++) {
     var det = [R.th[t] ? 'prese: ' + E.fmtTh(R.th[t]) + (t === lw ? ' (con l’ultima)' : '') : 'nessun punto preso'];
     if (R.acc[t]) det.push('accusi +' + R.acc[t]);
-    if (R.cap >= 0) det.push(t === R.cap ? 'cappotto: nessun punto' : 'cappotto: +11');
+    if (R.cap >= 0) det.push(t === R.cap ? 'cappotto: nessun punto' : 'cappotto: +' + E.handPts(g));
     rows += '<div class="rr-row' + (t === mt ? ' me' : '') + '" style="--pc:' + sideColor(g, t) + ';animation-delay:' + (anim ? t * .1 : 0) + 's"><span class="rr-n"><b>' + sideName(g, t) + '</b>' +
       '<span class="rr-w">' + det.join(' · ') + '<small>' + R.cards[t] + ' carte · totale ' + g.totals[t] + '</small></span></span><span class="rr-p"><b>' + R.pts[t] + '</b><small>punti</small></span></div>';
   }

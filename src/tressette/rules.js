@@ -28,9 +28,10 @@ var TSRules = (function () {
     lose: ['A perdere',
       '<p>Ognuno gioca per sé e le prese sono un guaio: alla fine della mano ognuno segna i punti che ha preso, e la partita finisce quando qualcuno arriva alla soglia. <b>Vince chi ha meno punti</b>.</p>' +
       '<p>Le regole della mano sono le stesse: bisogna rispondere al seme e prende la carta più alta. Quando non hai il seme è il momento di liberarti degli assi e delle figure.</p>' +
-      '<p><b>Cappotto</b>: chi in una mano prende <b>tutti gli 11 punti</b> non ne segna nessuno, e ne regala 11 a ciascuno degli altri. In 3 si gioca senza il 4 di bastoni, in 6 senza i quattro 4.</p>'],
+      '<p><b>Asso di bastoni da 11</b> (se chi apre il tavolo lo sceglie): l’asso di bastoni vale <b>11 punti</b> invece di 1, quindi in ogni mano ci sono 21 punti. È la carta da non prendere: liberatene sotto a un 2 o a un 3 di bastoni, oppure quando non hai il seme d’uscita.</p>' +
+      '<p><b>Cappotto</b>: chi in una mano prende <b>tutti i punti</b> (11, o 21 con l’asso di bastoni da 11) non ne segna nessuno, e li regala a ciascuno degli altri. In 3 si gioca senza il 4 di bastoni, in 6 senza i quattro 4.</p>'],
     end: ['La partita',
-      '<p>Dopo ogni mano si sommano i punti. <b>A vincere</b> vince chi arriva per primo alla soglia (21, 31 o 41); se ci arrivano insieme con gli stessi punti si gioca un’altra mano. <b>A perdere</b> la partita finisce appena qualcuno arriva alla soglia e vince chi ha meno punti, anche a pari merito.</p>'],
+      '<p>Dopo ogni mano si sommano i punti. <b>A vincere</b> vince chi arriva per primo alla soglia (11, 21, 31 o 41); se ci arrivano insieme con gli stessi punti si gioca un’altra mano. <b>A perdere</b> (con l’asso di bastoni da 11 le soglie sono 31, 41, 51 o 61) la partita finisce appena qualcuno arriva alla soglia e vince chi ha meno punti, anche a pari merito.</p>'],
     tips: ['Consigli',
       '<ul><li>Il 3 è la carta più forte: se hai il 3 e il 2 dello stesso seme, prendi due volte di fila.</li><li>Non lasciare l’asso da solo: basta un 2 o un 3 per portartelo via, ed è il punto più pesante.</li><li>Conta le carte uscite: sapere se il 3 di un seme è ancora in giro cambia tutto.</li><li>A perdere tieni qualche carta bassa per stare sotto alle prese degli altri.</li></ul>']
   };
