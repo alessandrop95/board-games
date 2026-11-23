@@ -10,6 +10,7 @@
    - «a perdere» (detto anche ciapanò): da 3 a 6, ognuno per sé. Bisogna prendere meno punti possibile;
      chi prende tutti gli 11 punti di una mano fa «cappotto» e li regala agli altri. Quando qualcuno arriva
      ai punti stabiliti la partita finisce e vince chi ne ha meno. In 3 si toglie il 4 di bastoni, in 6 tutti i 4.
+     Opzione «asso di bastoni da 11»: quell'asso vale 11 punti invece di 1, quindi in una mano ci sono 21 punti.
    Una carta è un numero da 0 a 39 (vedi src/carte/art.js): seme = c / 10, valore = c % 10 + 1. */
 var TSEngine = (function () {
   var rand = Math.random;
@@ -17,15 +18,18 @@ var TSEngine = (function () {
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rand() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   var POW = [0, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7];   // per valore (indice = valore): 3 > 2 > asso > re > cavallo > fante > 7 > … > 4
   var TH = [0, 3, 1, 1, 0, 0, 0, 0, 1, 1, 1];     // terzi di punto per valore
-  var TARGETS = [11, 21, 31, 41], TOTAL_TH = 35;
+  var TARGETS = [11, 21, 31, 41, 51, 61], TOTAL_TH = 35, BASTONI = 30;   // 30 = asso di bastoni
   var SIGNALS = { busso: 'Busso', striscio: 'Striscio', volo: 'Volo' };
   var SIGNAL_TXT = { busso: 'se prendi, torna a questo seme', striscio: 'ne ho ancora altre di questo seme', volo: 'era l’ultima che avevo di questo seme' };
   var SN = ['coppe', 'denari', 'spade', 'bastoni'], RN = { 1: 'l’asso', 2: 'il due', 3: 'il tre', 8: 'il fante', 9: 'il cavallo', 10: 'il re' };
   function suit(c) { return Math.floor(c / 10); }
   function rank(c) { return c % 10 + 1; }
-  function thirds(c) { return TH[rank(c)]; }
+  // con l'opzione dell'asso di bastoni (solo a perdere) quella carta vale 11 punti, cioè 33 terzi
+  function thirds(c, g) { return c === BASTONI && g && g.opts.bastoni ? 33 : TH[rank(c)]; }
+  function totalTh(g) { return TOTAL_TH + (g && g.opts.bastoni ? 30 : 0); }
+  function handPts(g) { return Math.floor(totalTh(g) / 3); }   // i terzi avanzati non contano: 11 punti, 21 con l'asso di bastoni da 11
   function power(c) { return POW[rank(c)]; }
-  function sumTh(cs) { return cs.reduce(function (s, c) { return s + thirds(c); }, 0); }
+  function sumTh(cs, g) { return cs.reduce(function (s, c) { return s + thirds(c, g); }, 0); }
   // 7 terzi → «2 e 1/3»
   function fmtTh(th) { var w = Math.floor(th / 3), r = th % 3; return r ? (w ? w + ' e ' : '') + r + '/3' : String(w); }
   function cname(c) { var r = rank(c); return (RN[r] || 'il ' + r) + ' di ' + SN[suit(c)]; }
@@ -68,10 +72,11 @@ var TSEngine = (function () {
 
   function newGame(seats, opts) {
     opts = opts || {};
-    var mode = opts.mode === 'perdere' ? 'perdere' : 'vincere';
+    var mode = opts.mode === 'perdere' ? 'perdere' : 'vincere', target = TARGETS.indexOf(+opts.target) >= 0 ? +opts.target : 31;
+    if (mode === 'vincere' && target > 41) target = 41;
     var g = {
       v: 1, phase: 'play', seq: 0, turnN: 0, hand: 0,
-      opts: { mode: mode, target: TARGETS.indexOf(+opts.target) >= 0 ? +opts.target : 31, accuse: mode === 'vincere' && opts.accuse !== false, signals: mode === 'vincere' && seats.length === 4 && opts.signals !== false, cappotto: mode === 'perdere' && opts.cappotto !== false },
+      opts: { mode: mode, target: target, bastoni: mode === 'perdere' && !!opts.bastoni, accuse: mode === 'vincere' && opts.accuse !== false, signals: mode === 'vincere' && seats.length === 4 && opts.signals !== false, cappotto: mode === 'perdere' && opts.cappotto !== false },
       players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, hand: [], ready: false }; }),
       deck: [], removed: [], trick: [], lead: 0, turn: 0, taken: [], last: null, totals: [], hist: [], res: null,
       acc: {}, accDone: {}, accPts: [], drawn: [], log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null, first: Math.floor(rand() * seats.length)
@@ -120,7 +125,7 @@ var TSEngine = (function () {
     fx(g, { k: 'play', p: p, c: c, s: s });
     if (s) log(g, nick(g, p) + ' apre con ' + cname(c) + ' e dice «' + SIGNALS[s] + '» (' + SIGNAL_TXT[s] + ').', 'sig', p);
     if (g.trick.length < n) { g.turn = (p + 1) % n; g.turnN++; return; }
-    var w = winner(g.trick), t = team(g, w), cards = g.trick.map(function (x) { return x.c; }), th = sumTh(cards);
+    var w = winner(g.trick), t = team(g, w), cards = g.trick.map(function (x) { return x.c; }), th = sumTh(cards, g);
     g.taken[t] = g.taken[t].concat(cards);
     g.last = { trick: g.trick, w: w, th: th };
     log(g, nick(g, w) + ' prende (' + g.trick.map(function (x) { return cname(x.c); }).join(', ') + ')' + (th ? ': ' + fmtTh(th) + (th < 3 ? '' : th < 6 ? ' punto' : ' punti') + '.' : '.'), 'take', w);
@@ -138,15 +143,15 @@ var TSEngine = (function () {
   }
   function endHand(g, lastW) {
     var S = sides(g), th = zeros(S), pts = zeros(S), cap = -1;
-    for (var t = 0; t < S; t++) th[t] = sumTh(g.taken[t]);
+    for (var t = 0; t < S; t++) th[t] = sumTh(g.taken[t], g);
     th[team(g, lastW)] += 3;                           // l'ultima presa
     for (t = 0; t < S; t++) pts[t] = Math.floor(th[t] / 3) + (g.accPts[t] || 0);
-    if (g.opts.mode === 'perdere' && g.opts.cappotto) for (t = 0; t < S; t++) if (th[t] === TOTAL_TH) cap = t;
-    if (cap >= 0) for (t = 0; t < S; t++) pts[t] = t === cap ? 0 : 11;
+    if (g.opts.mode === 'perdere' && g.opts.cappotto) for (t = 0; t < S; t++) if (th[t] === totalTh(g)) cap = t;
+    if (cap >= 0) for (t = 0; t < S; t++) pts[t] = t === cap ? 0 : handPts(g);
     for (t = 0; t < S; t++) g.totals[t] += pts[t];
     g.hist.push(pts.slice());
     g.res = { th: th, pts: pts, acc: g.accPts.slice(), lastW: lastW, cap: cap, cards: g.taken.map(function (x) { return x.length; }) };
-    log(g, 'Fine della mano ' + g.hand + ': ' + (cap >= 0 ? tname(g, cap) + ' fa cappotto e regala 11 punti a tutti gli altri. ' : '') + pts.map(function (x, i) { return tname(g, i) + ' ' + x; }).join(', ') + '. Totale: ' + g.totals.map(function (x, i) { return tname(g, i) + ' ' + x; }).join(', ') + '.', 'round');
+    log(g, 'Fine della mano ' + g.hand + ': ' + (cap >= 0 ? tname(g, cap) + ' fa cappotto e regala ' + handPts(g) + ' punti a tutti gli altri. ' : '') + pts.map(function (x, i) { return tname(g, i) + ' ' + x; }).join(', ') + '. Totale: ' + g.totals.map(function (x, i) { return tname(g, i) + ' ' + x; }).join(', ') + '.', 'round');
     var over = false, W = [];
     if (g.opts.mode === 'vincere') {
       var mx = Math.max.apply(null, g.totals);
@@ -196,7 +201,7 @@ var TSEngine = (function () {
   }
   function forceNext(g) { if (g.phase !== 'scores') return false; deal(g); g.seq++; return true; }
   return { newGame: newGame, act: act, decider: decider, pending: pending, forceNext: forceNext, winner: winner, legal: legal, team: team, partner: partner, tname: tname, sides: sides, pairs: pairs,
-    thirds: thirds, sumTh: sumTh, fmtTh: fmtTh, power: power, suit: suit, rank: rank, cname: cname, accuseOf: accuseOf, accText: accText, okPlayers: okPlayers, removedFor: removedFor,
+    thirds: thirds, sumTh: sumTh, totalTh: totalTh, handPts: handPts, BASTONI: BASTONI, fmtTh: fmtTh, power: power, suit: suit, rank: rank, cname: cname, accuseOf: accuseOf, accText: accText, okPlayers: okPlayers, removedFor: removedFor,
     setRandom: setRandom, shuffle: shuffle, SIGNALS: SIGNALS, SIGNAL_TXT: SIGNAL_TXT, SN: SN, TARGETS: TARGETS, TOTAL_TH: TOTAL_TH };
 })();
 if (typeof module !== 'undefined') module.exports = TSEngine;

@@ -84,6 +84,18 @@ t('cappotto: chi prende tutti i punti li regala agli altri', cp.res.cap === 2 &&
 var nc = E.newGame(seats(3), { mode: 'perdere', cappotto: false }); nc.turn = nc.lead = 0; nc.players[0].hand = [C(4, 0)]; nc.players[1].hand = [C(5, 0)]; nc.players[2].hand = [C(6, 0)]; nc.taken = [[], [], rest.slice()];
 E.act(nc, 0, { a: 'play', c: C(4, 0) }); E.act(nc, 1, { a: 'play', c: C(5, 0) }); E.act(nc, 2, { a: 'play', c: C(6, 0) });
 t('senza cappotto chi prende tutto si tiene gli 11 punti', nc.res.pts.join() === '0,0,11');
+// asso di bastoni da 11 (opzione, solo a perdere)
+var ab = E.newGame(seats(4), { mode: 'perdere', bastoni: true, target: 61 });
+t('asso di bastoni da 11: solo a perdere, soglie fino a 61', ab.opts.bastoni && ab.opts.target === 61 && E.thirds(30, ab) === 33 && E.thirds(C(1, 0), ab) === 3 && E.thirds(30) === 3 && E.totalTh(ab) === 65 && E.handPts(ab) === 21 &&
+  !E.newGame(seats(4), { bastoni: true }).opts.bastoni && E.newGame(seats(4), { target: 61 }).opts.target === 41 && !E.newGame(seats(4), { mode: 'perdere' }).opts.bastoni);
+var abm = E.newGame(seats(3), { mode: 'perdere', bastoni: true }); abm.turn = abm.lead = 0; abm.totals = [0, 0, 0];
+abm.players[0].hand = [C(3, 3)]; abm.players[1].hand = [C(1, 3)]; abm.players[2].hand = [C(5, 0)]; abm.taken = [[], [], []];
+E.act(abm, 0, { a: 'play', c: C(3, 3) }); E.act(abm, 1, { a: 'play', c: C(1, 3) }); E.act(abm, 2, { a: 'play', c: C(5, 0) });
+t('chi prende l’asso di bastoni segna 11 punti (+1 per l’ultima presa)', abm.res.th[0] === 37 && abm.res.pts.join() === '12,0,0');
+var acp = E.newGame(seats(3), { mode: 'perdere', bastoni: true, target: 61 }); acp.turn = acp.lead = 0;
+acp.players[0].hand = [C(4, 0)]; acp.players[1].hand = [C(5, 0)]; acp.players[2].hand = [C(6, 0)]; acp.taken = [[], [], rest.slice()];
+E.act(acp, 0, { a: 'play', c: C(4, 0) }); E.act(acp, 1, { a: 'play', c: C(5, 0) }); E.act(acp, 2, { a: 'play', c: C(6, 0) });
+t('con l’asso di bastoni da 11 il cappotto regala 21 punti', acp.res.cap === 2 && acp.res.pts.join() === '21,21,0' && /regala 21 punti/.test(acp.log[acp.log.length - 1].t));
 
 // i giocatori automatici
 var bm = E.newGame(seats(4), { mode: 'perdere' }); bm.turn = bm.lead = 0; bm.players[0].hand = [C(7, 0)]; bm.players[1].hand = [C(6, 0), C(3, 0), C(10, 0)]; bm.trick = [];
@@ -91,25 +103,30 @@ E.act(bm, 0, { a: 'play', c: C(7, 0) });
 t('a perdere l’automatico sta sotto con la più alta che non prende', B.decide(bm, 1).c === C(6, 0));
 bm.players[1].hand = [C(1, 2), C(4, 3)]; t('a perdere senza il seme scarica l’asso', B.decide(bm, 1).c === C(1, 2));
 var bw = E.newGame(seats(4), { accuse: false }); bw.turn = bw.lead = 0; bw.players[0].hand = [C(3, 1), C(4, 2)]; bw.trick = [];
+var bb = E.newGame(seats(4), { mode: 'perdere', bastoni: true }); bb.turn = bb.lead = 0; bb.players[0].hand = [C(2, 3)]; bb.players[1].hand = [C(1, 3), C(5, 3), C(4, 3)]; bb.trick = [];
+E.act(bb, 0, { a: 'play', c: C(2, 3) });
+t('asso di bastoni da 11: l’automatico lo scarica sotto al 2 di bastoni', B.decide(bb, 1).c === C(1, 3));
+bb.players[1].hand = [C(1, 3), C(1, 2), C(4, 1)]; bb.trick = [{ p: 0, c: C(5, 0) }];
+t('…e quando non ha il seme scarica quello prima degli altri assi', B.decide(bb, 1).c === C(1, 3));
 t('a vincere l’automatico apre con il 3 (carta buona con punti)', B.decide(bw, 0).c === C(3, 1));
 
 // partite tra automatici in tutte le varianti
 var bad = 0, N = +process.argv[2] || 20, hands = 0;
-[['vincere', 2], ['vincere', 4], ['perdere', 3], ['perdere', 4], ['perdere', 5], ['perdere', 6]].forEach(function (v) {
+[['vincere', 2], ['vincere', 4], ['perdere', 3], ['perdere', 4], ['perdere', 5], ['perdere', 6], ['perdere', 3, 1], ['perdere', 5, 1]].forEach(function (v) {
   for (var k = 0; k < N; k++) {
-    var b = E.newGame(seats(v[1]).map(function (x) { x.bot = true; return x; }), { mode: v[0], target: 21, accuse: k % 2 === 0 }), guard = 0;
+    var b = E.newGame(seats(v[1]).map(function (x) { x.bot = true; return x; }), { mode: v[0], target: v[2] ? 41 : 21, accuse: k % 2 === 0, bastoni: !!v[2] }), guard = 0;
     while (b.phase !== 'over' && guard++ < 20000) {
       var who = E.pending(b)[0]; if (who == null) { E.forceNext(b); continue; }
       var hb = b.hand, err = E.act(b, who, B.decide(b, who)); if (err) { bad++; console.log('errore', v.join(' '), err); break; }
       if (b.res && b.hand === hb && (b.phase === 'scores' || b.phase === 'over') && b.res.counted !== true) {
         b.res.counted = true; hands++;
-        if (sum(b.res.th) !== E.TOTAL_TH) { bad++; console.log('terzi', v.join(' '), sum(b.res.th)); }
-        if (b.res.cap < 0 && sum(b.res.pts) - sum(b.res.acc) > 11) { bad++; console.log('punti', v.join(' '), b.res.pts); }
+        if (sum(b.res.th) !== E.totalTh(b)) { bad++; console.log('terzi', v.join(' '), sum(b.res.th)); }
+        if (b.res.cap < 0 && sum(b.res.pts) - sum(b.res.acc) > E.handPts(b)) { bad++; console.log('punti', v.join(' '), b.res.pts); }
       }
     }
     if (b.phase !== 'over') { bad++; console.log('non finita', v.join(' ')); }
   }
 });
-t('partite tra automatici a vincere (2, 4) e a perdere (3-6) finite senza errori, sempre 35 terzi per mano', bad === 0 && hands > 0, bad);
+t('partite tra automatici a vincere (2, 4) e a perdere (3-6, anche con l’asso di bastoni da 11) finite senza errori, sempre tutti i terzi della mano', bad === 0 && hands > 0, bad);
 console.log('Tressette: ' + ok + ' prove superate, ' + ko + ' fallite');
 process.exit(ko ? 1 : 0);
