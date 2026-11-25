@@ -6,6 +6,9 @@ var News = (function () {
   var KEY = 'pp-news-seen';
   // la più recente in cima. g: giochi collegati [cartella, nome]
   var ITEMS = [
+    { id: '2026-11-25-emoji-tastiera', d: '2026-11-25', t: 'Emoji in scena: molte più emoji e titoli',
+      x: 'La tastiera del regista passa da circa 400 a <b>oltre 1200 emoji</b>, in 17 gruppi: arrivano mestieri, vestiti, casa, oggetti, scuola e tecnologia, viaggi, bandiere, numeri e orari. I titoli da raccontare sono più di 460 (prima 127), con tre categorie nuove: <b>serie e cartoni</b>, <b>mestieri</b> e <b>canzoni</b>. E ci sono tanti modi di dire, personaggi, film, cibi e luoghi in più.',
+      g: [['emoji', 'Emoji in scena']] },
     { id: '2026-11-25-tressette-eliminazione', d: '2026-11-25', t: 'Tressette a perdere: ad eliminazione',
       x: 'Nuova opzione nella sala d’attesa: con la fine partita <b>ad eliminazione</b> chi arriva ai punti stabiliti esce, e gli altri continuano a giocare finché ne resta uno solo, che vince. Quando restate in due si gioca con dieci carte a testa e il tallone.',
       g: [['tressette', 'Tressette']] },

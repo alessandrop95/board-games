@@ -10,6 +10,11 @@ var T0 = 1000;
 
 t('ogni titolo ha categoria, livello e un indizio fatto solo di emoji', D.ITEMS.every(function (x) { return D.CATS.indexOf(x[1]) >= 0 && (x[2] === 1 || x[2] === 2) && x[3].split(' ').every(E.isEmoji); }));
 t('la tastiera ha solo emoji', D.PAD.every(function (c) { return c.list.every(E.isEmoji); }));
+var padAll = []; D.PAD.forEach(function (c) { padAll = padAll.concat(c.list); });
+t('la tastiera non ripete emoji, in nessun gruppo', padAll.length === new Set(padAll).size && padAll.length > 1000, padAll.length);
+t('ogni indizio dei giocatori automatici si può scrivere con la tastiera', D.ITEMS.every(function (x) { return x[3].split(' ').every(function (e) { return padAll.indexOf(e) >= 0; }); }), D.ITEMS.filter(function (x) { return !x[3].split(' ').every(function (e) { return padAll.indexOf(e) >= 0; }); }).map(function (x) { return x[0]; }));
+t('nessuna risposta ripetuta e tutte riconosciute (anche le alternative)', new Set(D.ITEMS.map(function (x) { return E.norm(x[0]); })).size === D.ITEMS.length && D.ITEMS.every(function (x) { return [x[0]].concat(x[4]).every(function (a) { return E.right(a, x); }); }));
+t('ogni categoria ha titoli facili e difficili', D.CATS.every(function (c) { return [1, 2].every(function (l) { return D.ITEMS.some(function (x) { return x[1] === c && x[2] === l; }); }); }));
 t('lettere, numeri e testo non sono emoji', !['a', 'ciao', '7', 'x😀', '😀 😀', '<b>', ''].some(E.isEmoji) && E.isEmoji('1️⃣') && E.isEmoji('🇮🇹') && E.isEmoji('🧜‍♀️'));
 t('risposte: articolo, maiuscole, errori di battitura, altre risposte', E.right('re leone', D.ITEMS[find('Il re leone')]) && E.right('TITANIK', D.ITEMS[find('Titanic')]) && E.right('star wars', D.ITEMS[find('Guerre stellari')]) && !E.right('Tritone', D.ITEMS[find('Titanic')]));
 t('modi di dire lunghi: bastano quasi tutte le parole', E.right('una mela al giorno toglie il medico', D.ITEMS[find('Una mela al giorno toglie il medico di torno')]) && E.right('chi dorme non prende pesci', D.ITEMS[find('Chi dorme non piglia pesci')]) && !E.right('chi dorme', D.ITEMS[find('Chi dorme non piglia pesci')]));

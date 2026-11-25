@@ -2,7 +2,8 @@
 var ESRules = (function () {
   var S = {
     goal: ['Lo scopo',
-      '<p>Si gioca <b>a squadre</b>. A turno un giocatore fa il <b>regista</b>: racconta un titolo ai compagni usando <b>solo emoji</b>, niente parole. Un film, un modo di dire, un personaggio, un cibo, un luogo, una cosa…</p>' +
+      '<p>Si gioca <b>a squadre</b>. A turno un giocatore fa il <b>regista</b>: racconta un titolo ai compagni usando <b>solo emoji</b>, niente parole. Un film, una serie o un cartone, un modo di dire, un personaggio, un mestiere, una canzone, un cibo, un luogo, una cosa… Più di 460 titoli in tutto.</p>' +
+      '<p>La tastiera del regista ha oltre 1200 emoji divise in gruppi (facce, persone, mestieri, animali, cibo, sport, casa, oggetti, viaggi, bandiere, segni, numeri e orari…): tocca l’icona in alto per cambiare gruppo.</p>' +
       '<p>I compagni scrivono le risposte dal loro telefono. Vince la squadra che, alla fine dei turni, ha <b>più punti</b>.</p>'],
     director: ['Il regista',
       '<ul><li>Scegli tra un titolo <b>facile</b> (1 punto) e uno <b>difficile</b> (2 punti). Lo vedi solo tu.</li>' +
