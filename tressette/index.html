@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Tressette">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="pwa-sw" content="../sw.js" data-scope="../">
-<meta name="pp-build" content="183b05bc01fe" data-game="tressette">
+<meta name="pp-build" content="aa31d6664d26" data-game="tressette">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap">
 <style>
@@ -142,6 +142,7 @@ select.field { color: #13284f; }
 .pv.big { width: 54px; height: 54px; font-size: 30px; }
 .tag { display: inline-flex; align-items: center; gap: 3px; font: 800 10px var(--f-body); text-transform: uppercase; letter-spacing: .04em; border-radius: 6px; padding: 1px 5px; background: rgba(255, 255, 255, .14); }
 .tag.end { background: var(--gold); color: #4a2a00; } .tag.away { background: #c8402c; } .tag.bot { background: #3a5a8a; } .tag.wait { background: rgba(255, 255, 255, .18); animation: pulse 1.4s ease-in-out infinite; } .tag.ok { background: #2f9a58; }
+.tag.out { background: #6b5a4a; } .seat-t.outp { opacity: .5; } .score .sc-p.outp { opacity: .55; text-decoration: line-through; } .rr-row.out { opacity: .5; animation: none; }
 @keyframes pulse { 50% { opacity: .5; } }
 /* barra delle istruzioni */
 .gv-prompt { display: flex; align-items: center; gap: 8px; margin: 0 max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px)); padding: 7px 8px 7px 12px; border-radius: 14px; background: rgba(8, 34, 20, .78); backdrop-filter: blur(8px); border: 1px solid var(--line); flex-wrap: wrap; box-shadow: 0 6px 18px rgba(6, 18, 48, .3); }
@@ -527,6 +528,10 @@ var ITArt = (function () {
      chi prende tutti gli 11 punti di una mano fa «cappotto» e li regala agli altri. Quando qualcuno arriva
      ai punti stabiliti la partita finisce e vince chi ne ha meno. In 3 si toglie il 4 di bastoni, in 6 tutti i 4.
      Opzione «asso di bastoni da 11»: quell'asso vale 11 punti invece di 1, quindi in una mano ci sono 21 punti.
+     Opzione «ad eliminazione»: chi arriva ai punti stabiliti esce (P.outAt = la mano in cui è uscito) e gli altri
+     continuano; vince l'ultimo che resta. Le carte si danno solo a chi è ancora in gioco, con le regole del numero
+     rimasto (in 3 senza il 4 di bastoni…); in 2 dieci carte a testa e il tallone, da cui si pesca a carte scoperte.
+     Se escono tutti insieme vince, tra loro, chi ha meno punti.
    Una carta è un numero da 0 a 39 (vedi src/carte/art.js): seme = c / 10, valore = c % 10 + 1. */
 var TSEngine = (function () {
   var rand = Math.random;
@@ -561,6 +566,9 @@ var TSEngine = (function () {
   // a perdere: in 3 si toglie il 4 di bastoni (13 carte a testa), in 6 tutti i 4 (6 carte a testa)
   function removedFor(mode, n) { return mode !== 'perdere' ? [] : n === 3 ? [33] : n === 6 ? [3, 13, 23, 33] : []; }
   function okPlayers(mode, n) { return mode === 'perdere' ? n >= 3 && n <= 6 : n === 2 || n === 4; }
+  // ad eliminazione: chi è ancora in gioco, e il prossimo dopo p che lo è
+  function alive(g) { var a = []; g.players.forEach(function (P, i) { if (!P.outAt) a.push(i); }); return a; }
+  function nextP(g, p) { var n = g.players.length; for (var k = 1; k <= n; k++) { var q = (p + k) % n; if (!g.players[q].outAt) return q; } return p; }
 
   // chi prende: la carta più alta del seme d'uscita
   function winner(trick) {
@@ -592,8 +600,8 @@ var TSEngine = (function () {
     if (mode === 'vincere' && target > 41) target = 41;
     var g = {
       v: 1, phase: 'play', seq: 0, turnN: 0, hand: 0,
-      opts: { mode: mode, target: target, bastoni: mode === 'perdere' && !!opts.bastoni, accuse: mode === 'vincere' && opts.accuse !== false, signals: mode === 'vincere' && seats.length === 4 && opts.signals !== false, cappotto: mode === 'perdere' && opts.cappotto !== false },
-      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, hand: [], ready: false }; }),
+      opts: { mode: mode, target: target, bastoni: mode === 'perdere' && !!opts.bastoni, elim: mode === 'perdere' && !!opts.elim, accuse: mode === 'vincere' && opts.accuse !== false, signals: mode === 'vincere' && seats.length === 4 && opts.signals !== false, cappotto: mode === 'perdere' && opts.cappotto !== false },
+      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, hand: [], ready: false, outAt: 0 }; }),
       deck: [], removed: [], trick: [], lead: 0, turn: 0, taken: [], last: null, totals: [], hist: [], res: null,
       acc: {}, accDone: {}, accPts: [], drawn: [], log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null, first: Math.floor(rand() * seats.length)
     };
@@ -602,19 +610,21 @@ var TSEngine = (function () {
     return g;
   }
   function deal(g) {
-    var n = g.players.length, S = sides(g);
+    var A = alive(g), n = A.length, S = sides(g);   // ad eliminazione si danno le carte solo a chi è ancora in gioco
     g.hand++; g.phase = 'play'; g.res = null; g.trick = []; g.last = null; g.drawn = [];
     g.removed = removedFor(g.opts.mode, n);
     var cards = shuffle(Array.from({ length: 40 }, function (x, i) { return i; }).filter(function (c) { return g.removed.indexOf(c) < 0; }));
     var per = n === 2 ? 10 : cards.length / n;
-    g.players.forEach(function (P) { P.hand = cards.splice(0, per); P.ready = false; });
+    g.players.forEach(function (P) { P.hand = []; P.ready = false; });
+    A.forEach(function (i) { g.players[i].hand = cards.splice(0, per); });
     g.deck = cards;                                   // in 2: il tallone (20 carte); altrimenti vuoto
     g.taken = []; for (var t = 0; t < S; t++) g.taken.push([]);
     g.accPts = zeros(S); g.acc = {}; g.accDone = {};
     if (g.opts.accuse) g.players.forEach(function (P, i) { var a = accuseOf(P.hand); if (a.length) g.acc[i] = a; });
-    g.lead = g.turn = (g.first + g.hand - 1) % n;
+    var st = (g.first + g.hand - 1) % g.players.length;
+    g.lead = g.turn = g.players[st].outAt ? nextP(g, st) : st;
     g.turnN++;
-    log(g, 'Mano ' + g.hand + ': ' + per + ' carte a testa' + (g.removed.length ? ' (senza ' + (g.removed.length > 1 ? 'i 4' : 'il 4 di bastoni') + ')' : '') + (g.deck.length ? ', ' + g.deck.length + ' nel tallone' : '') + '. Comincia ' + nick(g, g.turn) + '.', 'sys');
+    log(g, 'Mano ' + g.hand + ': ' + (n < g.players.length ? 'restano in ' + n + ', ' : '') + per + ' carte a testa' + (g.removed.length ? ' (senza ' + (g.removed.length > 1 ? 'i 4' : 'il 4 di bastoni') + ')' : '') + (g.deck.length ? ', ' + g.deck.length + ' nel tallone' : '') + '. Comincia ' + nick(g, g.turn) + '.', 'sys');
     fx(g, { k: 'deal', hand: g.hand });
   }
   function decider(g) { return g.phase === 'play' ? g.turn : null; }
@@ -633,14 +643,14 @@ var TSEngine = (function () {
     fx(g, { k: 'accuse', p: p, a: a, pts: pts });
   }
   function play(g, p, c, sig) {
-    var P = g.players[p], n = g.players.length;
+    var P = g.players[p], n = alive(g).length;
     var s = !g.trick.length && g.opts.signals && SIGNALS[sig] ? sig : null;
     declare(g, p);
     P.hand.splice(P.hand.indexOf(c), 1);
     g.trick.push(s ? { p: p, c: c, s: s } : { p: p, c: c });
     fx(g, { k: 'play', p: p, c: c, s: s });
     if (s) log(g, nick(g, p) + ' apre con ' + cname(c) + ' e dice «' + SIGNALS[s] + '» (' + SIGNAL_TXT[s] + ').', 'sig', p);
-    if (g.trick.length < n) { g.turn = (p + 1) % n; g.turnN++; return; }
+    if (g.trick.length < n) { g.turn = nextP(g, p); g.turnN++; return; }
     var w = winner(g.trick), t = team(g, w), cards = g.trick.map(function (x) { return x.c; }), th = sumTh(cards, g);
     g.taken[t] = g.taken[t].concat(cards);
     g.last = { trick: g.trick, w: w, th: th };
@@ -650,7 +660,7 @@ var TSEngine = (function () {
     // in 2 si pesca dal tallone a carte scoperte: prima chi ha preso
     if (g.deck.length) {
       g.drawn = [];
-      for (var k = 0; k < n; k++) { var q = (w + k) % n; if (g.deck.length) { var d = g.deck.shift(); g.players[q].hand.push(d); g.drawn.push({ p: q, c: d }); } }
+      for (var k = 0, q = w; k < n; k++, q = nextP(g, q)) { if (g.deck.length) { var d = g.deck.shift(); g.players[q].hand.push(d); g.drawn.push({ p: q, c: d }); } }
       log(g, g.drawn.map(function (x) { return nick(g, x.p) + ' pesca ' + cname(x.c); }).join(', ') + '.', 'draw');
       fx(g, { k: 'draw', d: g.drawn });
     }
@@ -663,7 +673,7 @@ var TSEngine = (function () {
     th[team(g, lastW)] += 3;                           // l'ultima presa
     for (t = 0; t < S; t++) pts[t] = Math.floor(th[t] / 3) + (g.accPts[t] || 0);
     if (g.opts.mode === 'perdere' && g.opts.cappotto) for (t = 0; t < S; t++) if (th[t] === totalTh(g)) cap = t;
-    if (cap >= 0) for (t = 0; t < S; t++) pts[t] = t === cap ? 0 : handPts(g);
+    if (cap >= 0) for (t = 0; t < S; t++) pts[t] = t === cap || (g.opts.mode === 'perdere' && g.players[t].outAt) ? 0 : handPts(g);
     for (t = 0; t < S; t++) g.totals[t] += pts[t];
     g.hist.push(pts.slice());
     g.res = { th: th, pts: pts, acc: g.accPts.slice(), lastW: lastW, cap: cap, cards: g.taken.map(function (x) { return x.length; }) };
@@ -673,6 +683,20 @@ var TSEngine = (function () {
       var mx = Math.max.apply(null, g.totals);
       W = g.totals.map(function (x, i) { return x === mx ? i : -1; }).filter(function (i) { return i >= 0; });
       over = mx >= g.opts.target && W.length === 1;      // a pari sopra la soglia si gioca un'altra mano
+    } else if (g.opts.elim) {
+      // ad eliminazione: chi arriva alla soglia esce; si va avanti finché ne resta uno
+      var A = alive(g), hit = A.filter(function (i) { return g.totals[i] >= g.opts.target; }), rest = A.filter(function (i) { return hit.indexOf(i) < 0; });
+      if (hit.length) {
+        if (!rest.length) {                              // escono tutti insieme: vince chi ne ha meno
+          var low = Math.min.apply(null, hit.map(function (i) { return g.totals[i]; }));
+          W = hit.filter(function (i) { return g.totals[i] === low; });
+          hit = hit.filter(function (i) { return W.indexOf(i) < 0; });
+        } else if (rest.length === 1) W = rest;
+        hit.forEach(function (i) { g.players[i].outAt = g.hand; });
+        log(g, hit.map(function (i) { return nick(g, i); }).join(' e ') + (hit.length > 1 ? ' arrivano' : ' arriva') + ' a ' + g.opts.target + ' punti: ' + (hit.length > 1 ? 'sono eliminati.' : 'è eliminato.') + (W.length ? '' : ' Restano in ' + rest.length + '.'), 'out');
+        fx(g, { k: 'out', ps: hit });
+        over = W.length > 0;
+      }
     } else if (g.totals.some(function (x) { return x >= g.opts.target; })) {
       var mn = Math.min.apply(null, g.totals);
       W = g.totals.map(function (x, i) { return x === mn ? i : -1; }).filter(function (i) { return i >= 0; });
@@ -681,12 +705,17 @@ var TSEngine = (function () {
     if (over) {
       g.winners = W;
       var lower = g.opts.mode === 'perdere';
-      g.final = { place: g.totals.map(function (x) { return 1 + g.totals.filter(function (y) { return lower ? y < x : y > x; }).length; }) };
+      if (g.opts.elim) {
+        // ad eliminazione conta prima quanto si è resistito, poi i punti
+        var last = function (i) { return W.indexOf(i) >= 0 ? Infinity : g.players[i].outAt; };
+        var better = function (j, i) { return last(j) > last(i) || (last(j) === last(i) && g.totals[j] < g.totals[i]); };
+        g.final = { place: g.totals.map(function (x, i) { return 1 + g.totals.filter(function (y, j) { return better(j, i); }).length; }) };
+      } else g.final = { place: g.totals.map(function (x) { return 1 + g.totals.filter(function (y) { return lower ? y < x : y > x; }).length; }) };
       g.phase = 'over';
       log(g, (W.length > 1 ? 'Vincono a pari merito ' + W.map(function (i) { return tname(g, i); }).join(', ') : (pairs(g) ? 'Vincono ' : 'Vince ') + tname(g, W[0])) + '!', 'win');
       fx(g, { k: 'roundEnd', over: true }); fx(g, { k: 'over', t: W[0] });
     } else {
-      g.phase = 'scores'; g.players.forEach(function (P) { P.ready = !!P.bot; });
+      g.phase = 'scores'; g.players.forEach(function (P) { P.ready = !!P.bot || !!P.outAt; });   // chi è eliminato guarda e non deve confermare
       fx(g, { k: 'roundEnd', over: false });
     }
   }
@@ -717,7 +746,7 @@ var TSEngine = (function () {
   }
   function forceNext(g) { if (g.phase !== 'scores') return false; deal(g); g.seq++; return true; }
   return { newGame: newGame, act: act, decider: decider, pending: pending, forceNext: forceNext, winner: winner, legal: legal, team: team, partner: partner, tname: tname, sides: sides, pairs: pairs,
-    thirds: thirds, sumTh: sumTh, totalTh: totalTh, handPts: handPts, BASTONI: BASTONI, fmtTh: fmtTh, power: power, suit: suit, rank: rank, cname: cname, accuseOf: accuseOf, accText: accText, okPlayers: okPlayers, removedFor: removedFor,
+    alive: alive, nextP: nextP, thirds: thirds, sumTh: sumTh, totalTh: totalTh, handPts: handPts, BASTONI: BASTONI, fmtTh: fmtTh, power: power, suit: suit, rank: rank, cname: cname, accuseOf: accuseOf, accText: accText, okPlayers: okPlayers, removedFor: removedFor,
     setRandom: setRandom, shuffle: shuffle, SIGNALS: SIGNALS, SIGNAL_TXT: SIGNAL_TXT, SN: SN, TARGETS: TARGETS, TOTAL_TH: TOTAL_TH };
 })();
 if (typeof module !== 'undefined') module.exports = TSEngine;
@@ -759,7 +788,7 @@ var TSBot = (function () {
   }
 
   function toWin(g, p, L) {
-    var n = g.players.length, hand = g.players[p].hand;
+    var n = E.alive(g).length, hand = g.players[p].hand;
     if (!g.trick.length) {
       // carte buone con punti (il 3, poi il 2 e l'asso quando sono rimasti i più alti)
       var good = L.filter(function (c) { return master(g, p, c) && E.thirds(c) > 0; });
@@ -790,7 +819,7 @@ var TSBot = (function () {
   }
 
   function toLose(g, p, L) {
-    var n = g.players.length;
+    var n = E.alive(g).length;   // ad eliminazione giocano solo quelli rimasti
     if (!g.trick.length) {
       // si apre con la carta più bassa, preferendo i semi di cui sono uscite poche carte (qualcuno starà sopra)
       var gone = out(g), zero = L.filter(function (c) { return E.thirds(c, g) === 0; }), pool = zero.length ? zero : L;
@@ -841,9 +870,10 @@ var TSRules = (function () {
       '<p>Ognuno gioca per sé e le prese sono un guaio: alla fine della mano ognuno segna i punti che ha preso, e la partita finisce quando qualcuno arriva alla soglia. <b>Vince chi ha meno punti</b>.</p>' +
       '<p>Le regole della mano sono le stesse: bisogna rispondere al seme e prende la carta più alta. Quando non hai il seme è il momento di liberarti degli assi e delle figure.</p>' +
       '<p><b>Asso di bastoni da 11</b> (se chi apre il tavolo lo sceglie): l’asso di bastoni vale <b>11 punti</b> invece di 1, quindi in ogni mano ci sono 21 punti. È la carta da non prendere: liberatene sotto a un 2 o a un 3 di bastoni, oppure quando non hai il seme d’uscita.</p>' +
+      '<p><b>Ad eliminazione</b> (se chi apre il tavolo lo sceglie): chi arriva alla soglia non fa finire la partita ma <b>esce</b>, e gli altri continuano. Le carte si danno solo a chi è rimasto (in 3 senza il 4 di bastoni, in 4 dieci a testa…). Quando restano in due si prendono dieci carte a testa e le altre venti fanno il tallone: dopo ogni presa si pesca, a carte scoperte. <b>Vince l’ultimo che resta</b>; se escono tutti insieme, vince chi ha meno punti.</p>' +
       '<p><b>Cappotto</b>: chi in una mano prende <b>tutti i punti</b> (11, o 21 con l’asso di bastoni da 11) non ne segna nessuno, e li regala a ciascuno degli altri. In 3 si gioca senza il 4 di bastoni, in 6 senza i quattro 4.</p>'],
     end: ['La partita',
-      '<p>Dopo ogni mano si sommano i punti. <b>A vincere</b> vince chi arriva per primo alla soglia (11, 21, 31 o 41); se ci arrivano insieme con gli stessi punti si gioca un’altra mano. <b>A perdere</b> (con l’asso di bastoni da 11 le soglie sono 31, 41, 51 o 61) la partita finisce appena qualcuno arriva alla soglia e vince chi ha meno punti, anche a pari merito.</p>'],
+      '<p>Dopo ogni mano si sommano i punti. <b>A vincere</b> vince chi arriva per primo alla soglia (11, 21, 31 o 41); se ci arrivano insieme con gli stessi punti si gioca un’altra mano. <b>A perdere</b> (con l’asso di bastoni da 11 le soglie sono 31, 41, 51 o 61) la partita finisce appena qualcuno arriva alla soglia e vince chi ha meno punti, anche a pari merito. Ad eliminazione, invece, chi arriva alla soglia esce e si va avanti finché ne resta uno solo.</p>'],
     tips: ['Consigli',
       '<ul><li>Il 3 è la carta più forte: se hai il 3 e il 2 dello stesso seme, prendi due volte di fila.</li><li>Non lasciare l’asso da solo: basta un 2 o un 3 per portartelo via, ed è il punto più pesante.</li><li>Conta le carte uscite: sapere se il 3 di un seme è ancora in giro cambia tutto.</li><li>A perdere tieni qualche carta bassa per stare sotto alle prese degli altri.</li></ul>']
   };
@@ -4251,29 +4281,30 @@ var Account = (function () {
 var CFG = {
   game: 'tressette', key: 'ts', title: 'Tressette', E: TSEngine, BOT: TSBot, RU: TSRules,
   botNames: ['Napoletana', 'Busso', 'Striscio', 'Volo', 'Ciapanò', 'Cappotto', 'Tre di spade', 'Asso', 'Cavallo'],
-  defaults: { mode: 'vincere', target: 31, accuse: true, signals: true, cappotto: true, bastoni: false },
+  defaults: { mode: 'vincere', target: 31, accuse: true, signals: true, cappotto: true, bastoni: false, elim: false },
   opt: function (doc, op) {
     if (op.mode === 'vincere' || op.mode === 'perdere') doc.opts.mode = op.mode;
     if (op.target != null && TSEngine.TARGETS.indexOf(+op.target) >= 0) doc.opts.target = +op.target;
-    ['accuse', 'signals', 'cappotto', 'bastoni'].forEach(function (k) { if (op[k] != null) doc.opts[k] = !!op[k]; });
+    ['accuse', 'signals', 'cappotto', 'bastoni', 'elim'].forEach(function (k) { if (op[k] != null) doc.opts[k] = !!op[k]; });
     // soglie: 11-41 di solito; con l'asso di bastoni da 11 (21 punti a mano) 31-61
     var big = doc.opts.mode === 'perdere' && doc.opts.bastoni;
     if (big && doc.opts.target < 31) doc.opts.target = 41;
     if (!big && doc.opts.target > 41) doc.opts.target = 41;
   },
   targets: function (o) { return o.mode === 'perdere' && o.bastoni ? [31, 41, 51, 61] : [11, 21, 31, 41]; },
-  lobbyNote: function (o) { return (o.mode === 'perdere' ? 'a perdere' + (o.bastoni ? ', asso di bastoni da 11' : '') : 'a vincere') + ', ' + (o.target || 31) + ' punti'; },
+  lobbyNote: function (o) { return (o.mode === 'perdere' ? 'a perdere' + (o.elim ? ' ad eliminazione' : '') + (o.bastoni ? ', asso di bastoni da 11' : '') : 'a vincere') + ', ' + (o.target || 31) + ' punti'; },
   kicker: 'Il classico delle carte italiane, a vincere e a perdere', heroCards: [2, 11, 20, 32, 1],
   tagline: '3, 2, asso: rispondi al seme e fai punti con il tuo compagno, oppure gioca a perdere e lascia le prese agli altri. Ognuno dal proprio telefono, anche a distanza: per parlarsi bastano busso, striscio e volo.',
   quick: ['goal', 'trick'],
   intro: ['goal', 'cards', 'trick', 'end'],
   optionsHTML: function (d, isHost) {
     var o = d.opts || {}, perd = o.mode === 'perdere', tg = o.target || 31, hp = perd && o.bastoni ? 21 : 11;
-    if (!isHost) return '<p class="lead">Si gioca <b>' + (perd ? 'a perdere' : 'a vincere') + '</b>: ' + (perd ? 'finisce quando qualcuno arriva a ' : 'vince chi arriva per primo a ') + '<b>' + tg + ' punti</b>' +
+    if (!isHost) return '<p class="lead">Si gioca <b>' + (perd ? 'a perdere' + (o.elim ? ' ad eliminazione' : '') : 'a vincere') + '</b>: ' + (perd ? (o.elim ? 'chi arriva a <b>' + tg + ' punti</b> è eliminato e vince l’ultimo che resta' : 'finisce quando qualcuno arriva a <b>' + tg + ' punti</b>') : 'vince chi arriva per primo a <b>' + tg + ' punti</b>') +
       (perd ? (o.bastoni ? ', con l’asso di bastoni da 11' : '') + (o.cappotto === false ? ', senza cappotto' : ', con il cappotto') : (o.accuse === false ? ', senza accusi' : ', con gli accusi') + (o.signals === false ? ', senza segnali' : ', con busso, striscio e volo')) + '.</p>';
     return optRow('opt-mode', 'Variante', 'A vincere in 2 o in 4 a coppie; a perdere da 3 a 6, ognuno per sé.', perd ? 'perdere' : 'vincere', [['vincere', 'A vincere'], ['perdere', 'A perdere']]) +
-      optRow('opt-target', 'Punti', perd ? 'Quando qualcuno ci arriva la partita finisce: vince chi ne ha meno.' : 'Vince chi ci arriva per primo.', tg, CFG.targets(o).map(function (x) { return [x, String(x)]; })) +
-      (perd ? optRow('opt-bastoni', 'Asso di bastoni', 'Da 11 punti invece di 1: in ogni mano ci sono 21 punti invece di 11, meglio scegliere una soglia più alta.', o.bastoni ? 1 : 0, [[0, 'Vale 1'], [1, 'Vale 11']]) +
+      optRow('opt-target', 'Punti', perd ? (o.elim ? 'Chi ci arriva è eliminato: vince l’ultimo che resta al tavolo.' : 'Quando qualcuno ci arriva la partita finisce: vince chi ne ha meno.') : 'Vince chi ci arriva per primo.', tg, CFG.targets(o).map(function (x) { return [x, String(x)]; })) +
+      (perd ? optRow('opt-elim', 'Fine della partita', 'Classica: finisce appena qualcuno arriva ai punti e vince chi ne ha meno. Ad eliminazione: chi ci arriva esce, gli altri continuano finché ne resta uno solo.', o.elim ? 1 : 0, [[0, 'Classica'], [1, 'Ad eliminazione']]) +
+        optRow('opt-bastoni', 'Asso di bastoni', 'Da 11 punti invece di 1: in ogni mano ci sono 21 punti invece di 11, meglio scegliere una soglia più alta.', o.bastoni ? 1 : 0, [[0, 'Vale 1'], [1, 'Vale 11']]) +
         optRow('opt-cappotto', 'Cappotto', 'Chi prende tutti i ' + hp + ' punti di una mano li regala agli altri.', o.cappotto === false ? 0 : 1, [[1, 'Sì'], [0, 'No']])
         : optRow('opt-accuse', 'Accusi', 'Napoletana e buon gioco valgono punti in più.', o.accuse === false ? 0 : 1, [[1, 'Sì'], [0, 'No']]) +
           optRow('opt-signals', 'Segnali', 'In 4: busso, striscio e volo quando si apre la mano.', o.signals === false ? 0 : 1, [[1, 'Ammessi'], [0, 'Vietati']]));
@@ -4636,7 +4667,7 @@ var Game = (function () {
   function render() {
     if (mountedFor !== App.code || !el('gv')) mount();
     var g = G(), me = myIdx();
-    setHTML('gv-info', '<b>' + CFG.title + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : (perd(g) ? 'a perdere · ' : '') + 'Mano ' + g.hand) + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
+    setHTML('gv-info', '<b>' + CFG.title + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : (perd(g) ? (g.opts.elim ? 'ad eliminazione · ' : 'a perdere · ') : '') + 'Mano ' + g.hand) + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
     setHTML('table', table(g, me));
     setHTML('gv-prompt', prompt(g, me));
     setHTML('gv-me', hand(g, me));
@@ -4650,8 +4681,8 @@ var Game = (function () {
     var P = g.players[p], t = E.team(g, p), on = g.phase === 'play' && g.turn === p;
     var mate = me >= 0 && p === E.partner(g, me);
     var dr = g.drawn.filter(function (x) { return x.p === p; })[0];
-    return '<div class="seat-t ' + pos(g, p, me) + (on ? ' on' : '') + '" data-p="' + p + '" style="--pc:' + pcol(g, p) + ';--tc:' + sideCol(g, t) + '">' +
-      '<button class="who" data-act="player" data-p="' + p + '"><span class="pv">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><b>' + Net.dot(P.uid) + esc(P.nick) + '</b>' + (mate ? '<span class="tag ok">compagno</span>' : '') + (P.away ? '<span class="tag away">assente</span>' : P.bot ? '<span class="tag bot">auto</span>' : '') + '</button>' +
+    return '<div class="seat-t ' + pos(g, p, me) + (on ? ' on' : '') + (P.outAt ? ' outp' : '') + '" data-p="' + p + '" style="--pc:' + pcol(g, p) + ';--tc:' + sideCol(g, t) + '">' +
+      '<button class="who" data-act="player" data-p="' + p + '"><span class="pv">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><b>' + Net.dot(P.uid) + esc(P.nick) + '</b>' + (mate ? '<span class="tag ok">compagno</span>' : '') + (P.outAt ? '<span class="tag out">eliminato</span>' : P.away ? '<span class="tag away">assente</span>' : P.bot ? '<span class="tag bot">auto</span>' : '') + '</button>' +
       '<span class="oh">' + (P.hand.length ? ART.card(null, false) + '<i>' + P.hand.length + '</i>' : '') + '</span>' +
       (dr ? '<span class="drawn" title="Carta pescata">' + ART.flat(dr.c) + '<small>pescata</small></span>' : '') + accTag(g, p) + '</div>';
   }
@@ -4661,10 +4692,10 @@ var Game = (function () {
       var a = mt >= 0 ? mt : 0, b = 1 - a;
       out = '<span style="--tc:' + sideCol(g, a) + '"><b>' + (mt >= 0 ? (E.pairs(g) ? 'Noi' : 'Tu') : esc(E.tname(g, a))) + ' ' + g.totals[a] + '</b> · ' + (mt >= 0 ? (E.pairs(g) ? 'loro' : esc(g.players[b].nick)) : esc(E.tname(g, b))) + ' ' + g.totals[b] + '</span>';
     } else {
-      for (var t = 0; t < S; t++) out += '<span class="sc-p' + (t === mt ? ' me' : '') + '" style="--tc:' + sideCol(g, t) + '">' + esc(t === mt ? 'Tu' : g.players[t].nick) + ' <b>' + g.totals[t] + '</b></span>';
+      for (var t = 0; t < S; t++) out += '<span class="sc-p' + (t === mt ? ' me' : '') + (g.players[t].outAt ? ' outp' : '') + '" style="--tc:' + sideCol(g, t) + '">' + esc(t === mt ? 'Tu' : g.players[t].nick) + ' <b>' + g.totals[t] + '</b></span>';
     }
-    var my = mt >= 0 && g.phase === 'play' ? E.sumTh(g.taken[mt], g) : null;
-    return '<div class="score">' + out + '<span>' + (perd(g) ? 'si chiude a ' : 'si vince a ') + g.opts.target + '</span>' + (my != null ? '<span>' + (E.pairs(g) ? 'Preso da voi' : 'Preso da te') + ': ' + E.fmtTh(my) + '</span>' : '') + '</div>';
+    var my = mt >= 0 && g.phase === 'play' && !g.players[me].outAt ? E.sumTh(g.taken[mt], g) : null;
+    return '<div class="score">' + out + '<span>' + (perd(g) ? (g.opts.elim ? 'eliminato a ' : 'si chiude a ') : 'si vince a ') + g.opts.target + '</span>' + (my != null ? '<span>' + (E.pairs(g) ? 'Preso da voi' : 'Preso da te') + ': ' + E.fmtTh(my) + '</span>' : '') + '</div>';
   }
   function table(g, me) {
     var n = g.players.length, h = '';
@@ -4677,6 +4708,7 @@ var Game = (function () {
   }
   function hand(g, me) {
     if (me < 0) return '<div class="mine"><p class="muted">Stai guardando la partita.</p></div>';
+    if (g.players[me].outAt && g.phase !== 'over') return '<div class="mine"><p class="muted">Sei arrivato a ' + g.totals[me] + ' punti e sei <b>eliminato</b>: guardi gli altri finché ne resta uno.</p></div>';
     var P = g.players[me], my = g.phase === 'play' && g.turn === me, L = my ? E.legal(g, me) : null, cs = sorted(P.hand);
     var lead = my && g.trick.length ? E.SN[E.suit(g.trick[0].c)] : null;
     return '<div class="mine' + (my ? ' on' : '') + '" style="--pc:' + pcol(g, me) + '"><div class="mine-h"><b>' + esc(P.nick) + ' (tu)</b>' + accTag(g, me) +
@@ -4732,7 +4764,7 @@ var Game = (function () {
   }
   function plan(g, me, e) {
     switch (e.k) {
-      case 'deal': enqueue(function () { App.linger = null; Sound.play('deal'); banner('Mano ' + e.hand, perd(g) ? 'a perdere' : 'a vincere'); render(); return sleep(500); }); break;
+      case 'deal': enqueue(function () { App.linger = null; Sound.play('deal'); banner('Mano ' + e.hand, perd(g) ? (g.opts.elim ? 'restano in ' + E.alive(g).length : 'a perdere') : 'a vincere'); render(); return sleep(500); }); break;
       case 'play': enqueue(function () {
         Sound.play('card'); if (App.linger) render();
         var tc = document.querySelector('.trick .tc[data-p="' + e.p + '"]'), src = rect(seatEl(e.p));
@@ -4759,6 +4791,7 @@ var Game = (function () {
         render(); return sleep(150);
       }); break;
       case 'accuse': enqueue(function () { Sound.play('sign'); toast('<b>' + esc(g.players[e.p].nick) + '</b> accusa ' + esc(e.a.map(E.accText).join(' e ')) + ': +' + e.pts + (e.pts === 1 ? ' punto' : ' punti')); return sleep(80); }); break;
+      case 'out': enqueue(function () { toast(e.ps.map(function (p) { return p === me ? 'Sei arrivato a ' + g.opts.target + ' punti: <b>sei eliminato</b>.' : '<b>' + esc(g.players[p].nick) + '</b> arriva a ' + g.opts.target + ' punti ed è eliminato.'; }).join(' '), '', 4500); return sleep(60); }); break;
       case 'roundEnd': enqueue(function () { App.sheet = { kind: e.over ? 'over' : 'round', fresh: true }; renderSheet(); return sleep(200); }); break;
       case 'over': enqueue(function () { var w = G().winners || [], mt = me >= 0 ? E.team(G(), me) : -1; Sound.play(w.indexOf(mt) >= 0 ? 'win' : 'lose'); if (w.length === 1 && w[0] === mt) confetti(); return sleep(100); }); break;
     }
@@ -4812,7 +4845,7 @@ function sheetBody(s) {
     var P = g.players[s.p]; if (!P) return '';
     var isHost = App.doc.host === Net.uid;
     return '<div class="phead"><span class="pv big" style="--pc:' + pcol(g, s.p) + '">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><div><div class="kicker">' + (s.p === me ? 'Tu' : me >= 0 && s.p === E.partner(g, me) ? 'Il tuo compagno' : 'Avversario') + '</div><h2>' + Net.dot(P.uid) + esc(P.nick) + '</h2></div></div>' +
-      '<div class="tags"><span class="gc">' + P.hand.length + ' carte in mano</span><span class="gc">' + g.totals[E.team(g, s.p)] + ' punti in totale</span>' + (P.away ? '<span class="gc">assente: gioca l’automatico</span>' : P.bot ? '<span class="gc">giocatore automatico</span>' : '') + '</div>' +
+      '<div class="tags"><span class="gc">' + P.hand.length + ' carte in mano</span><span class="gc">' + g.totals[E.team(g, s.p)] + ' punti in totale</span>' + (P.outAt ? '<span class="gc">eliminato alla mano ' + P.outAt + '</span>' : '') + (P.away ? '<span class="gc">assente: gioca l’automatico</span>' : P.bot ? '<span class="gc">giocatore automatico</span>' : '') + '</div>' +
       (isHost && s.p !== me && g.phase !== 'over' ? '<button class="btn ghost block" data-act="auto" data-p="' + s.p + '">' + (P.bot ? 'Ridai il controllo al giocatore' : 'Fallo giocare in automatico (se è assente)') + '</button>' : '') + closeBtn();
   }
   if (s.kind === 'round' && (g.phase === 'scores' || g.phase === 'over') && g.res) return roundBody(g, me, s);
@@ -4833,13 +4866,16 @@ function sideColor(g, t) { return E.pairs(g) ? TCOL[t] : pcol(g, t); }
 function roundRows(g, anim) {
   var R = g.res, mt = myIdx() >= 0 ? E.team(g, myIdx()) : -1, S = E.sides(g), lw = E.team(g, R.lastW), rows = '';
   for (var t = 0; t < S; t++) {
+    var oa = g.opts.mode === 'perdere' ? g.players[t].outAt : 0;
+    if (oa && oa < g.hand) { rows += '<div class="rr-row out" style="--pc:' + sideColor(g, t) + '"><span class="rr-n"><b>' + sideName(g, t) + '</b><span class="rr-w">eliminato alla mano ' + oa + '<small>totale ' + g.totals[t] + '</small></span></span><span class="rr-p"><b>–</b></span></div>'; continue; }
     var det = [R.th[t] ? 'prese: ' + E.fmtTh(R.th[t]) + (t === lw ? ' (con l’ultima)' : '') : 'nessun punto preso'];
     if (R.acc[t]) det.push('accusi +' + R.acc[t]);
     if (R.cap >= 0) det.push(t === R.cap ? 'cappotto: nessun punto' : 'cappotto: +' + E.handPts(g));
+    if (oa) det.push('<b>eliminato</b>');
     rows += '<div class="rr-row' + (t === mt ? ' me' : '') + '" style="--pc:' + sideColor(g, t) + ';animation-delay:' + (anim ? t * .1 : 0) + 's"><span class="rr-n"><b>' + sideName(g, t) + '</b>' +
       '<span class="rr-w">' + det.join(' · ') + '<small>' + R.cards[t] + ' carte · totale ' + g.totals[t] + '</small></span></span><span class="rr-p"><b>' + R.pts[t] + '</b><small>punti</small></span></div>';
   }
-  return '<div class="rr">' + rows + '</div><p class="lead" style="text-align:center">' + (g.opts.mode === 'perdere' ? 'La partita finisce quando qualcuno arriva a <b>' + g.opts.target + '</b>: vince chi ha meno punti.' : 'Vince chi arriva per primo a <b>' + g.opts.target + '</b>.') + '</p>';
+  return '<div class="rr">' + rows + '</div><p class="lead" style="text-align:center">' + (g.opts.elim ? 'Chi arriva a <b>' + g.opts.target + '</b> è eliminato: vince l’ultimo che resta' + (g.phase === 'scores' ? ' (in gioco: ' + E.alive(g).length + ')' : '') + '.' : g.opts.mode === 'perdere' ? 'La partita finisce quando qualcuno arriva a <b>' + g.opts.target + '</b>: vince chi ha meno punti.' : 'Vince chi arriva per primo a <b>' + g.opts.target + '</b>.') + '</p>';
 }
 function scorecard(g) {
   if (!g.hist.length) return '<p class="lead">Ancora nessuna mano finita.</p>';
@@ -4851,7 +4887,7 @@ function scorecard(g) {
 function overBody(g, me) {
   var W = g.winners || [], mt = me >= 0 ? E.team(g, me) : -1, iw = W.indexOf(mt) >= 0, pairs = E.pairs(g);
   var title = iw ? (W.length > 1 ? 'Vinci a pari merito!' : pairs ? 'Avete vinto!' : 'Hai vinto!') : W.length > 1 ? 'Vincono a pari merito ' + W.map(function (t) { return sideName(g, t); }).join(', ') : (pairs ? 'Vincono ' : 'Vince ') + sideName(g, W[0]);
-  var line = g.opts.mode === 'perdere' ? 'A perdere, con ' + g.totals[W[0]] + ' punti dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.' : 'Finisce ' + Math.max.apply(null, g.totals) + ' a ' + Math.min.apply(null, g.totals) + ' dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.';
+  var line = g.opts.elim ? (W.length > 1 ? 'Sono usciti tutti insieme: vince chi ha meno punti, ' + g.totals[W[0]] + ',' : 'Ultimo rimasto al tavolo, con ' + g.totals[W[0]] + ' punti,') + ' dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.' : g.opts.mode === 'perdere' ? 'A perdere, con ' + g.totals[W[0]] + ' punti dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.' : 'Finisce ' + Math.max.apply(null, g.totals) + ' a ' + Math.min.apply(null, g.totals) + ' dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.';
   return '<div class="over"><span class="over-cards">' + [2, 12, 22, 32].map(function (c) { return ART.flat(c); }).join('') + '</span><h2>' + title + '</h2><p class="lead">' + line + '</p>' +
     (g.res ? '<details class="lastround"><summary>Ultima mano</summary>' + roundRows(g, false) + '</details>' : '') + scorecard(g) +
     Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda il tavolo') + '</div>';

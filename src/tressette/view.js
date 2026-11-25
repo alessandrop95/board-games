@@ -28,7 +28,7 @@ var Game = (function () {
   function render() {
     if (mountedFor !== App.code || !el('gv')) mount();
     var g = G(), me = myIdx();
-    setHTML('gv-info', '<b>' + CFG.title + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : (perd(g) ? 'a perdere · ' : '') + 'Mano ' + g.hand) + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
+    setHTML('gv-info', '<b>' + CFG.title + '</b> <span class="muted">· ' + connInfo((g.phase === 'over' ? 'Partita finita' : (perd(g) ? (g.opts.elim ? 'ad eliminazione · ' : 'a perdere · ') : '') + 'Mano ' + g.hand) + ' · tavolo ' + esc(App.code)) + '</span><span id="tt" class="tt"></span>');
     setHTML('table', table(g, me));
     setHTML('gv-prompt', prompt(g, me));
     setHTML('gv-me', hand(g, me));
@@ -42,8 +42,8 @@ var Game = (function () {
     var P = g.players[p], t = E.team(g, p), on = g.phase === 'play' && g.turn === p;
     var mate = me >= 0 && p === E.partner(g, me);
     var dr = g.drawn.filter(function (x) { return x.p === p; })[0];
-    return '<div class="seat-t ' + pos(g, p, me) + (on ? ' on' : '') + '" data-p="' + p + '" style="--pc:' + pcol(g, p) + ';--tc:' + sideCol(g, t) + '">' +
-      '<button class="who" data-act="player" data-p="' + p + '"><span class="pv">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><b>' + Net.dot(P.uid) + esc(P.nick) + '</b>' + (mate ? '<span class="tag ok">compagno</span>' : '') + (P.away ? '<span class="tag away">assente</span>' : P.bot ? '<span class="tag bot">auto</span>' : '') + '</button>' +
+    return '<div class="seat-t ' + pos(g, p, me) + (on ? ' on' : '') + (P.outAt ? ' outp' : '') + '" data-p="' + p + '" style="--pc:' + pcol(g, p) + ';--tc:' + sideCol(g, t) + '">' +
+      '<button class="who" data-act="player" data-p="' + p + '"><span class="pv">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><b>' + Net.dot(P.uid) + esc(P.nick) + '</b>' + (mate ? '<span class="tag ok">compagno</span>' : '') + (P.outAt ? '<span class="tag out">eliminato</span>' : P.away ? '<span class="tag away">assente</span>' : P.bot ? '<span class="tag bot">auto</span>' : '') + '</button>' +
       '<span class="oh">' + (P.hand.length ? ART.card(null, false) + '<i>' + P.hand.length + '</i>' : '') + '</span>' +
       (dr ? '<span class="drawn" title="Carta pescata">' + ART.flat(dr.c) + '<small>pescata</small></span>' : '') + accTag(g, p) + '</div>';
   }
@@ -53,10 +53,10 @@ var Game = (function () {
       var a = mt >= 0 ? mt : 0, b = 1 - a;
       out = '<span style="--tc:' + sideCol(g, a) + '"><b>' + (mt >= 0 ? (E.pairs(g) ? 'Noi' : 'Tu') : esc(E.tname(g, a))) + ' ' + g.totals[a] + '</b> · ' + (mt >= 0 ? (E.pairs(g) ? 'loro' : esc(g.players[b].nick)) : esc(E.tname(g, b))) + ' ' + g.totals[b] + '</span>';
     } else {
-      for (var t = 0; t < S; t++) out += '<span class="sc-p' + (t === mt ? ' me' : '') + '" style="--tc:' + sideCol(g, t) + '">' + esc(t === mt ? 'Tu' : g.players[t].nick) + ' <b>' + g.totals[t] + '</b></span>';
+      for (var t = 0; t < S; t++) out += '<span class="sc-p' + (t === mt ? ' me' : '') + (g.players[t].outAt ? ' outp' : '') + '" style="--tc:' + sideCol(g, t) + '">' + esc(t === mt ? 'Tu' : g.players[t].nick) + ' <b>' + g.totals[t] + '</b></span>';
     }
-    var my = mt >= 0 && g.phase === 'play' ? E.sumTh(g.taken[mt], g) : null;
-    return '<div class="score">' + out + '<span>' + (perd(g) ? 'si chiude a ' : 'si vince a ') + g.opts.target + '</span>' + (my != null ? '<span>' + (E.pairs(g) ? 'Preso da voi' : 'Preso da te') + ': ' + E.fmtTh(my) + '</span>' : '') + '</div>';
+    var my = mt >= 0 && g.phase === 'play' && !g.players[me].outAt ? E.sumTh(g.taken[mt], g) : null;
+    return '<div class="score">' + out + '<span>' + (perd(g) ? (g.opts.elim ? 'eliminato a ' : 'si chiude a ') : 'si vince a ') + g.opts.target + '</span>' + (my != null ? '<span>' + (E.pairs(g) ? 'Preso da voi' : 'Preso da te') + ': ' + E.fmtTh(my) + '</span>' : '') + '</div>';
   }
   function table(g, me) {
     var n = g.players.length, h = '';
@@ -69,6 +69,7 @@ var Game = (function () {
   }
   function hand(g, me) {
     if (me < 0) return '<div class="mine"><p class="muted">Stai guardando la partita.</p></div>';
+    if (g.players[me].outAt && g.phase !== 'over') return '<div class="mine"><p class="muted">Sei arrivato a ' + g.totals[me] + ' punti e sei <b>eliminato</b>: guardi gli altri finché ne resta uno.</p></div>';
     var P = g.players[me], my = g.phase === 'play' && g.turn === me, L = my ? E.legal(g, me) : null, cs = sorted(P.hand);
     var lead = my && g.trick.length ? E.SN[E.suit(g.trick[0].c)] : null;
     return '<div class="mine' + (my ? ' on' : '') + '" style="--pc:' + pcol(g, me) + '"><div class="mine-h"><b>' + esc(P.nick) + ' (tu)</b>' + accTag(g, me) +
@@ -124,7 +125,7 @@ var Game = (function () {
   }
   function plan(g, me, e) {
     switch (e.k) {
-      case 'deal': enqueue(function () { App.linger = null; Sound.play('deal'); banner('Mano ' + e.hand, perd(g) ? 'a perdere' : 'a vincere'); render(); return sleep(500); }); break;
+      case 'deal': enqueue(function () { App.linger = null; Sound.play('deal'); banner('Mano ' + e.hand, perd(g) ? (g.opts.elim ? 'restano in ' + E.alive(g).length : 'a perdere') : 'a vincere'); render(); return sleep(500); }); break;
       case 'play': enqueue(function () {
         Sound.play('card'); if (App.linger) render();
         var tc = document.querySelector('.trick .tc[data-p="' + e.p + '"]'), src = rect(seatEl(e.p));
@@ -151,6 +152,7 @@ var Game = (function () {
         render(); return sleep(150);
       }); break;
       case 'accuse': enqueue(function () { Sound.play('sign'); toast('<b>' + esc(g.players[e.p].nick) + '</b> accusa ' + esc(e.a.map(E.accText).join(' e ')) + ': +' + e.pts + (e.pts === 1 ? ' punto' : ' punti')); return sleep(80); }); break;
+      case 'out': enqueue(function () { toast(e.ps.map(function (p) { return p === me ? 'Sei arrivato a ' + g.opts.target + ' punti: <b>sei eliminato</b>.' : '<b>' + esc(g.players[p].nick) + '</b> arriva a ' + g.opts.target + ' punti ed è eliminato.'; }).join(' '), '', 4500); return sleep(60); }); break;
       case 'roundEnd': enqueue(function () { App.sheet = { kind: e.over ? 'over' : 'round', fresh: true }; renderSheet(); return sleep(200); }); break;
       case 'over': enqueue(function () { var w = G().winners || [], mt = me >= 0 ? E.team(G(), me) : -1; Sound.play(w.indexOf(mt) >= 0 ? 'win' : 'lose'); if (w.length === 1 && w[0] === mt) confetti(); return sleep(100); }); break;
     }

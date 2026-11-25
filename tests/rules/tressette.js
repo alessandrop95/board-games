@@ -110,11 +110,34 @@ bb.players[1].hand = [C(1, 3), C(1, 2), C(4, 1)]; bb.trick = [{ p: 0, c: C(5, 0)
 t('…e quando non ha il seme scarica quello prima degli altri assi', B.decide(bb, 1).c === C(1, 3));
 t('a vincere l’automatico apre con il 3 (carta buona con punti)', B.decide(bw, 0).c === C(3, 1));
 
+// ad eliminazione
+function playOut(g) { var guard = 0; while (g.phase === 'play' && guard++ < 500) { var w = E.pending(g)[0], e = E.act(g, w, B.decide(g, w)); if (e) return e; } return null; }
+t('l’eliminazione vale solo a perdere', E.newGame(seats(4), { mode: 'perdere', elim: true }).opts.elim === true && E.newGame(seats(4), { mode: 'vincere', elim: true }).opts.elim === false);
+var e2 = E.newGame(seats(4), { mode: 'perdere', elim: true, target: 21 }); e2.totals = [30, 0, 0, 0]; playOut(e2);
+t('in 4, chi arriva alla soglia esce e gli altri tre continuano', e2.phase === 'scores' && e2.players[0].outAt === 1 && E.alive(e2).join() === '1,2,3' && e2.players[0].ready && /è eliminato/.test(e2.log[e2.log.length - 1].t), e2.phase + ' ' + E.alive(e2));
+E.forceNext(e2);
+t('…la mano dopo si danno le carte solo ai tre rimasti (13 a testa, senza il 4 di bastoni)', e2.players[0].hand.length === 0 && [1, 2, 3].every(function (i) { return e2.players[i].hand.length === 13; }) && e2.removed.join() === '33' && e2.turn !== 0);
+var t0 = e2.totals[0], turns = {}, g3 = 0; while (e2.phase === 'play' && g3++ < 500) { var w3 = E.pending(e2)[0]; turns[w3] = 1; E.act(e2, w3, B.decide(e2, w3)); }
+t('…e l’eliminato non gioca più né prende punti', !turns[0] && e2.res.th[0] === 0 && e2.res.pts[0] === 0 && e2.totals[0] === t0);
+var e3 = E.newGame(seats(3), { mode: 'perdere', elim: true, target: 21 }); e3.totals = [25, 0, 0]; playOut(e3); E.forceNext(e3);
+t('in due rimasti: dieci carte a testa e venti nel tallone', E.alive(e3).length === 2 && e3.players[1].hand.length === 10 && e3.players[2].hand.length === 10 && e3.deck.length === 20 && e3.players[0].hand.length === 0);
+playOut(e3);
+t('…si pesca fino alla fine della mano, solo i due rimasti', (e3.phase === 'scores' || e3.phase === 'over') && e3.res.cards[0] === 0 && e3.res.cards[1] + e3.res.cards[2] === 40, e3.res && e3.res.cards);
+var e4 = E.newGame(seats(3), { mode: 'perdere', elim: true, target: 21 }); e4.totals = [30, 25, 0]; playOut(e4);
+t('quando ne resta uno solo la partita finisce e vince lui', e4.phase === 'over' && e4.winners.join() === '2' && e4.final.place[2] === 1 && e4.players[0].outAt && e4.players[1].outAt && !e4.players[2].outAt);
+var e5 = E.newGame(seats(4), { mode: 'perdere', elim: true, target: 21 }); e5.totals = [40, 0, 0, 0]; playOut(e5); E.forceNext(e5); e5.totals[1] = 40; playOut(e5);
+t('chi esce prima arriva dopo in classifica', e5.phase === 'scores' && e5.players[1].outAt === 2 && E.alive(e5).length === 2);
+E.forceNext(e5); e5.totals[2] = 40; playOut(e5);
+t('…fino all’ultimo rimasto, che vince', e5.phase === 'over' && e5.winners.join() === '3' && e5.final.place.join() === '4,3,2,1', e5.final && e5.final.place);
+var e6 = E.newGame(seats(3), { mode: 'perdere', elim: true, target: 21 }); e6.totals = [40, 30, 30]; playOut(e6);
+var low = Math.min(e6.totals[0], e6.totals[1], e6.totals[2]);
+t('se escono tutti insieme vince chi ha meno punti', e6.phase === 'over' && e6.winners.every(function (i) { return e6.totals[i] === low; }) && e6.winners.every(function (i) { return e6.final.place[i] === 1; }), e6.totals + ' ' + e6.winners);
+
 // partite tra automatici in tutte le varianti
 var bad = 0, N = +process.argv[2] || 20, hands = 0;
-[['vincere', 2], ['vincere', 4], ['perdere', 3], ['perdere', 4], ['perdere', 5], ['perdere', 6], ['perdere', 3, 1], ['perdere', 5, 1]].forEach(function (v) {
+[['vincere', 2], ['vincere', 4], ['perdere', 3], ['perdere', 4], ['perdere', 5], ['perdere', 6], ['perdere', 3, 1], ['perdere', 5, 1], ['perdere', 4, 0, 1], ['perdere', 6, 0, 1], ['perdere', 5, 1, 1]].forEach(function (v) {
   for (var k = 0; k < N; k++) {
-    var b = E.newGame(seats(v[1]).map(function (x) { x.bot = true; return x; }), { mode: v[0], target: v[2] ? 41 : 21, accuse: k % 2 === 0, bastoni: !!v[2] }), guard = 0;
+    var b = E.newGame(seats(v[1]).map(function (x) { x.bot = true; return x; }), { mode: v[0], target: v[2] ? 41 : 21, accuse: k % 2 === 0, bastoni: !!v[2], elim: !!v[3] }), guard = 0;
     while (b.phase !== 'over' && guard++ < 20000) {
       var who = E.pending(b)[0]; if (who == null) { E.forceNext(b); continue; }
       var hb = b.hand, err = E.act(b, who, B.decide(b, who)); if (err) { bad++; console.log('errore', v.join(' '), err); break; }
@@ -125,8 +148,9 @@ var bad = 0, N = +process.argv[2] || 20, hands = 0;
       }
     }
     if (b.phase !== 'over') { bad++; console.log('non finita', v.join(' ')); }
+    if (v[3] && b.phase === 'over' && (E.alive(b).length !== b.winners.length || b.players.some(function (P, i) { return P.outAt && b.totals[i] < b.opts.target; }))) { bad++; console.log('eliminazione', v.join(' '), E.alive(b), b.winners); }
   }
 });
-t('partite tra automatici a vincere (2, 4) e a perdere (3-6, anche con l’asso di bastoni da 11) finite senza errori, sempre tutti i terzi della mano', bad === 0 && hands > 0, bad);
+t('partite tra automatici a vincere (2, 4) e a perdere (3-6, anche con l’asso di bastoni da 11 e ad eliminazione) finite senza errori, sempre tutti i terzi della mano', bad === 0 && hands > 0, bad);
 console.log('Tressette: ' + ok + ' prove superate, ' + ko + ' fallite');
 process.exit(ko ? 1 : 0);

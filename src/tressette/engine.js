@@ -11,6 +11,10 @@
      chi prende tutti gli 11 punti di una mano fa «cappotto» e li regala agli altri. Quando qualcuno arriva
      ai punti stabiliti la partita finisce e vince chi ne ha meno. In 3 si toglie il 4 di bastoni, in 6 tutti i 4.
      Opzione «asso di bastoni da 11»: quell'asso vale 11 punti invece di 1, quindi in una mano ci sono 21 punti.
+     Opzione «ad eliminazione»: chi arriva ai punti stabiliti esce (P.outAt = la mano in cui è uscito) e gli altri
+     continuano; vince l'ultimo che resta. Le carte si danno solo a chi è ancora in gioco, con le regole del numero
+     rimasto (in 3 senza il 4 di bastoni…); in 2 dieci carte a testa e il tallone, da cui si pesca a carte scoperte.
+     Se escono tutti insieme vince, tra loro, chi ha meno punti.
    Una carta è un numero da 0 a 39 (vedi src/carte/art.js): seme = c / 10, valore = c % 10 + 1. */
 var TSEngine = (function () {
   var rand = Math.random;
@@ -45,6 +49,9 @@ var TSEngine = (function () {
   // a perdere: in 3 si toglie il 4 di bastoni (13 carte a testa), in 6 tutti i 4 (6 carte a testa)
   function removedFor(mode, n) { return mode !== 'perdere' ? [] : n === 3 ? [33] : n === 6 ? [3, 13, 23, 33] : []; }
   function okPlayers(mode, n) { return mode === 'perdere' ? n >= 3 && n <= 6 : n === 2 || n === 4; }
+  // ad eliminazione: chi è ancora in gioco, e il prossimo dopo p che lo è
+  function alive(g) { var a = []; g.players.forEach(function (P, i) { if (!P.outAt) a.push(i); }); return a; }
+  function nextP(g, p) { var n = g.players.length; for (var k = 1; k <= n; k++) { var q = (p + k) % n; if (!g.players[q].outAt) return q; } return p; }
 
   // chi prende: la carta più alta del seme d'uscita
   function winner(trick) {
@@ -76,8 +83,8 @@ var TSEngine = (function () {
     if (mode === 'vincere' && target > 41) target = 41;
     var g = {
       v: 1, phase: 'play', seq: 0, turnN: 0, hand: 0,
-      opts: { mode: mode, target: target, bastoni: mode === 'perdere' && !!opts.bastoni, accuse: mode === 'vincere' && opts.accuse !== false, signals: mode === 'vincere' && seats.length === 4 && opts.signals !== false, cappotto: mode === 'perdere' && opts.cappotto !== false },
-      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, hand: [], ready: false }; }),
+      opts: { mode: mode, target: target, bastoni: mode === 'perdere' && !!opts.bastoni, elim: mode === 'perdere' && !!opts.elim, accuse: mode === 'vincere' && opts.accuse !== false, signals: mode === 'vincere' && seats.length === 4 && opts.signals !== false, cappotto: mode === 'perdere' && opts.cappotto !== false },
+      players: seats.map(function (s, i) { return { uid: s.uid, nick: s.nick, bot: !!s.bot, away: false, col: i, hand: [], ready: false, outAt: 0 }; }),
       deck: [], removed: [], trick: [], lead: 0, turn: 0, taken: [], last: null, totals: [], hist: [], res: null,
       acc: {}, accDone: {}, accPts: [], drawn: [], log: [], logN: 0, fx: [], fxN: 0, winners: null, final: null, first: Math.floor(rand() * seats.length)
     };
@@ -86,19 +93,21 @@ var TSEngine = (function () {
     return g;
   }
   function deal(g) {
-    var n = g.players.length, S = sides(g);
+    var A = alive(g), n = A.length, S = sides(g);   // ad eliminazione si danno le carte solo a chi è ancora in gioco
     g.hand++; g.phase = 'play'; g.res = null; g.trick = []; g.last = null; g.drawn = [];
     g.removed = removedFor(g.opts.mode, n);
     var cards = shuffle(Array.from({ length: 40 }, function (x, i) { return i; }).filter(function (c) { return g.removed.indexOf(c) < 0; }));
     var per = n === 2 ? 10 : cards.length / n;
-    g.players.forEach(function (P) { P.hand = cards.splice(0, per); P.ready = false; });
+    g.players.forEach(function (P) { P.hand = []; P.ready = false; });
+    A.forEach(function (i) { g.players[i].hand = cards.splice(0, per); });
     g.deck = cards;                                   // in 2: il tallone (20 carte); altrimenti vuoto
     g.taken = []; for (var t = 0; t < S; t++) g.taken.push([]);
     g.accPts = zeros(S); g.acc = {}; g.accDone = {};
     if (g.opts.accuse) g.players.forEach(function (P, i) { var a = accuseOf(P.hand); if (a.length) g.acc[i] = a; });
-    g.lead = g.turn = (g.first + g.hand - 1) % n;
+    var st = (g.first + g.hand - 1) % g.players.length;
+    g.lead = g.turn = g.players[st].outAt ? nextP(g, st) : st;
     g.turnN++;
-    log(g, 'Mano ' + g.hand + ': ' + per + ' carte a testa' + (g.removed.length ? ' (senza ' + (g.removed.length > 1 ? 'i 4' : 'il 4 di bastoni') + ')' : '') + (g.deck.length ? ', ' + g.deck.length + ' nel tallone' : '') + '. Comincia ' + nick(g, g.turn) + '.', 'sys');
+    log(g, 'Mano ' + g.hand + ': ' + (n < g.players.length ? 'restano in ' + n + ', ' : '') + per + ' carte a testa' + (g.removed.length ? ' (senza ' + (g.removed.length > 1 ? 'i 4' : 'il 4 di bastoni') + ')' : '') + (g.deck.length ? ', ' + g.deck.length + ' nel tallone' : '') + '. Comincia ' + nick(g, g.turn) + '.', 'sys');
     fx(g, { k: 'deal', hand: g.hand });
   }
   function decider(g) { return g.phase === 'play' ? g.turn : null; }
@@ -117,14 +126,14 @@ var TSEngine = (function () {
     fx(g, { k: 'accuse', p: p, a: a, pts: pts });
   }
   function play(g, p, c, sig) {
-    var P = g.players[p], n = g.players.length;
+    var P = g.players[p], n = alive(g).length;
     var s = !g.trick.length && g.opts.signals && SIGNALS[sig] ? sig : null;
     declare(g, p);
     P.hand.splice(P.hand.indexOf(c), 1);
     g.trick.push(s ? { p: p, c: c, s: s } : { p: p, c: c });
     fx(g, { k: 'play', p: p, c: c, s: s });
     if (s) log(g, nick(g, p) + ' apre con ' + cname(c) + ' e dice «' + SIGNALS[s] + '» (' + SIGNAL_TXT[s] + ').', 'sig', p);
-    if (g.trick.length < n) { g.turn = (p + 1) % n; g.turnN++; return; }
+    if (g.trick.length < n) { g.turn = nextP(g, p); g.turnN++; return; }
     var w = winner(g.trick), t = team(g, w), cards = g.trick.map(function (x) { return x.c; }), th = sumTh(cards, g);
     g.taken[t] = g.taken[t].concat(cards);
     g.last = { trick: g.trick, w: w, th: th };
@@ -134,7 +143,7 @@ var TSEngine = (function () {
     // in 2 si pesca dal tallone a carte scoperte: prima chi ha preso
     if (g.deck.length) {
       g.drawn = [];
-      for (var k = 0; k < n; k++) { var q = (w + k) % n; if (g.deck.length) { var d = g.deck.shift(); g.players[q].hand.push(d); g.drawn.push({ p: q, c: d }); } }
+      for (var k = 0, q = w; k < n; k++, q = nextP(g, q)) { if (g.deck.length) { var d = g.deck.shift(); g.players[q].hand.push(d); g.drawn.push({ p: q, c: d }); } }
       log(g, g.drawn.map(function (x) { return nick(g, x.p) + ' pesca ' + cname(x.c); }).join(', ') + '.', 'draw');
       fx(g, { k: 'draw', d: g.drawn });
     }
@@ -147,7 +156,7 @@ var TSEngine = (function () {
     th[team(g, lastW)] += 3;                           // l'ultima presa
     for (t = 0; t < S; t++) pts[t] = Math.floor(th[t] / 3) + (g.accPts[t] || 0);
     if (g.opts.mode === 'perdere' && g.opts.cappotto) for (t = 0; t < S; t++) if (th[t] === totalTh(g)) cap = t;
-    if (cap >= 0) for (t = 0; t < S; t++) pts[t] = t === cap ? 0 : handPts(g);
+    if (cap >= 0) for (t = 0; t < S; t++) pts[t] = t === cap || (g.opts.mode === 'perdere' && g.players[t].outAt) ? 0 : handPts(g);
     for (t = 0; t < S; t++) g.totals[t] += pts[t];
     g.hist.push(pts.slice());
     g.res = { th: th, pts: pts, acc: g.accPts.slice(), lastW: lastW, cap: cap, cards: g.taken.map(function (x) { return x.length; }) };
@@ -157,6 +166,20 @@ var TSEngine = (function () {
       var mx = Math.max.apply(null, g.totals);
       W = g.totals.map(function (x, i) { return x === mx ? i : -1; }).filter(function (i) { return i >= 0; });
       over = mx >= g.opts.target && W.length === 1;      // a pari sopra la soglia si gioca un'altra mano
+    } else if (g.opts.elim) {
+      // ad eliminazione: chi arriva alla soglia esce; si va avanti finché ne resta uno
+      var A = alive(g), hit = A.filter(function (i) { return g.totals[i] >= g.opts.target; }), rest = A.filter(function (i) { return hit.indexOf(i) < 0; });
+      if (hit.length) {
+        if (!rest.length) {                              // escono tutti insieme: vince chi ne ha meno
+          var low = Math.min.apply(null, hit.map(function (i) { return g.totals[i]; }));
+          W = hit.filter(function (i) { return g.totals[i] === low; });
+          hit = hit.filter(function (i) { return W.indexOf(i) < 0; });
+        } else if (rest.length === 1) W = rest;
+        hit.forEach(function (i) { g.players[i].outAt = g.hand; });
+        log(g, hit.map(function (i) { return nick(g, i); }).join(' e ') + (hit.length > 1 ? ' arrivano' : ' arriva') + ' a ' + g.opts.target + ' punti: ' + (hit.length > 1 ? 'sono eliminati.' : 'è eliminato.') + (W.length ? '' : ' Restano in ' + rest.length + '.'), 'out');
+        fx(g, { k: 'out', ps: hit });
+        over = W.length > 0;
+      }
     } else if (g.totals.some(function (x) { return x >= g.opts.target; })) {
       var mn = Math.min.apply(null, g.totals);
       W = g.totals.map(function (x, i) { return x === mn ? i : -1; }).filter(function (i) { return i >= 0; });
@@ -165,12 +188,17 @@ var TSEngine = (function () {
     if (over) {
       g.winners = W;
       var lower = g.opts.mode === 'perdere';
-      g.final = { place: g.totals.map(function (x) { return 1 + g.totals.filter(function (y) { return lower ? y < x : y > x; }).length; }) };
+      if (g.opts.elim) {
+        // ad eliminazione conta prima quanto si è resistito, poi i punti
+        var last = function (i) { return W.indexOf(i) >= 0 ? Infinity : g.players[i].outAt; };
+        var better = function (j, i) { return last(j) > last(i) || (last(j) === last(i) && g.totals[j] < g.totals[i]); };
+        g.final = { place: g.totals.map(function (x, i) { return 1 + g.totals.filter(function (y, j) { return better(j, i); }).length; }) };
+      } else g.final = { place: g.totals.map(function (x) { return 1 + g.totals.filter(function (y) { return lower ? y < x : y > x; }).length; }) };
       g.phase = 'over';
       log(g, (W.length > 1 ? 'Vincono a pari merito ' + W.map(function (i) { return tname(g, i); }).join(', ') : (pairs(g) ? 'Vincono ' : 'Vince ') + tname(g, W[0])) + '!', 'win');
       fx(g, { k: 'roundEnd', over: true }); fx(g, { k: 'over', t: W[0] });
     } else {
-      g.phase = 'scores'; g.players.forEach(function (P) { P.ready = !!P.bot; });
+      g.phase = 'scores'; g.players.forEach(function (P) { P.ready = !!P.bot || !!P.outAt; });   // chi è eliminato guarda e non deve confermare
       fx(g, { k: 'roundEnd', over: false });
     }
   }
@@ -201,7 +229,7 @@ var TSEngine = (function () {
   }
   function forceNext(g) { if (g.phase !== 'scores') return false; deal(g); g.seq++; return true; }
   return { newGame: newGame, act: act, decider: decider, pending: pending, forceNext: forceNext, winner: winner, legal: legal, team: team, partner: partner, tname: tname, sides: sides, pairs: pairs,
-    thirds: thirds, sumTh: sumTh, totalTh: totalTh, handPts: handPts, BASTONI: BASTONI, fmtTh: fmtTh, power: power, suit: suit, rank: rank, cname: cname, accuseOf: accuseOf, accText: accText, okPlayers: okPlayers, removedFor: removedFor,
+    alive: alive, nextP: nextP, thirds: thirds, sumTh: sumTh, totalTh: totalTh, handPts: handPts, BASTONI: BASTONI, fmtTh: fmtTh, power: power, suit: suit, rank: rank, cname: cname, accuseOf: accuseOf, accText: accText, okPlayers: okPlayers, removedFor: removedFor,
     setRandom: setRandom, shuffle: shuffle, SIGNALS: SIGNALS, SIGNAL_TXT: SIGNAL_TXT, SN: SN, TARGETS: TARGETS, TOTAL_TH: TOTAL_TH };
 })();
 if (typeof module !== 'undefined') module.exports = TSEngine;
