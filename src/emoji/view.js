@@ -62,10 +62,14 @@ var Game = (function () {
   function controls(g, me) {
     var box = el('gv-ctl'), R = g.regista;
     if (g.phase === 'play' && R === me) {
-      var tabs = '<div class="padtabs">' + E.D.PAD.map(function (c, k) { return '<button class="ptab' + (k === padK ? ' on' : '') + '" data-act="pad" data-k="' + k + '" aria-label="' + esc(c.n) + '">' + c.ic + '</button>'; }).join('') + '</div>';
+      var tabs = '<div class="padtabs">' + E.D.PAD.map(function (c, k) { return '<button class="ptab' + (k === padK ? ' on' : '') + '" data-act="pad" data-k="' + k + '" aria-label="' + esc(c.n) + '" title="' + esc(c.n) + '">' + c.ic + '</button>'; }).join('') + '</div>' +
+        '<div class="padname">' + esc(E.D.PAD[padK].n) + ' <small>' + E.D.PAD[padK].list.length + ' emoji</small></div>';
       var keys = '<div class="pad">' + E.D.PAD[padK].list.map(function (e) { return '<button class="key" data-act="emo" data-e="' + esc(e) + '"' + (g.clue.length >= E.MAXCLUE ? ' disabled' : '') + '>' + e + '</button>'; }).join('') + '</div>';
       var tools = '<div class="tools"><button class="btn small ghost" data-act="undo"' + (g.clue.length ? '' : ' disabled') + '>' + IC('undo') + ' Togli</button><button class="btn small ghost" data-act="clear"' + (g.clue.length ? '' : ' disabled') + '>' + IC('trash') + ' Ricomincia</button><button class="btn small ghost" data-act="skip"' + (g.skips > 0 ? '' : ' disabled') + '>' + IC('swap') + ' Cambia titolo</button></div>';
+      // la tastiera resta dov'era dopo ogni emoji (i gruppi sono lunghi), si riparte dall'alto solo cambiando gruppo
+      var pv = box && box.querySelector('.pad'), st = pv && box._pk === padK ? pv.scrollTop : 0;
       box._k = null; setHTML('gv-ctl', '<div class="card dir">' + tools + tabs + keys + '</div>');
+      var pn = box && box.querySelector('.pad'); if (pn && st) pn.scrollTop = st; if (box) box._pk = padK;
       return;
     }
     if (me >= 0 && E.canGuess(g, me)) {

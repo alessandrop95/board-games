@@ -37,7 +37,7 @@ function sheetBody(s) {
     var P = g.players[s.p]; if (!P) return '';
     var isHost = App.doc.host === Net.uid;
     return '<div class="phead"><span class="pv big" style="--pc:' + pcol(g, s.p) + '">' + esc(P.nick.charAt(0).toUpperCase()) + '</span><div><div class="kicker">' + (s.p === me ? 'Tu' : me >= 0 && s.p === E.partner(g, me) ? 'Il tuo compagno' : 'Avversario') + '</div><h2>' + Net.dot(P.uid) + esc(P.nick) + '</h2></div></div>' +
-      '<div class="tags"><span class="gc">' + P.hand.length + ' carte in mano</span><span class="gc">' + g.totals[E.team(g, s.p)] + ' punti in totale</span>' + (P.away ? '<span class="gc">assente: gioca l’automatico</span>' : P.bot ? '<span class="gc">giocatore automatico</span>' : '') + '</div>' +
+      '<div class="tags"><span class="gc">' + P.hand.length + ' carte in mano</span><span class="gc">' + g.totals[E.team(g, s.p)] + ' punti in totale</span>' + (P.outAt ? '<span class="gc">eliminato alla mano ' + P.outAt + '</span>' : '') + (P.away ? '<span class="gc">assente: gioca l’automatico</span>' : P.bot ? '<span class="gc">giocatore automatico</span>' : '') + '</div>' +
       (isHost && s.p !== me && g.phase !== 'over' ? '<button class="btn ghost block" data-act="auto" data-p="' + s.p + '">' + (P.bot ? 'Ridai il controllo al giocatore' : 'Fallo giocare in automatico (se è assente)') + '</button>' : '') + closeBtn();
   }
   if (s.kind === 'round' && (g.phase === 'scores' || g.phase === 'over') && g.res) return roundBody(g, me, s);
@@ -58,13 +58,16 @@ function sideColor(g, t) { return E.pairs(g) ? TCOL[t] : pcol(g, t); }
 function roundRows(g, anim) {
   var R = g.res, mt = myIdx() >= 0 ? E.team(g, myIdx()) : -1, S = E.sides(g), lw = E.team(g, R.lastW), rows = '';
   for (var t = 0; t < S; t++) {
+    var oa = g.opts.mode === 'perdere' ? g.players[t].outAt : 0;
+    if (oa && oa < g.hand) { rows += '<div class="rr-row out" style="--pc:' + sideColor(g, t) + '"><span class="rr-n"><b>' + sideName(g, t) + '</b><span class="rr-w">eliminato alla mano ' + oa + '<small>totale ' + g.totals[t] + '</small></span></span><span class="rr-p"><b>–</b></span></div>'; continue; }
     var det = [R.th[t] ? 'prese: ' + E.fmtTh(R.th[t]) + (t === lw ? ' (con l’ultima)' : '') : 'nessun punto preso'];
     if (R.acc[t]) det.push('accusi +' + R.acc[t]);
     if (R.cap >= 0) det.push(t === R.cap ? 'cappotto: nessun punto' : 'cappotto: +' + E.handPts(g));
+    if (oa) det.push('<b>eliminato</b>');
     rows += '<div class="rr-row' + (t === mt ? ' me' : '') + '" style="--pc:' + sideColor(g, t) + ';animation-delay:' + (anim ? t * .1 : 0) + 's"><span class="rr-n"><b>' + sideName(g, t) + '</b>' +
       '<span class="rr-w">' + det.join(' · ') + '<small>' + R.cards[t] + ' carte · totale ' + g.totals[t] + '</small></span></span><span class="rr-p"><b>' + R.pts[t] + '</b><small>punti</small></span></div>';
   }
-  return '<div class="rr">' + rows + '</div><p class="lead" style="text-align:center">' + (g.opts.mode === 'perdere' ? 'La partita finisce quando qualcuno arriva a <b>' + g.opts.target + '</b>: vince chi ha meno punti.' : 'Vince chi arriva per primo a <b>' + g.opts.target + '</b>.') + '</p>';
+  return '<div class="rr">' + rows + '</div><p class="lead" style="text-align:center">' + (g.opts.elim ? 'Chi arriva a <b>' + g.opts.target + '</b> è eliminato: vince l’ultimo che resta' + (g.phase === 'scores' ? ' (in gioco: ' + E.alive(g).length + ')' : '') + '.' : g.opts.mode === 'perdere' ? 'La partita finisce quando qualcuno arriva a <b>' + g.opts.target + '</b>: vince chi ha meno punti.' : 'Vince chi arriva per primo a <b>' + g.opts.target + '</b>.') + '</p>';
 }
 function scorecard(g) {
   if (!g.hist.length) return '<p class="lead">Ancora nessuna mano finita.</p>';
@@ -76,7 +79,7 @@ function scorecard(g) {
 function overBody(g, me) {
   var W = g.winners || [], mt = me >= 0 ? E.team(g, me) : -1, iw = W.indexOf(mt) >= 0, pairs = E.pairs(g);
   var title = iw ? (W.length > 1 ? 'Vinci a pari merito!' : pairs ? 'Avete vinto!' : 'Hai vinto!') : W.length > 1 ? 'Vincono a pari merito ' + W.map(function (t) { return sideName(g, t); }).join(', ') : (pairs ? 'Vincono ' : 'Vince ') + sideName(g, W[0]);
-  var line = g.opts.mode === 'perdere' ? 'A perdere, con ' + g.totals[W[0]] + ' punti dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.' : 'Finisce ' + Math.max.apply(null, g.totals) + ' a ' + Math.min.apply(null, g.totals) + ' dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.';
+  var line = g.opts.elim ? (W.length > 1 ? 'Sono usciti tutti insieme: vince chi ha meno punti, ' + g.totals[W[0]] + ',' : 'Ultimo rimasto al tavolo, con ' + g.totals[W[0]] + ' punti,') + ' dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.' : g.opts.mode === 'perdere' ? 'A perdere, con ' + g.totals[W[0]] + ' punti dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.' : 'Finisce ' + Math.max.apply(null, g.totals) + ' a ' + Math.min.apply(null, g.totals) + ' dopo ' + g.hand + (g.hand === 1 ? ' mano' : ' mani') + '.';
   return '<div class="over"><span class="over-cards">' + [2, 12, 22, 32].map(function (c) { return ART.flat(c); }).join('') + '</span><h2>' + title + '</h2><p class="lead">' + line + '</p>' +
     (g.res ? '<details class="lastround"><summary>Ultima mano</summary>' + roundRows(g, false) + '</details>' : '') + scorecard(g) +
     Score.endHTML(App.doc) + (App.doc.host === Net.uid ? '<button class="btn block" data-act="rematch">Nuova partita con lo stesso tavolo</button>' : '<p class="lead">L’host può avviare una nuova partita.</p>') + closeBtn('Guarda il tavolo') + '</div>';

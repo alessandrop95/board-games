@@ -35,7 +35,7 @@ var TSBot = (function () {
   }
 
   function toWin(g, p, L) {
-    var n = g.players.length, hand = g.players[p].hand;
+    var n = E.alive(g).length, hand = g.players[p].hand;
     if (!g.trick.length) {
       // carte buone con punti (il 3, poi il 2 e l'asso quando sono rimasti i più alti)
       var good = L.filter(function (c) { return master(g, p, c) && E.thirds(c) > 0; });
@@ -66,7 +66,7 @@ var TSBot = (function () {
   }
 
   function toLose(g, p, L) {
-    var n = g.players.length;
+    var n = E.alive(g).length;   // ad eliminazione giocano solo quelli rimasti
     if (!g.trick.length) {
       // si apre con la carta più bassa, preferendo i semi di cui sono uscite poche carte (qualcuno starà sopra)
       var gone = out(g), zero = L.filter(function (c) { return E.thirds(c, g) === 0; }), pool = zero.length ? zero : L;

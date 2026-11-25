@@ -4,29 +4,30 @@
 var CFG = {
   game: 'tressette', key: 'ts', title: 'Tressette', E: TSEngine, BOT: TSBot, RU: TSRules,
   botNames: ['Napoletana', 'Busso', 'Striscio', 'Volo', 'Ciapanò', 'Cappotto', 'Tre di spade', 'Asso', 'Cavallo'],
-  defaults: { mode: 'vincere', target: 31, accuse: true, signals: true, cappotto: true, bastoni: false },
+  defaults: { mode: 'vincere', target: 31, accuse: true, signals: true, cappotto: true, bastoni: false, elim: false },
   opt: function (doc, op) {
     if (op.mode === 'vincere' || op.mode === 'perdere') doc.opts.mode = op.mode;
     if (op.target != null && TSEngine.TARGETS.indexOf(+op.target) >= 0) doc.opts.target = +op.target;
-    ['accuse', 'signals', 'cappotto', 'bastoni'].forEach(function (k) { if (op[k] != null) doc.opts[k] = !!op[k]; });
+    ['accuse', 'signals', 'cappotto', 'bastoni', 'elim'].forEach(function (k) { if (op[k] != null) doc.opts[k] = !!op[k]; });
     // soglie: 11-41 di solito; con l'asso di bastoni da 11 (21 punti a mano) 31-61
     var big = doc.opts.mode === 'perdere' && doc.opts.bastoni;
     if (big && doc.opts.target < 31) doc.opts.target = 41;
     if (!big && doc.opts.target > 41) doc.opts.target = 41;
   },
   targets: function (o) { return o.mode === 'perdere' && o.bastoni ? [31, 41, 51, 61] : [11, 21, 31, 41]; },
-  lobbyNote: function (o) { return (o.mode === 'perdere' ? 'a perdere' + (o.bastoni ? ', asso di bastoni da 11' : '') : 'a vincere') + ', ' + (o.target || 31) + ' punti'; },
+  lobbyNote: function (o) { return (o.mode === 'perdere' ? 'a perdere' + (o.elim ? ' ad eliminazione' : '') + (o.bastoni ? ', asso di bastoni da 11' : '') : 'a vincere') + ', ' + (o.target || 31) + ' punti'; },
   kicker: 'Il classico delle carte italiane, a vincere e a perdere', heroCards: [2, 11, 20, 32, 1],
   tagline: '3, 2, asso: rispondi al seme e fai punti con il tuo compagno, oppure gioca a perdere e lascia le prese agli altri. Ognuno dal proprio telefono, anche a distanza: per parlarsi bastano busso, striscio e volo.',
   quick: ['goal', 'trick'],
   intro: ['goal', 'cards', 'trick', 'end'],
   optionsHTML: function (d, isHost) {
     var o = d.opts || {}, perd = o.mode === 'perdere', tg = o.target || 31, hp = perd && o.bastoni ? 21 : 11;
-    if (!isHost) return '<p class="lead">Si gioca <b>' + (perd ? 'a perdere' : 'a vincere') + '</b>: ' + (perd ? 'finisce quando qualcuno arriva a ' : 'vince chi arriva per primo a ') + '<b>' + tg + ' punti</b>' +
+    if (!isHost) return '<p class="lead">Si gioca <b>' + (perd ? 'a perdere' + (o.elim ? ' ad eliminazione' : '') : 'a vincere') + '</b>: ' + (perd ? (o.elim ? 'chi arriva a <b>' + tg + ' punti</b> è eliminato e vince l’ultimo che resta' : 'finisce quando qualcuno arriva a <b>' + tg + ' punti</b>') : 'vince chi arriva per primo a <b>' + tg + ' punti</b>') +
       (perd ? (o.bastoni ? ', con l’asso di bastoni da 11' : '') + (o.cappotto === false ? ', senza cappotto' : ', con il cappotto') : (o.accuse === false ? ', senza accusi' : ', con gli accusi') + (o.signals === false ? ', senza segnali' : ', con busso, striscio e volo')) + '.</p>';
     return optRow('opt-mode', 'Variante', 'A vincere in 2 o in 4 a coppie; a perdere da 3 a 6, ognuno per sé.', perd ? 'perdere' : 'vincere', [['vincere', 'A vincere'], ['perdere', 'A perdere']]) +
-      optRow('opt-target', 'Punti', perd ? 'Quando qualcuno ci arriva la partita finisce: vince chi ne ha meno.' : 'Vince chi ci arriva per primo.', tg, CFG.targets(o).map(function (x) { return [x, String(x)]; })) +
-      (perd ? optRow('opt-bastoni', 'Asso di bastoni', 'Da 11 punti invece di 1: in ogni mano ci sono 21 punti invece di 11, meglio scegliere una soglia più alta.', o.bastoni ? 1 : 0, [[0, 'Vale 1'], [1, 'Vale 11']]) +
+      optRow('opt-target', 'Punti', perd ? (o.elim ? 'Chi ci arriva è eliminato: vince l’ultimo che resta al tavolo.' : 'Quando qualcuno ci arriva la partita finisce: vince chi ne ha meno.') : 'Vince chi ci arriva per primo.', tg, CFG.targets(o).map(function (x) { return [x, String(x)]; })) +
+      (perd ? optRow('opt-elim', 'Fine della partita', 'Classica: finisce appena qualcuno arriva ai punti e vince chi ne ha meno. Ad eliminazione: chi ci arriva esce, gli altri continuano finché ne resta uno solo.', o.elim ? 1 : 0, [[0, 'Classica'], [1, 'Ad eliminazione']]) +
+        optRow('opt-bastoni', 'Asso di bastoni', 'Da 11 punti invece di 1: in ogni mano ci sono 21 punti invece di 11, meglio scegliere una soglia più alta.', o.bastoni ? 1 : 0, [[0, 'Vale 1'], [1, 'Vale 11']]) +
         optRow('opt-cappotto', 'Cappotto', 'Chi prende tutti i ' + hp + ' punti di una mano li regala agli altri.', o.cappotto === false ? 0 : 1, [[1, 'Sì'], [0, 'No']])
         : optRow('opt-accuse', 'Accusi', 'Napoletana e buon gioco valgono punti in più.', o.accuse === false ? 0 : 1, [[1, 'Sì'], [0, 'No']]) +
           optRow('opt-signals', 'Segnali', 'In 4: busso, striscio e volo quando si apre la mano.', o.signals === false ? 0 : 1, [[1, 'Ammessi'], [0, 'Vietati']]));

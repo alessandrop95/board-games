@@ -122,6 +122,7 @@ select.field { color: #13284f; }
 .pv.big { width: 54px; height: 54px; font-size: 30px; }
 .tag { display: inline-flex; align-items: center; gap: 3px; font: 800 10px var(--f-body); text-transform: uppercase; letter-spacing: .04em; border-radius: 6px; padding: 1px 5px; background: rgba(255, 255, 255, .14); }
 .tag.end { background: var(--gold); color: #4a2a00; } .tag.away { background: #c8402c; } .tag.bot { background: #3a5a8a; } .tag.wait { background: rgba(255, 255, 255, .18); animation: pulse 1.4s ease-in-out infinite; } .tag.ok { background: #2f9a58; }
+.tag.out { background: #6b5a4a; } .seat-t.outp { opacity: .5; } .score .sc-p.outp { opacity: .55; text-decoration: line-through; } .rr-row.out { opacity: .5; animation: none; }
 @keyframes pulse { 50% { opacity: .5; } }
 /* barra delle istruzioni */
 .gv-prompt { display: flex; align-items: center; gap: 8px; margin: 0 max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px)); padding: 7px 8px 7px 12px; border-radius: 14px; background: rgba(8, 34, 20, .78); backdrop-filter: blur(8px); border: 1px solid var(--line); flex-wrap: wrap; box-shadow: 0 6px 18px rgba(6, 18, 48, .3); }
