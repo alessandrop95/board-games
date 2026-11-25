@@ -53,10 +53,11 @@ with sync_playwright() as p:
     B.wait_for_function('G().drawn', timeout=10000); B.wait_for_timeout(700)
     idle(B); t('tutti vedono la carta pescata', B.locator('#hand .hc-card').count() == 1 and 'ale' in B.inner_text('#hand .pl').lower(), B.inner_text('#hand .pl'))
     idle(A); A.screenshot(path=os.path.join(OUT, 'skyjo-pescata.png'))
-    old = js(A, 'G().players[myIdx()].grid[3].v')
+    old = js(A, 'G().players[myIdx()].grid[3].v'); nd = js(A, 'G().disc.length')
     click(A, '.board.big .slot[data-i="3"]')
     A.wait_for_function('G().players[%d].grid[3].v === -2 && G().players[%d].grid[3].up' % (a, a), timeout=10000)
-    t('tengo il −2 al posto di una carta coperta, che va sugli scarti', js(A, 'G().disc[G().disc.length-1]') == old and js(A, 'G().turn') != a)
+    # l'ordine dei giocatori è casuale: se dopo Ale tocca all'automatico, può aver già giocato, quindi si guarda la carta messa da Ale e non la cima
+    t('tengo il −2 al posto di una carta coperta, che va sugli scarti', js(A, 'G().disc[%d]' % nd) == old and js(A, 'G().turn') != a)
     # scarta e scopri
     host(A, "g.turn=%d;g.drawn=null;g.turnN++;g.deck.push(12)" % a); A.wait_for_function('G().turn === myIdx() && !G().drawn', timeout=10000); idle(A)
     click(A, '[data-act=deck]'); A.wait_for_function('G().drawn && G().drawn.v === 12', timeout=10000); idle(A)
@@ -75,7 +76,7 @@ with sync_playwright() as p:
     t('la colonna brilla prima di volare via', A.locator('.flyer.still').count() == 3)
     A.screenshot(path=os.path.join(OUT, 'skyjo-colonna.png'))
     A.wait_for_function('G().players[%d].grid[1] === null && G().players[%d].grid[9] === null' % (a, a), timeout=10000); idle(A)
-    t('la colonna di 6 è sparita', A.locator('.board.big .slot.gone').count() == 3 and js(A, 'G().disc.slice(-3).join()') == '6,6,6')
+    t('la colonna di 6 è sparita', A.locator('.board.big .slot.gone').count() == 3 and js(A, "G().log.some(function (l) { return l.k === 'col' && l.p === %d && / di [+]6:/.test(l.t); })" % a), js(A, 'G().log.slice(-4)'))
     # fine manche: Ale chiude con più punti di Bea e raddoppia
     host(A, "var P=g.players[%d],V=[5,0,6,7,8,0,9,10,11,0,12,4];for(var i=0;i<12;i++){if(P.grid[i]){P.grid[i]={v:V[i],up:i!==11};}}P.grid[1]=P.grid[5]=P.grid[9]=null;g.players.forEach(function(Q,k){if(k!==%d){for(var j=0;j<12;j++)Q.grid[j]={v:0,up:j<10};}});g.turn=%d;g.drawn=null;g.turnN++;g.deck.push(3);g.opts.target=150" % (a, a, a))
     A.wait_for_function('G().turn === myIdx() && !G().drawn', timeout=10000); idle(A)
