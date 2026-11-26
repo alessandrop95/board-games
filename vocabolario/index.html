@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Vocabolario">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="pwa-sw" content="../sw.js" data-scope="../">
-<meta name="pp-build" content="7496f7275e9e" data-game="vocabolario">
+<meta name="pp-build" content="38052cc046ea" data-game="vocabolario">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap">
 <style>
@@ -2925,10 +2925,12 @@ var Chat = (function () {
     '.chat-dock .cd-m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chat-dock .cd-m:not(:last-of-type){opacity:.6}.chat-dock .cd-m b{color:var(--k-accent);font-weight:700}.chat-dock .cd-e{opacity:.6;font-style:italic}' +
     '.chat-dock .cd-x{position:absolute;top:2px;right:2px;appearance:none;border:0;background:none;color:inherit;opacity:.6;font-size:18px;line-height:1;padding:4px 7px;cursor:pointer}' +
     '.chat-m .who{background:none;box-shadow:none;border:0;border-radius:0;padding:0;width:auto;min-height:0}' +
-    '.chat-form .chat-mic{padding:0;appearance:none;flex:none;width:46px;border:0;border-radius:50%;background:var(--k-surface-2);box-shadow:inset 0 0 0 1px var(--k-line-2);color:var(--k-text);display:grid;place-items:center;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.chat-form .chat-mic:hover{background:var(--k-surface-3)}.chat-mic svg{width:22px;height:22px;pointer-events:none}' +
-    '.chat-rec{display:flex;align-items:center;gap:10px;padding:10px max(16px,env(safe-area-inset-right,0px)) 14px max(16px,env(safe-area-inset-left,0px));min-height:46px}.chat-rec[hidden],.chat-form[hidden]{display:none}' +
+    '.chat-form .chat-mic{padding:0;appearance:none;flex:none;width:46px;height:46px;align-self:center;border:0;border-radius:50%;background:var(--k-surface-2);box-shadow:inset 0 0 0 1px var(--k-line-2);color:var(--k-text);display:grid;place-items:center;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.chat-form .chat-mic:hover{background:var(--k-surface-3)}.chat-mic svg{width:22px;height:22px;pointer-events:none}' +
+    '.chat-rec{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:46px}.chat-rec[hidden]{display:none}' +
+    '.chat-form.rec,.chat-form.rec *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.chat-form.rec #chat-input,.chat-form.rec.locked button[type=submit],.chat-form.rec.locked .chat-mic{display:none}.chat-form.rec button[type=submit]{visibility:hidden}' +
+    '.chat-form .chat-mic.on{background:var(--k-danger);color:#fff;box-shadow:0 0 0 6px color-mix(in srgb,var(--k-danger) 25%,transparent);transform:scale(1.12)}' +
     '.chat-rec .rd{width:12px;height:12px;border-radius:50%;background:var(--k-danger);flex:none;animation:crec 1s ease-in-out infinite}@keyframes crec{50%{opacity:.25}}' +
-    '.chat-rec .rt{font:700 16px var(--k-font);font-variant-numeric:tabular-nums;min-width:42px}.chat-rec .rh{flex:1;min-width:0;font-size:13.5px;color:var(--k-muted)}.chat-rec.away .rh{color:var(--k-err-ink);font-weight:700}' +
+    '.chat-rec .rt{font:700 16px var(--k-font);font-variant-numeric:tabular-nums;min-width:42px}.chat-rec .rh{flex:1;min-width:0;font-size:12.5px;line-height:1.25;max-height:2.5em;overflow:hidden;color:var(--k-muted)}.chat-rec.away .rh{color:var(--k-err-ink);font-weight:700}' +
     '.chat-rec button{appearance:none;border:0;border-radius:999px;padding:10px 16px;font:650 14.5px var(--k-font);cursor:pointer;background:var(--k-surface-2);color:var(--k-text);box-shadow:inset 0 0 0 1px var(--k-line-2)}.chat-rec button.go{background:var(--k-accent);color:var(--k-on-accent);box-shadow:none}' +
     '.chat-v{display:flex;align-items:center;gap:9px;min-width:190px}.chat-v .pl{appearance:none;flex:none;width:34px;height:34px;border:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;background:var(--k-accent);color:var(--k-on-accent);font-size:13px}' +
     '.chat-m.me .chat-v .pl{background:var(--k-on-accent);color:var(--k-accent)}.chat-v .pl[disabled]{opacity:.45;cursor:default}' +
@@ -3082,22 +3084,26 @@ var Chat = (function () {
       else showErr(blob.size > 240000 ? 'Il vocale è troppo pesante per partire: prova a farlo più corto.' : 'Sei offline: il vocale non è partito. Riprova quando torna la connessione.');
     }, function () { showErr('Il vocale non è partito. Riprova.'); });
   }
-  function paintRecTime() { var t = root && root.querySelector('.chat-rec .rt'); if (t && rec && rec.t0) t.textContent = secs((Date.now() - rec.t0) / 1000) + ' / ' + secs(MAXS); }
+  function paintRecTime() { var t = root && root.querySelector('.chat-rec .rt'); if (t && rec && rec.t0) t.textContent = secs((Date.now() - rec.t0) / 1000) + (rec.locked ? ' / ' + secs(MAXS) : ''); }
   function paintRec() {
     if (!root) return;
-    var bar = root.querySelector('.chat-rec'), form = root.querySelector('.chat-form');
-    bar.hidden = !rec; form.hidden = !!rec;
+    // il modulo resta: il tasto del microfono non deve sparire da sotto il dito (sul testo che comparirebbe al suo posto
+    // un tocco lungo selezionerebbe le parole e Android aprirebbe la ricerca Google, annullando il vocale)
+    var bar = root.querySelector('.chat-rec'), form = root.querySelector('.chat-form'), mic = root.querySelector('.chat-mic');
+    bar.hidden = !rec; form.classList.toggle('rec', !!rec); form.classList.toggle('locked', !!(rec && rec.locked));
+    if (mic) mic.classList.toggle('on', !!(rec && !rec.locked));
     if (!rec) return;
     bar.classList.toggle('away', !!rec.away);
-    bar.innerHTML = '<span class="rd" aria-hidden="true"></span><span class="rt">' + (rec.starting ? '…' : secs(0) + ' / ' + secs(MAXS)) + '</span>' +
+    bar.innerHTML = '<span class="rd" aria-hidden="true"></span><span class="rt">' + (rec.starting ? '…' : secs(0) + (rec.locked ? ' / ' + secs(MAXS) : '')) + '</span>' +
       (rec.locked ? '<span class="rh">' + (rec.starting ? 'Preparo il microfono…' : 'Sto registrando') + '</span><button type="button" data-chat="rec-cancel">Annulla</button><button type="button" class="go" data-chat="rec-send">Invia</button>'
-        : '<span class="rh">' + (rec.away ? 'Rilascia per annullare' : 'Rilascia per inviare, trascina via per annullare') + '</span>');
+        : '<span class="rh">' + (rec.away ? 'Rilascia per annullare' : 'Rilascia: invia<br>Scorri via: annulla') + '</span>');
     paintRecTime();
   }
   // tieni premuto il microfono: rilasci e parte; trascini via e si annulla; un tocco breve registra «a mani libere»
   function micDown(e) {
     var b = e.target.closest('[data-chat="mic"]'); if (!b || rec || (e.button != null && e.button > 0)) return;
     e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (x) {}
+    try { var sel = window.getSelection && getSelection(); if (sel) sel.removeAllRanges(); } catch (x) {}
     press = { at: Date.now(), x: e.clientX, y: e.clientY, id: e.pointerId };
     startRec(true);
   }
@@ -3109,9 +3115,10 @@ var Chat = (function () {
   function micUp(e) {
     if (!rec || rec.locked || e.pointerId !== press.id) return;
     press.id = null;
-    if (e.type === 'pointercancel' || rec.away) { stopRec(false); return; }
-    // tocco breve, o il telefono ha appena chiesto il permesso: si continua a registrare con «Annulla» e «Invia»
-    if (rec.starting || Date.now() - press.at < 400) { rec.locked = true; paintRec(); return; }
+    if (rec.away) { stopRec(false); return; }
+    // tocco breve, il telefono ha appena chiesto il permesso, o il browser si è preso il gesto (pointercancel):
+    // non si butta via niente, si continua a registrare con «Annulla» e «Invia»
+    if (e.type === 'pointercancel' || rec.starting || Date.now() - press.at < 400) { rec.locked = true; paintRec(); return; }
     stopRec(true);
   }
 
@@ -3122,15 +3129,17 @@ var Chat = (function () {
     root = document.createElement('div'); root.className = 'chat-back';
     root.innerHTML = '<div class="chat-box" role="dialog" aria-modal="true" aria-label="Chat del tavolo"><div class="chat-head"><b>Chat del tavolo</b><button type="button" class="chat-pin' + (pinned ? ' on' : '') + '" data-chat="pin" aria-pressed="' + pinned + '" title="Mostra sempre gli ultimi messaggi sullo schermo del tavolo">' + (pinned ? 'Sgancia dal tavolo' : 'Fissa sul tavolo') + '</button><button class="chat-x" data-chat="close" aria-label="Chiudi la chat">×</button></div>' +
       '<div class="chat-list" aria-live="polite"></div><div class="chat-err" hidden></div><div class="chat-quick">' + QUICK.map(function (q) { return '<button type="button" data-chat="quick">' + q + '</button>'; }).join('') + '</div>' +
-      '<form class="chat-form"><input id="chat-input" maxlength="240" autocomplete="off" enterkeyhint="send" placeholder="Scrivi un messaggio…" aria-label="Messaggio">' +
+      '<form class="chat-form"><div class="chat-rec" role="status" hidden></div><input id="chat-input" maxlength="240" autocomplete="off" enterkeyhint="send" placeholder="Scrivi un messaggio…" aria-label="Messaggio">' +
       (canRecord() ? '<button type="button" class="chat-mic" data-chat="mic" aria-label="Vocale: tieni premuto e parla, rilascia per inviare" title="Tieni premuto per registrare un vocale">' + MIC + '</button>' : '') +
-      '<button type="submit">Invia</button></form><div class="chat-rec" role="status" hidden></div></div>';
+      '<button type="submit">Invia</button></form></div>';
     root.addEventListener('click', function (e) { if (e.target === root) close(); });
     root.addEventListener('pointerdown', micDown);
     root.addEventListener('pointermove', micMove);
     root.addEventListener('pointerup', micUp);
     root.addEventListener('pointercancel', micUp);
-    root.addEventListener('contextmenu', function (e) { if (e.target.closest('[data-chat="mic"]')) e.preventDefault(); });
+    root.addEventListener('contextmenu', function (e) { if (e.target.closest('[data-chat="mic"]') || (rec && e.target.closest('.chat-form'))) e.preventDefault(); });
+    // tocco lungo sul microfono: niente menu, selezione o «Tocca per cercare» del browser (serve un ascoltatore non passivo)
+    root.addEventListener('touchstart', function (e) { if (e.target.closest('[data-chat="mic"]')) e.preventDefault(); }, { passive: false });
     root.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); send(root.querySelector('#chat-input').value); });
     document.body.appendChild(root);
     paintList();
