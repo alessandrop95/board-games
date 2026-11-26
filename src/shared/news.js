@@ -6,6 +6,8 @@ var News = (function () {
   var KEY = 'pp-news-seen';
   // la più recente in cima. g: giochi collegati [cartella, nome]
   var ITEMS = [
+    { id: '2026-11-26-chat-vocali', d: '2026-11-26', t: 'Chat: arrivano i vocali',
+      x: 'In tutti i giochi, nella chat del tavolo c’è il tasto 🎤: <b>tienilo premuto e parla</b>, rilascia per inviare (trascina il dito via per annullare). Con un tocco breve registri senza tenere premuto e poi scegli «Invia» o «Annulla». Al massimo 30 secondi; li ascolta chi è al tavolo in quel momento.' },
     { id: '2026-11-25-emoji-tastiera', d: '2026-11-25', t: 'Emoji in scena: molte più emoji e titoli',
       x: 'La tastiera del regista passa da circa 400 a <b>oltre 1200 emoji</b>, in 17 gruppi: arrivano mestieri, vestiti, casa, oggetti, scuola e tecnologia, viaggi, bandiere, numeri e orari. I titoli da raccontare sono più di 460 (prima 127), con tre categorie nuove: <b>serie e cartoni</b>, <b>mestieri</b> e <b>canzoni</b>. E ci sono tanti modi di dire, personaggi, film, cibi e luoghi in più.',
       g: [['emoji', 'Emoji in scena']] },

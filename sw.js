@@ -2,7 +2,7 @@
    saltando anche la cache del browser) e, se la rete manca o è troppo lenta, dalla copia salvata. Le immagini e i
    font si prendono dalla copia salvata e si aggiornano dietro le quinte. version.json (la versione pubblicata di
    ogni gioco, vedi build.py) va sempre e solo in rete. La partita vera passa da WebSocket e non tocca questo file. */
-var CACHE = 'board-games-v44';
+var CACHE = 'board-games-v45';
 var NET_WAIT = 3500;   // rete lenta: oltre questa attesa si usa la copia salvata (quella nuova si salva per la volta dopo)
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './src/shared/kit.js', './src/shared/install.js', './src/shared/net.js', './src/shared/alerts.js', './src/shared/account.js', './src/shared/news.js',
   './polvere-e-piombo/', './polvere-e-piombo/manifest.webmanifest', './polvere-e-piombo/icon-192.png',

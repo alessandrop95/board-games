@@ -483,10 +483,10 @@ var Net = (function () {
     if (!f || !f.doc) return f && f.closed ? 'closed' : 'missing';
     if (!mayEnter(f.doc, uid, keyFor(code))) { f.c.unsubscribe(topic(code, 'state')); return 'private'; }
     var c = f.c;
-    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, stops: [], graceUntil: 0, chat: [], chatIds: {},
+    T = { code: code, c: c, doc: null, isHost: false, onDoc: onDoc, onStatus: onStatus, pending: {}, answered: {}, answeredKeys: [], lastPing: Date.now(), up: c.connected, stops: [], graceUntil: 0, chat: [], chatIds: {}, voices: {}, vparts: {},
       seen: {}, hid: {}, visSince: {}, lost: {}, upSince: Date.now(), lastHb: 0, sentHid: null, resync: false, unpub: false, hostRev: 0, hostHeard: 0, visAt: Date.now() };
     var me = T;
-    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tVis = topic(code, 'vis'), tReact = topic(code, 'react'), tLive = topic(code, 'live');
+    var tState = topic(code, 'state'), tAct = topic(code, 'act'), tRes = topic(code, 'res/' + uid), tPing = topic(code, 'ping'), tChat = topic(code, 'chat'), tLog = topic(code, 'chatlog'), tHb = topic(code, 'hb'), tVis = topic(code, 'vis'), tReact = topic(code, 'react'), tLive = topic(code, 'live'), tVoice = topic(code, 'voice');
     me.handler = function (t, p, retained) {
       if (T !== me) return;
       if (t === tState) {
@@ -513,6 +513,8 @@ var Net = (function () {
       } else if (t === tChat) {
         var cm = safeParse(p); if (cm && cm.uid) heard(me, String(cm.uid).slice(0, 40), false);
         if (addChat(me, cm, false) && me.isHost) saveChatLog(me);
+      } else if (t === tVoice) {
+        gotVoicePart(me, safeParse(p));
       } else if (t === tLive) {
         var lm = safeParse(p); if (lm && lm.uid && lm.uid !== uid && liveCb && T === me) liveCb(lm);
       } else if (t === tReact) {
@@ -544,7 +546,7 @@ var Net = (function () {
     };
     c.onStatus(me.statusFn);
     c.fast++;   // seduti al tavolo: connessione controllata più spesso (vedi MQ._tickPing)
-    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tVis); c.subscribe(tReact); c.subscribe(tLive);
+    c.subscribe(tRes); c.subscribe(tPing); c.subscribe(tState); c.subscribe(tLog); c.subscribe(tChat); c.subscribe(tHb); c.subscribe(tVis); c.subscribe(tReact); c.subscribe(tLive); c.subscribe(tVoice);
     accept(f.doc);
     heartbeat(me, true);
     if (bc) { try { bc.postMessage({ k: 'open', key: PREFIX + code, tab: TAB }); } catch (e) {} }
@@ -997,6 +999,7 @@ var Net = (function () {
   function addChat(me, m, fromLog) {
     if (!m || typeof m.id !== 'string' || typeof m.text !== 'string' || me.chatIds[m.id]) return false;
     var clean = { id: m.id.slice(0, 40), uid: String(m.uid || '').slice(0, 40), nick: String(m.nick || '').trim().slice(0, 18) || 'Giocatore', text: m.text.trim().slice(0, 240), ts: +m.ts || Date.now() };
+    if (m.v && +m.v.dur > 0) clean.v = { dur: Math.min(VOICE_MAX_S, Math.round(+m.v.dur)) };   // vocale: nel testo «🎤 Vocale», l'audio resta in me.voices
     if (!clean.text) return false;
     me.chatIds[clean.id] = 1; me.chat.push(clean);
     me.chat.sort(function (a, b) { return a.ts - b.ts; });
@@ -1015,6 +1018,49 @@ var Net = (function () {
     if (!T.c.publish(topic(T.code, 'chat'), JSON.stringify(m), false)) return false;
     if (addChat(T, m, false) && T.isHost) saveChatLog(T);
     return true;
+  }
+  /* --- Vocali: l'audio registrato passa sullo stesso canale, a pezzi (i server pubblici non amano i messaggi grandi).
+     Non entra nella cronologia salvata: chi entra dopo vede «🎤 Vocale» ma non lo può ascoltare. --- */
+  var VOICE_MAX_S = 30, VOICE_MAX_B = 240000, VOICE_CHUNK = 12000;
+  function voiceText(dur) { return '🎤 Vocale (' + Math.max(1, Math.round(dur)) + '")'; }
+  function b64(buf) { var u = new Uint8Array(buf), s = ''; for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+  function unb64(str) { var s = atob(str), u = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+  function okMime(m) { m = String(m || ''); return /^audio\/[a-z0-9.+-]+(;\s*codecs=[a-z0-9.,"' -]+)?$/i.test(m) ? m.slice(0, 60) : 'audio/webm'; }
+  async function sendVoice(blob, dur, nick) {
+    if (!T || !T.up || !blob || !blob.size || blob.size > VOICE_MAX_B) return false;
+    var me = T, data = b64(await blob.arrayBuffer());
+    if (T !== me || !me.up) return false;
+    dur = Math.max(1, Math.min(VOICE_MAX_S, Math.round(dur)));
+    var id = uid + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), n = Math.ceil(data.length / VOICE_CHUNK), ts = Date.now(), mime = okMime(blob.type);
+    for (var k = 0; k < n; k++) {
+      var part = { id: id, uid: uid, nick: String(nick || '').slice(0, 18), ts: ts, dur: dur, mime: mime, k: k, n: n, d: data.slice(k * VOICE_CHUNK, (k + 1) * VOICE_CHUNK) };
+      if (!me.c.publish(topic(me.code, 'voice'), JSON.stringify(part), false)) return false;
+    }
+    me.voices[id] = URL.createObjectURL(blob);
+    if (addChat(me, { id: id, uid: uid, nick: nick, text: voiceText(dur), ts: ts, v: { dur: dur } }, false) && me.isHost) saveChatLog(me);
+    return true;
+  }
+  function gotVoicePart(me, m) {
+    if (!m || typeof m.id !== 'string' || m.uid === uid || me.chatIds[m.id] || typeof m.d !== 'string') return;
+    var n = +m.n, k = +m.k; if (!(n >= 1 && n <= Math.ceil(VOICE_MAX_B * 4 / 3 / VOICE_CHUNK) + 1 && k >= 0 && k < n)) return;
+    var id = m.id.slice(0, 40), v = me.vparts[id];
+    if (!v) {
+      // al massimo qualche vocale a metà alla volta: i pezzi persi non devono riempire la memoria
+      var ks = Object.keys(me.vparts); if (ks.length >= 6) delete me.vparts[ks[0]];
+      v = me.vparts[id] = { n: n, got: {}, cnt: 0, m: m };
+    }
+    if (v.n !== n || v.got[k] != null) return;
+    v.got[k] = m.d.slice(0, VOICE_CHUNK); v.cnt++;
+    heard(me, String(m.uid || '').slice(0, 40), false);
+    if (v.cnt < n) return;
+    delete me.vparts[id];
+    var all = ''; for (var i = 0; i < n; i++) all += v.got[i];
+    try {
+      var bytes = unb64(all); if (bytes.length > VOICE_MAX_B) return;
+      me.voices[id] = URL.createObjectURL(new Blob([bytes], { type: okMime(v.m.mime) }));
+    } catch (e) { return; }
+    var dur = Math.max(1, Math.min(VOICE_MAX_S, Math.round(+v.m.dur || 1)));
+    if (addChat(me, { id: id, uid: v.m.uid, nick: v.m.nick, text: voiceText(dur), ts: +v.m.ts, v: { dur: dur } }, false) && me.isHost) saveChatLog(me);
   }
   function close(opts) {
     if (!T) return;
@@ -1038,14 +1084,15 @@ var Net = (function () {
     Beat.boost(false);
     me.stops.forEach(function (f) { f(); });
     Object.keys(me.pending).forEach(function (k) { clearInterval(me.pending[k].timer); });
-    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'vis', 'react', 'live'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    ['state', 'act', 'ping', 'res/' + uid, 'chat', 'chatlog', 'hb', 'vis', 'react', 'live', 'voice'].forEach(function (t) { me.c.unsubscribe(topic(me.code, t)); });
+    Object.keys(me.voices).forEach(function (k) { try { URL.revokeObjectURL(me.voices[k]); } catch (e) {} });
     me.c.handlers = me.c.handlers.filter(function (h) { return h !== me.handler; });
     me.c.statusHandlers = me.c.statusHandlers.filter(function (h) { return h !== me.statusFn; });
   }
   return {
     create: create, open: open, send: send, newInvite: newInvite, keyFor: keyFor, close: close, hostApply: hostApply, takeHost: takeHost, clearTable: clearTable, closeTable: closeTable, watchLobby: watchLobby, peek: peek,
     setLobbyInfo: function (f) { lobbyInfo = f; },
-    sendChat: sendChat, onChat: function (f) { chatCb = f; }, sendReact: sendReact, onReact: function (f) { reactCb = f; }, sendLive: sendLive, onLive: function (f) { liveCb = f; }, peekAt: peekAt, get prefix() { return PREFIX; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
+    sendChat: sendChat, sendVoice: sendVoice, voiceUrl: function (id) { return T && T.voices[id] || null; }, VOICE_MAX_S: VOICE_MAX_S, onChat: function (f) { chatCb = f; }, sendReact: sendReact, onReact: function (f) { reactCb = f; }, sendLive: sendLive, onLive: function (f) { liveCb = f; }, peekAt: peekAt, get prefix() { return PREFIX; }, chatList: function () { return T ? T.chat.slice() : []; }, get tableCode() { return T ? T.code : null; },
     setReducer: function (f) { reducer = f; },
     setBeforePublish: function (f) { beforePublish = f; },
     setOnTakeover: function (f) { onTakeover = f; },
